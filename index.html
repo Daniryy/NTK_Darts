@@ -268,12 +268,15 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 
 .fgrid { display: grid; gap: 22px; }
 @media (min-width: 960px) { .fgrid { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
-.mc { display: grid; gap: 11px; transition: border-color .15s ease, transform .15s ease; }
-.mc:hover { border-color: var(--line-bright); }
-.mc-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
-.mc-h time { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
-.mc-rows { display: grid; gap: 5px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--surface2) 55%, transparent); cursor: pointer; transition: background .15s ease; }
-.mc-rows:hover { background: var(--surface2); }
+.mc { display: grid; gap: 9px; transition: border-color .15s ease; }
+.mc[role=button] { cursor: pointer; }
+.mc[role=button]:hover { border-color: var(--line-bright); }
+.mc-ctx { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--muted); }
+.mc-ctx span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-ctx .ic { color: var(--green); }
+.mc-h { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.mc-h time { margin-left: auto; flex: none; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.mc-rows { display: grid; gap: 5px; }
 .mr { display: grid; grid-template-columns: minmax(0, 1fr) auto 2.2em; align-items: baseline; gap: 12px; color: var(--muted); }
 .mr .pn, .mr > span:first-child { color: var(--muted); }
 .mr .avg { font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -414,15 +417,30 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .phero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
 .phero h1 { font-family: var(--display); font-size: clamp(26px, 6vw, 38px); text-transform: uppercase; letter-spacing: .02em; line-height: 1.05; }
 .phero .row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; }
-.rbox { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
-.rbox .k { display: grid; gap: 2px; padding: 4px 0; }
-.rbox .big { font-family: var(--display); font-size: 42px; line-height: 1; font-weight: 700; color: var(--fg); }
+.prate { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.prate b { font-family: var(--display); font-size: 30px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pextra { color: var(--muted); font-size: 13.5px; line-height: 1.7; }
+.pextra b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.prw { display: grid; grid-template-columns: 26px 3.4em minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 11px; background: var(--surface); border: 1px solid var(--line); cursor: pointer; font-size: 14px; }
+.prw:hover { border-color: var(--line-bright); }
+.prw .wl { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--surface2); color: var(--muted); font-weight: 700; font-size: 13px; }
+.prw .wl.w { background: color-mix(in srgb, var(--green) 18%, var(--surface2)); color: var(--green); }
+.prw .num { font-size: 18px; font-weight: 600; }
+.prw .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phd { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 12px; border-radius: 12px; background: var(--surface2); }
+.phd .ph { font-weight: 700; font-size: 16px; color: var(--muted); overflow-wrap: anywhere; }
+.phd .ph.w { color: var(--fg); }
+.phd .ph:last-child { text-align: right; }
+.phd .num { font-size: 34px; font-weight: 700; padding: 0 6px; }
+@media (max-width: 959px) { .side .toprate { display: none; } }
+@media (max-width: 479px) { .tbl .av { display: none; } .tbl th, .tbl td { padding: 9px 6px; } }
+@media (max-width: 419px) { .rtbl th:nth-child(5), .rtbl td:nth-child(5) { display: none; } }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; display: grid; gap: 2px; min-width: 0; }
 .tile .v { font-family: var(--display); font-size: 27px; font-weight: 600; line-height: 1.1; }
 .tile .s { color: var(--muted); font-size: 12px; }
 .tile .label { font-size: 11px; }
-@media (min-width: 640px) { .tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .chart { position: relative; height: 200px; user-select: none; }
 .chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ch-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
@@ -1338,19 +1356,17 @@ function highlights(m) {
   m.pl.forEach(l => { if (l.c180) out.push({ txt: '180 ×' + l.c180 + ' · ' + esc(surname(l)), ton80: true }); });
   const best = m.pl.reduce((a, l) => (l.hco || 0) > (a ? a.hco : 0) ? l : a, null);
   if (best && best.hco >= 100) out.push({ txt: 'закрытие ' + best.hco + ' · ' + esc(surname(best)) });
-  m.pl.forEach(l => { if (l.darts && l.pts / l.darts * 3 >= 90) out.push({ txt: 'ср. ' + lAvg(l) + ' · ' + esc(surname(l)) }); });
   return out.slice(0, 3);
 }
 function matchCard(m) {
-  const t = m.tid ? TBY[m.tid] : null;
-  const g = t ? t.games.find(x => x.res && x.res.mid === m.id) : null;
-  const ctx = t ? '<button class="lnk" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + (g ? ' · ' + gameLabel(t, g) : '') + '</button>' : '<span class="muted">Дружеская игра · ' + m.mode + '</span>';
-  let h = '<article class="card mc"><div class="mc-h">' + ctx + '<time>' + ago(m.t) + '</time></div>';
-  h += '<div class="mc-rows" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '" title="Открыть протокол матча">';
-  m.pl.forEach((l, i) => { h += '<div class="mr' + (m.w === i ? ' win' : '') + '">' + pname(l) + '<span class="avg">ср. ' + lAvg(l) + '</span><span class="lg num">' + l.legs + '</span></div>'; });
-  h += '</div><div class="mc-f">' + highlights(m).map(x => '<span class="hl' + (x.ton80 ? ' ton80' : '') + '">' + x.txt + '</span>').join('');
-  h += '<button class="mini" style="margin-left:auto" data-act="minfo" data-v="' + m.id + '">Статистика</button>';
-  return h + '</div></article>';
+  const t = m.tid ? TBY[m.tid] : null, g = t ? t.games.find(x => x.res && x.res.mid === m.id) : null;
+  const ctx = t ? t.name + (g ? ' · ' + gameLabel(t, g) : '') : 'Дружеский · ' + m.mode;
+  let h = '<article class="card mc" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '"><div class="mc-h"><span class="mc-ctx">' + (t ? I.check : '') + '<span>' + esc(ctx) + '</span></span><time>' + ago(m.t) + '</time></div><div class="mc-rows">';
+  m.pl.forEach((l, i) => { h += '<div class="mr' + (m.w === i ? ' win' : '') + '"><span class="pn">' + esc(nameOf(l)) + (l.id && P[l.id] ? '' : ' <span class="muted">(гость)</span>') + '</span><span class="avg">' + (l.darts ? 'ср. ' + lAvg(l) : '') + '</span><span class="lg num">' + l.legs + '</span></div>'; });
+  h += '</div>';
+  const hl = highlights(m);
+  if (hl.length) h += '<div class="mc-f">' + hl.map(x => '<span class="hl' + (x.ton80 ? ' ton80' : '') + '">' + x.txt + '</span>').join('') + '</div>';
+  return h + '</article>';
 }
 function tourEvent(t, c) {
   const fg = finalGame(t), fin = fg && fg.res;
@@ -1376,18 +1392,17 @@ function renderModals() {
     const A = m.pl[0], B = m.pl[1];
     let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true"><div class="ocard">';
     const tg = t ? t.games.find(x => x.res && x.res.mid === m.id) : null;
-    h += '<div class="ohead"><span class="label">' + (t ? esc(t.name) + (tg ? ' · ' + gameLabel(t, tg) : '') : 'Дружеский матч · ' + m.mode) + ' · ' + fmtDate(m.t) + '</span>' + closeBtn + '</div>';
+    const no = tg ? gameNums(t, resolver(t)).get(tg.r + ':' + tg.i) : 0;
+    h += '<div class="ohead"><span class="label">' + (no ? '№' + no + ' · ' : '') + (t ? '<button class="lnk" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + '</button>' + (tg ? ' · ' + gameLabel(t, tg) : '') : 'Дружеский · ' + m.mode) + ' · ' + fmtDate(m.t) + '</span>' + closeBtn + '</div>';
     if (m.pl.length === 2) {
-      h += '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center;padding:12px;border-radius:12px;background:var(--surface2)">';
-      h += '<div style="text-align:left;min-width:0;display:grid;gap:3px"><div style="font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis">' + pname(A) + '</div><span class="meta">' + (m.w === 0 ? 'Победитель' : '') + '</span></div>';
-      h += '<div class="num" style="font-size:34px;font-weight:700;color:var(--green);padding:0 10px">' + A.legs + ' : ' + B.legs + '</div>';
-      h += '<div style="text-align:right;min-width:0;display:grid;gap:3px;justify-items:end"><div style="font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis">' + pname(B) + '</div><span class="meta">' + (m.w === 1 ? 'Победитель' : '') + '</span></div></div>';
+      const ph = (l, i) => '<div class="ph' + (m.w === i ? ' w' : '') + '">' + esc(nameOf(l)) + '</div>';
+      h += '<div class="phd">' + ph(A, 0) + '<div class="num">' + A.legs + ' : ' + B.legs + '</div>' + ph(B, 1) + '</div>';
       const ms = l => ({ ...l, avg: l.darts ? l.pts / l.darts * 3 : null, coa: l.coa || l.coh });
       if (m.pl.every(l => !l.darts)) h += '<div class="note-box">Счёт внесён по легам, без статистики бросков.</div>';
       else h += '<div>' + statRows(ms(A), ms(B)) + '</div>';
     } else {
-      h += '<div class="stats"><table><thead><tr><th>Игрок</th><th>Леги</th><th>Ср.</th><th>Макс.</th><th>180</th></tr></thead><tbody>';
-      m.pl.forEach(p => { h += '<tr><td>' + esc(nameOf(p)) + '</td><td>' + p.legs + '</td><td>' + lAvg(p) + '</td><td>' + (p.hi || '—') + '</td><td>' + p.c180 + '</td></tr>'; });
+      h += '<div class="stats"><table><thead><tr><th>Игрок</th><th>Леги</th><th>Ср.</th><th>Перв. 9</th><th>180</th></tr></thead><tbody>';
+      m.pl.forEach(p => { h += '<tr><td>' + esc(nameOf(p)) + '</td><td>' + p.legs + '</td><td>' + lAvg(p) + '</td><td>' + (p.f9 ? (+p.f9).toFixed(1) : '—') + '</td><td>' + (p.c180 || 0) + '</td></tr>'; });
       h += '</tbody></table></div>';
     }
     if (tg) {
@@ -1483,7 +1498,7 @@ function feedView() {
 function sideView() {
   const top = db.players.filter(p => RANK[p.id]).sort((a, b) => RANK[a.id] - RANK[b.id]).slice(0, 5);
   const reg = db.tournaments.filter(t => tStatus(t) === 'reg').sort((a, b) => a.start - b.start);
-  let h = '<div class="card sec"><div class="tstat"><span class="label">Топ рейтинга</span><button class="lnk meta" data-act="go" data-v="rating">Весь рейтинг</button></div><div>';
+  let h = '<div class="card sec toprate"><div class="tstat"><span class="label">Топ рейтинга</span><button class="lnk meta" data-act="go" data-v="rating">Весь рейтинг</button></div><div>';
   top.forEach(p => { h += '<div class="prow"><span class="rk">' + RANK[p.id] + '</span>' + avatar(p.id) + '<div style="min-width:0;display:grid">' + pid(p.id) + '<span class="meta">' + esc(p.city) + '</span></div><span class="v">' + RATING[p.id].r + '</span></div>'; });
   h += '</div></div>';
   if (reg.length) {
@@ -1803,7 +1818,7 @@ function createTour() {
 }
 
 function ratingView() {
-  const cities = [...new Set(db.players.map(p => p.city))];
+  const cities = [...new Set(db.players.map(p => p.city).filter(Boolean))];
   const sq = (S.rsearch || '').trim().toLowerCase();
   const rows = db.players.filter(p => {
     if (RATING[p.id].n <= 0) return false;
@@ -1814,29 +1829,32 @@ function ratingView() {
       (p.code && p.code.toLowerCase().includes(sq.replace(/^#/, '')));
   }).map(p => {
     const s = pStats(p.id, true);
-    return { p, r: RATING[p.id].r, avg: s.avg || 0, c180: s.c180, n: RATING[p.id].n };
+    return { p, r: RATING[p.id].r, avg: s.avg || 0, n: RATING[p.id].n };
   });
-  const key = S.rtab === 'r' ? 'r' : S.rtab === 'a' ? 'avg' : 'c180';
-  rows.sort((a, b) => b[key] - a[key]);
+  const key = S.rtab === 'a' ? 'avg' : 'r';
+  rows.sort((a, b) => b[key] - a[key] || b.r - a.r);
   let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по турнирным матчам: старт 1500, до ±32 за матч</p></div></div>';
-  h += '<div class="search-row"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее'], ['c', '180']].map(([v, l]) => '<button class="' + (S.rtab === v ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += '<div class="search-row"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее']].map(([v, l]) => '<button class="' + (key === (v === 'a' ? 'avg' : 'r') ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   h += '<input class="inp" id="r-search" data-rsearch="1" placeholder="Поиск игрока" value="' + esc(S.rsearch) + '" aria-label="Поиск игрока"></div>';
-  h += '<div class="fchips">' + [['all', 'Все города']].concat(cities.map(c => [c, c])).map(([v, l]) => '<button class="fchip' + (S.rcity === v ? ' on' : '') + '" data-act="rcity" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>';
-  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl"><thead><tr><th>#</th><th>Игрок</th><th>' + (key === 'r' ? 'Рейтинг' : key === 'avg' ? 'Среднее' : '180') + '</th><th>Матчей</th></tr></thead><tbody>';
-  if (!rows.length) {
-    h += '<tr><td colspan="4" class="meta" style="text-align:center;padding:18px">Игроки по запросу не найдены.</td></tr>';
-  } else {
-    rows.forEach((x, i) => {
-      const v = key === 'r' ? x.r : key === 'avg' ? x.avg.toFixed(1) : x.c180;
-      h += '<tr class="' + (x.p.id === 'me' ? 'me' : '') + '"><td class="num">' + (i + 1) + '</td><td><div class="who">' + avatar(x.p.id) + '<div>' + pid(x.p.id) + '<span class="meta">' + esc(x.p.city) + '</span></div></div></td><td class="num" style="font-size:18px">' + v + '</td><td>' + x.n + '</td></tr>';
-    });
-  }
+  if (cities.length > 1) h += '<div class="fchips">' + [['all', 'Все города']].concat(cities.map(c => [c, c])).map(([v, l]) => '<button class="fchip' + (S.rcity === v ? ' on' : '') + '" data-act="rcity" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>';
+  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl rtbl"><thead><tr><th>№</th><th>Игрок</th><th>Рейтинг</th><th>Ср.</th><th>Матчей</th></tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="5" class="meta" style="text-align:center;padding:18px">Игроки не найдены.</td></tr>';
+  rows.forEach((x, i) => {
+    h += '<tr class="' + (x.p.id === 'me' ? 'me' : '') + '"><td>' + (i < 3 ? plcBadge(i + 1, i + 1, true) : '<span class="num muted">' + (i + 1) + '</span>') + '</td><td><div class="who">' + avatar(x.p.id) + '<div>' + pid(x.p.id) + '<span class="meta">' + esc(x.p.city) + '</span></div></div></td><td class="num" style="font-size:18px' + (key === 'r' ? ';font-weight:600' : '') + '">' + x.r + '</td><td class="num"' + (key === 'avg' ? ' style="font-weight:600"' : '') + '>' + (x.avg ? x.avg.toFixed(1) : '—') + '</td><td>' + x.n + '</td></tr>';
+  });
   h += '</tbody></table></div>';
   if (!RATING.me.n) h += '<p class="meta">Сыграйте турнир, чтобы попасть в рейтинг.</p>';
   return h;
 }
 
 let CHART = null;
+function placeBadge(t, id) {
+  const st = tStatus(t);
+  if (st === 'reg') return '<span class="meta">записан</span>';
+  if (t.format === 'rr') { const i = standings(t).findIndex(x => x.id === id) + 1; return plcBadge(i, i, st === 'done'); }
+  const rg = placeRange(t, id);
+  return rg ? plcBadge(rg[0], rg[1], rg[0] === rg[1] || st === 'done' || (t.format === 'ko' && rg[0] > 1)) : '';
+}
 function profileView(id) {
   const p = P[id];
   if (!p) return '<div class="note-box">Игрок не найден.</div>';
@@ -1850,24 +1868,32 @@ function profileView(id) {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
   if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
+  if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
-  h += '<div class="card rbox"><div class="k"><span class="label">Рейтинг</span><span class="big">' + (RATING[id].n ? RATING[id].r : '—') + '</span><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + '</span></div><div class="k"><span class="label">Матчи</span><span class="big">' + all.n + '</span><span class="meta">' + (all.n ? Math.round(all.w / all.n * 100) + '% побед' : 'пока нет') + '</span></div><div class="k"><span class="label">Среднее</span><span class="big">' + (all.avg ? all.avg.toFixed(1) : '—') + '</span><span class="meta">за 3 дротика</span></div></div>';
-  h += '<div class="seg2">' + [['all', 'Все'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   if (!s.n) {
     h += '<div class="note-box">' + (S.pf === 'off' ? 'Турнирных матчей пока нет.' : 'Матчей пока нет.') + '</div>';
   } else {
     const t = (l, v, sub) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span>' + (sub ? '<span class="s">' + sub + '</span>' : '') + '</div>';
-    h += '<div class="tiles">' + t('Среднее', s.avg ? s.avg.toFixed(1) : '—', 'за 3 дротика') + t('Первые 9', s.f9 ? s.f9.toFixed(1) : '—', 'среднее') + t('Закрытия', s.coa ? Math.round(s.coh / s.coa * 100) + '%' : '—', s.coh + ' из ' + s.coa) + t('Лучший лег', s.bl ? s.bl : '—', s.bl ? 'дротиков, 501' : 'в 501 нет побед') + t('Макс. закрытие', s.hco || '—', '') + t('180', s.c180, '') + t('140+', s.c140, '') + t('100+', s.c100, '') + t('Макс. подход', s.hi || '—', '') + t('Победы', s.w + '/' + s.n, Math.round(s.w / s.n * 100) + '%') + '</div>';
+    const bd = bands(s);
+    h += '<div class="tiles">' + t('Среднее', s.avg ? s.avg.toFixed(1) : '—', 'за 3 дротика') + t('Первые 9', s.f9 ? s.f9.toFixed(1) : '—', 'среднее') + t('Закрытия', s.coa ? Math.round(s.coh / s.coa * 100) + '%' : '—', s.coa ? s.coh + ' из ' + s.coa : '') + t('Лучший лег', s.bl ? s.bl + ' др.' : '—', '501') + '</div>';
+    h += '<div class="pextra">180: <b>' + bd.t180 + '</b> · 140+: <b>' + bd.t140 + '</b> · 100+: <b>' + bd.t100 + '</b> · Макс. закрытие: <b>' + (s.hco || '—') + '</b> · Победы: <b>' + s.w + ' из ' + s.n + '</b></div>';
     const pts = s.ms.filter(m => m.pl.some(l => l.id === id && l.darts > 0)).slice(0, 20).reverse().map(m => { const i = m.pl.findIndex(l => l.id === id); const l = m.pl[i]; return { v: l.pts / l.darts * 3, t: m.t, opp: m.pl.filter((x, j) => j !== i).map(nameOf).join(', '), w: m.w === i }; });
     CHART = pts.length >= 2 ? pts : null;
     if (CHART) h += '<div class="card sec"><div class="tstat"><span class="label">Среднее за последние ' + pts.length + ' ' + pl(pts.length, 'матч', 'матча', 'матчей') + '</span></div><div class="chart" id="chart" role="img" aria-label="График среднего набора по матчам"></div></div>';
   }
   h += '<div class="pgrid"><div class="sec"><span class="label">Последние матчи</span><div class="list">';
   const shown = S.pMore ? s.ms : s.ms.slice(0, 6);
-  h += shown.length ? shown.map(matchCard).join('') : '<div class="note-box">Нет матчей.</div>';
+  const mrow = m => {
+    const i = m.pl.findIndex(l => l.id === id), me = m.pl[i], opp = m.pl.filter((x, j) => j !== i), won = m.w === i;
+    const t = m.tid ? TBY[m.tid] : null, g = t ? t.games.find(x => x.res && x.res.mid === m.id) : null;
+    const ctx = (t ? t.name + (g ? ' · ' + gameLabel(t, g) : '') : 'Дружеский · ' + m.mode) + ' · ' + fmtDate(m.t);
+    return '<div class="prw" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '"><span class="wl' + (won ? ' w' : '') + '">' + (won ? 'В' : 'П') + '</span><span class="num">' + [me].concat(opp).map(l => l.legs).join(':') + '</span><div style="display:grid;min-width:0"><span class="ell">' + esc(opp.map(nameOf).join(', ')) + '</span><span class="meta ell">' + esc(ctx) + '</span></div><span class="meta">' + (me.darts ? 'ср. ' + lAvg(me) : '') + '</span></div>';
+  };
+  h += shown.length ? shown.map(mrow).join('') : '<div class="note-box">Нет матчей.</div>';
   h += '</div>' + (!S.pMore && s.ms.length > 6 ? '<button class="ghost more" data-act="pmore">Показать все ' + s.ms.length + '</button>' : '') + '</div>';
   const tours = db.tournaments.filter(t => t.players.includes(id)).sort((a, b) => b.start - a.start);
-  h += '<div class="sec"><span class="label">Турниры</span>' + (tours.length ? '<div class="list">' + tours.map(t => '<div class="trow"><div style="display:grid;min-width:0"><button class="lnk" data-act="go" data-v="t.' + t.id + '" style="text-align:left">' + esc(t.name) + '</button><span class="meta">' + fmtDate(t.start) + '</span></div><span class="r">' + (tStatus(t) === 'reg' ? 'записан' : placeOf(t, id)) + '</span></div>').join('') + '</div>' : '<div class="note-box">Турниров пока нет.</div>');
+  h += '<div class="sec"><span class="label">Турниры</span>' + (tours.length ? '<div class="list">' + tours.map(t => '<div class="trow"><div style="display:grid;min-width:0"><button class="lnk" data-act="go" data-v="t.' + t.id + '" style="text-align:left">' + esc(t.name) + '</button><span class="meta">' + fmtDate(t.start) + '</span></div>' + placeBadge(t, id) + '</div>').join('') + '</div>' : '<div class="note-box">Турниров пока нет.</div>');
   h += '</div></div>';
   return h;
 }
