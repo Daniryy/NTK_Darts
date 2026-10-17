@@ -598,6 +598,14 @@ body.ingame .tabs, body.ingame .top-wrap { display: none; }
 .fmt b { font-weight: 600; }
 .fmt span { color: var(--muted); font-size: 13px; }
 .pick[hidden] { display: none; }
+.selchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.selchip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px 5px 5px; border-radius: 999px; border: 1.5px solid var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface2)); font-size: 13.5px; font-weight: 500; max-width: 100%; }
+.selchip b { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 999px; background: var(--surface); font-family: var(--display); font-size: 12px; font-weight: 600; }
+.selchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selchip i { font-style: normal; color: var(--muted); font-size: 17px; line-height: 1; }
+.addp { justify-self: start; }
+.nt-foot { display: grid; gap: 10px; }
+@media (max-width: 899px) { .nt-foot { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 5; background: var(--surface); padding-top: 10px; box-shadow: 0 -12px 14px -12px rgba(0, 0, 0, .45); } }
 .note-box.warn { border-color: color-mix(in srgb, var(--red) 55%, transparent); color: var(--fg); }
 .ttabs { justify-self: stretch; }
 @media (max-width: 899px) { .ttabs { position: sticky; top: var(--top-h); z-index: 9; } .bsec { scroll-margin-top: calc(var(--top-h) + 64px); } }
@@ -1735,50 +1743,48 @@ function shuffle(a) {
 }
 function ntSummary(nt) {
   const n = nt.sel.length, br = nt.fmt !== 'rr', max = br ? BR_MAX : RR_MAX;
-  if (n < 3) return { ok: false, txt: 'Выберите минимум 3 участника.' };
-  if (n > max) return { ok: false, txt: 'Для этого формата максимум ' + max + ' участников, выбрано ' + n + '.' };
-  if (!br) {
-    const rounds = n % 2 ? n : n - 1, games = n * (n - 1) / 2;
-    return { ok: true, txt: n + ' ' + pl(n, 'участник', 'участника', 'участников') + ' · ' + rounds + ' ' + pl(rounds, 'тур', 'тура', 'туров') + ' · ' + games + ' ' + pl(games, 'матч', 'матча', 'матчей') + '. Каждый сыграет ' + (n - 1) + ' ' + pl(n - 1, 'матч', 'матча', 'матчей') + '.' };
-  }
+  const cnt = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
+  if (n < 3) return { ok: false, txt: 'Выберите минимум 3 участника' };
+  if (n > max) return { ok: false, txt: 'Для этого формата максимум ' + max + ' участников' };
+  if (!br) { const rounds = n % 2 ? n : n - 1; return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), cnt(rounds, 'тур', 'тура', 'туров'), cnt(n * (n - 1) / 2, 'матч', 'матча', 'матчей')].join(' · ') }; }
   const tmp = {};
   setBracket(tmp, nt.fmt, nt.sel);
-  const size = bSize(tmp), R = bRounds(tmp), games = tProgress(tmp).total;
-  let txt = n + ' ' + pl(n, 'участник', 'участника', 'участников') + ' · ' + R + ' ' + pl(R, 'круг', 'круга', 'кругов') + ' · ' + games + ' ' + pl(games, 'матч', 'матча', 'матчей') + '. ';
-  txt += nt.fmt === 'pl' ? 'Разыгрываются все места с 1-го по ' + n + '-е.' : 'Проигравший выбывает.';
-  if (size > n) txt += ' Сетка на ' + size + ': ' + (size - n) + ' ' + pl(size - n, 'свободное место', 'свободных места', 'свободных мест') + ', ' + (nt.seed === 'x' ? 'по жеребьёвке' : 'сильнейшие по рейтингу') + ' пропускают первый круг.';
-  return { ok: true, txt };
+  const size = bSize(tmp), parts = [cnt(n, 'участник', 'участника', 'участников'), cnt(bRounds(tmp), 'круг', 'круга', 'кругов'), cnt(tProgress(tmp).total, 'матч', 'матча', 'матчей')];
+  if (size > n) parts.push(cnt(size - n, 'свободное место', 'свободных места', 'свободных мест'));
+  return { ok: true, txt: parts.join(' · ') };
 }
+const ntExact = q => !!q && db.players.some(p => p.name.toLowerCase() === q.toLowerCase());
 function newTourView() {
-  const nt = S.nt || (S.nt = { name: 'Мой турнир', city: P.me.city, fmt: 'pl', mode: 501, ltw: 2, seed: 'r', sel: ['me', 'p6', 'p9', 'p12'], q: '', err: '' });
+  const nt = S.nt || (S.nt = { name: 'Мой турнир', city: P.me.city, venue: P.me.club || '', fmt: 'pl', mode: 501, ltw: 2, seed: 'r', sel: [], q: '', err: '' });
+  if (nt.venue == null) nt.venue = '';
   nt.sel = nt.sel.filter(id => P[id]);
   let h = '<button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button><div class="narrow"><h1 class="h1">Новый турнир</h1><div class="panel">';
   h += '<div class="field"><label class="label" for="nt-name">Название</label><input class="inp" id="nt-name" data-nt="name" maxlength="60" value="' + esc(nt.name) + '"></div>';
-  h += '<div class="field"><label class="label" for="nt-city">Город</label><input class="inp" id="nt-city" data-nt="city" maxlength="40" value="' + esc(nt.city) + '"></div>';
+  h += '<div class="field"><label class="label" for="nt-venue">Место проведения</label><input class="inp" id="nt-venue" data-nt="venue" maxlength="60" value="' + esc(nt.venue) + '" placeholder="Клуб или бар"></div>';
   const FMTS = [
-    ['pl', 'С розыгрышем всех мест', 'Никто не выбывает: проигравшие играют с проигравшими, определяются все места.'],
-    ['ko', 'Олимпийская система', 'На вылет: проигравший выбывает, до финала.'],
-    ['rr', 'Круговая система', 'Каждый с каждым, места — по таблице (до ' + RR_MAX + ' участников).']
+    ['pl', 'С розыгрышем всех мест', 'Проигравшие играют с проигравшими — определяются все места.'],
+    ['ko', 'Олимпийская система', 'На вылет: проигравший выбывает.'],
+    ['rr', 'Круговая система', 'Каждый с каждым, до ' + RR_MAX + ' участников.']
   ];
   h += '<div class="field"><span class="label">Формат</span><div class="fmts" role="radiogroup">' + FMTS.map(([v, l, d]) => '<button class="fmt' + (nt.fmt === v ? ' on' : '') + '" role="radio" aria-checked="' + (nt.fmt === v) + '" data-act="nt-fmt" data-v="' + v + '"><b>' + l + '</b><span>' + d + '</span></button>').join('') + '</div></div>';
   h += '<div class="field"><span class="label">Очки</span><div class="chips">' + chips([301, 501, 701], nt.mode, 'nt-mode') + '</div></div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4, 5], nt.ltw, 'nt-ltw') + '</div></div>';
   if (nt.fmt !== 'rr') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
-  const q = nt.q.trim().toLowerCase();
-  h += '<div class="field"><span class="label">Участники · выбрано ' + nt.sel.length + '</span>';
-  h += '<div class="nrow"><input class="inp" id="nt-newp" maxlength="32" placeholder="Новый игрок: имя и фамилия" aria-label="Имя нового игрока"><button class="mini go" data-act="nt-addp" style="flex:none">' + I.plus + 'Добавить</button></div>';
-  h += '<div class="nrow"><input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Поиск игрока" aria-label="Поиск игрока">' + (nt.sel.length ? '<button class="mini" data-act="nt-clear" style="flex:none">Снять всех</button>' : '') + '</div>';
-  h += '<div class="picks">';
+  const sel = nt.fmt !== 'rr' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
+  h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
+  if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
+  const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
+  h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока" aria-label="Найти или добавить игрока" autocomplete="off">';
+  h += '<button class="ghost addp" id="nt-add" data-act="nt-addp"' + (raw && !ntExact(raw) ? '' : ' hidden') + '>+ Добавить «' + esc(raw) + '»</button>';
   const order = p => p.id === 'me' ? 0 : /^x/.test(p.id) ? 1 : 2;
-  db.players.slice().sort((a, b) => order(a) - order(b) || rt(b.id) - rt(a.id)).forEach(p => {
-    const on = nt.sel.includes(p.id), key = (p.name + ' @' + p.handle + ' ' + p.code).toLowerCase();
-    h += '<button class="pick' + (on ? ' on' : '') + '" data-act="nt-p" data-v="' + p.id + '" data-key="' + esc(key) + '" aria-pressed="' + on + '"' + (q && !key.includes(q.replace(/^@/, '')) ? ' hidden' : '') + '>' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span></span></button>';
-  });
-  h += '</div></div>';
+  h += '<div class="picks">' + db.players.filter(p => !nt.sel.includes(p.id)).sort((a, b) => order(a) - order(b) || rt(b.id) - rt(a.id)).map(p => {
+    const key = (p.name + ' @' + p.handle + ' ' + p.code).toLowerCase();
+    return '<button class="pick" data-act="nt-p" data-v="' + p.id + '" data-key="' + esc(key) + '"' + (q && !key.includes(q) ? ' hidden' : '') + '>' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc([p.city, p.club].filter(Boolean).join(' · ')) + '</span></span></button>';
+  }).join('') + '</div></div>';
   const sm = ntSummary(nt);
-  h += '<div class="note-box' + (sm.ok ? '' : ' warn') + '">' + esc(sm.txt) + '</div>';
+  h += '<div class="nt-foot"><span class="meta"' + (sm.ok ? '' : ' style="color:var(--red)"') + '>' + esc(sm.txt) + '</span>';
   if (nt.err) h += '<div class="err">' + esc(nt.err) + '</div>';
-  h += '<button class="btn" data-act="nt-create"' + (!sm.ok ? ' disabled' : '') + '>Создать турнир</button></div></div>';
+  h += '<button class="btn" data-act="nt-create"' + (!sm.ok ? ' disabled' : '') + '>Создать турнир</button></div></div></div>';
   return h;
 }
 function createTour() {
@@ -1787,7 +1793,7 @@ function createTour() {
   const ids = nt.sel.filter(id => P[id]), sm = ntSummary(nt);
   if (!nt.name.trim()) { nt.err = 'Введите название турнира.'; return render(); }
   if (!sm.ok) { nt.err = sm.txt; return render(); }
-  const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: P.me.name, ver: false }, city: nt.city.trim() || '—', venue: 'место уточняется', start: Date.now(), dbl: true, mode: nt.mode, ltw: nt.ltw, status: null, cap: ids.length, format: nt.fmt, players: [], games: [] };
+  const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: P.me.name, ver: false }, city: (nt.city || P.me.city || '').trim() || '—', venue: (nt.venue || '').trim(), start: Date.now(), dbl: true, mode: nt.mode, ltw: nt.ltw, status: null, cap: ids.length, format: nt.fmt, players: [], games: [] };
   const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
   if (nt.fmt === 'rr') { t.players = order; t.games = rrGames(order); }
   else setBracket(t, nt.fmt, order);
@@ -1936,12 +1942,6 @@ function playView() {
     h += S.confirmDrop ? '<button class="ghost dng" data-act="drop-yes">Удалить</button><button class="ghost" data-act="drop-no">Нет</button>' : '<button class="ghost" data-act="drop">Удалить</button><button class="btn sm" data-act="cont">Продолжить</button>';
     h += '</div></div>';
   }
-  const mine = myTourGames();
-  if (mine.length) {
-    h += '<div class="sec"><span class="label">Ваши матчи в турнирах</span><div class="list">';
-    mine.forEach(x => { h += '<div class="trow"><div style="display:grid;min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>против</span>' + pid(x.opp) + '</div><span class="meta">' + esc(x.t.name) + ' · ' + gameLabel(x.t, x.g) + '</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">' + gameActs(x.t, x.g, 'ready', true) + '</div></div>'; });
-    h += '</div></div>';
-  }
   h += '<div class="panel"><span class="h2">Дружеский матч</span>';
   h += '<div class="field"><span class="label">Игроки</span><div class="names">';
   su.names.forEach((n, i) => {
@@ -1954,8 +1954,14 @@ function playView() {
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4], su.legsToWin, 'legs') + '</div></div>';
   h += '<div class="field"><span class="label">Закрытие</span><div class="chips"><button class="chip txt ' + (su.dbl ? 'on' : '') + '" data-act="dbl" data-v="1">Через дубль</button><button class="chip txt ' + (!su.dbl ? 'on' : '') + '" data-act="dbl" data-v="0">Любым броском</button></div></div>';
   if (S.setupNote) h += '<div class="err">' + esc(S.setupNote) + '</div>';
-  h += '<button class="btn" data-act="start">Начать игру</button></div></div>';
-  return h;
+  h += '<button class="btn" data-act="start">Начать игру</button></div>';
+  const mine = myTourGames();
+  if (mine.length) {
+    h += '<div class="sec"><span class="label">Ваши матчи в турнирах</span><div class="list">';
+    mine.forEach(x => { h += '<div class="trow"><div style="display:grid;min-width:0"><b>' + esc(P[x.opp] ? P[x.opp].name : '—') + '</b><span class="meta">' + esc(x.t.name) + ' · ' + gameLabel(x.t, x.g) + '</span></div><div class="gacts">' + gameActs(x.t, x.g, 'ready', true) + '</div></div>'; });
+    h += '</div></div>';
+  }
+  return h + '</div>';
 }
 
 function newGame(list, o, ctx, starter) {
@@ -2397,7 +2403,7 @@ document.addEventListener('click', e => {
       const k = S.nt.sel.indexOf(v);
       if (k >= 0) S.nt.sel.splice(k, 1);
       else if (S.nt.sel.length >= BR_MAX) toast('Максимум ' + BR_MAX + ' участника.');
-      else S.nt.sel.push(v);
+      else { S.nt.sel.push(v); S.nt.q = ''; }
       S.nt.err = ''; render(); break;
     }
     case 'nt-clear': S.nt.sel = []; S.nt.err = ''; render(); break;
@@ -2470,9 +2476,11 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.ntq && S.nt) {
     // без render(), чтобы не терять фокус
     S.nt.q = t.value;
-    const q = t.value.trim().toLowerCase().replace(/^@/, '');
+    const raw = t.value.trim(), q = raw.toLowerCase().replace(/^@/, ''), add = $('nt-add');
     document.querySelectorAll('.pick[data-key]').forEach(b => { b.hidden = !!q && !b.dataset.key.includes(q); });
+    if (add) { add.hidden = !raw || ntExact(raw); add.textContent = '+ Добавить «' + raw + '»'; }
   }
+
   if (t.dataset && t.dataset.rsearch) {
     S.rsearch = t.value;
     const pos = t.selectionStart;
@@ -2485,7 +2493,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && anyModal()) { closeModals(); render(); return; }
   const t = e.target;
   const inInput = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
-  if (e.key === 'Enter' && t && t.id === 'nt-newp') { e.preventDefault(); addNtPlayer(); return; }
+  if (e.key === 'Enter' && t && t.id === 'nt-q') {
+    e.preventDefault();
+    const vis = [...document.querySelectorAll('.pick[data-key]:not([hidden])')];
+    if (t.value.trim() && vis.length === 1) { vis[0].click(); const ne = $('nt-q'); if (ne) ne.focus(); }
+    else if (t.value.trim() && !vis.length) addNtPlayer();
+    return;
+  }
   if (e.key === 'Enter' && t && /^me-/.test(t.id)) { const sb = $('app').querySelector('[data-act="savename"]'); if (sb) sb.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button') { e.preventDefault(); t.click(); return; }
 
@@ -2508,19 +2522,19 @@ document.addEventListener('keydown', e => {
 });
 
 function addNtPlayer() {
-  const el = $('nt-newp'), nt = S.nt;
+  const el = $('nt-q'), nt = S.nt;
   if (!el || !nt) return;
   const name = el.value.trim().replace(/\s+/g, ' ');
   if (!name) { el.focus(); return; }
-  const existed = db.players.some(p => p.name.toLowerCase() === name.toLowerCase());
-  const p = addLocalPlayer(name, nt.city.trim());
+  const existed = ntExact(name);
+  const p = addLocalPlayer(name, (nt.city || '').trim());
   if (!p) return;
   if (nt.sel.includes(p.id)) toast(p.name + ' уже в списке участников.');
   else if (nt.sel.length >= BR_MAX) toast('Максимум ' + BR_MAX + ' участника.');
-  else { nt.sel.push(p.id); toast(existed ? p.name + ' есть в базе — добавлен в турнир.' : 'Игрок ' + p.name + ' создан и добавлен в турнир.'); }
-  nt.err = '';
+  else { nt.sel.push(p.id); toast(existed ? p.name + ' добавлен в турнир.' : 'Новый игрок ' + p.name + ' добавлен в турнир.'); }
+  nt.q = ''; nt.err = '';
   render();
-  const ne = $('nt-newp');
+  const ne = $('nt-q');
   if (ne) ne.focus();
 }
 
