@@ -73,6 +73,82 @@
   --brass-glow: rgba(222, 185, 98, 0.2);
   --brass-ink: #1e1705;
 }
+:root[data-palette="ruby"] {
+  --bg: #120d10;
+  --bg-grad: radial-gradient(1200px 600px at 50% -10%, rgba(251, 113, 133, 0.16), rgba(251, 146, 60, 0.06) 55%, transparent 75%);
+  --surface: #1b1318;
+  --surface2: #261b22;
+  --surface3: #35252f;
+  --line: #36242e;
+  --line-bright: #543747;
+  --fg: #f9eff2;
+  --muted: #ad96a1;
+  --green: #fb7185;
+  --green-glow: rgba(251, 113, 133, 0.25);
+  --green-ink: #2a0610;
+  --red: #fb923c;
+  --red-glow: rgba(251, 146, 60, 0.2);
+  --brass: #facc15;
+  --brass-glow: rgba(250, 204, 21, 0.2);
+  --brass-ink: #1f1702;
+}
+:root[data-palette="violet"] {
+  --bg: #100c1a;
+  --bg-grad: radial-gradient(1200px 600px at 50% -10%, rgba(167, 139, 250, 0.18), rgba(236, 72, 153, 0.07) 55%, transparent 75%);
+  --surface: #181326;
+  --surface2: #221b36;
+  --surface3: #2f254a;
+  --line: #31274c;
+  --line-bright: #4b3b73;
+  --fg: #f3effb;
+  --muted: #a39ac0;
+  --green: #a78bfa;
+  --green-glow: rgba(167, 139, 250, 0.26);
+  --green-ink: #140b2e;
+  --red: #fb7185;
+  --red-glow: rgba(251, 113, 133, 0.2);
+  --brass: #2dd4bf;
+  --brass-glow: rgba(45, 212, 191, 0.2);
+  --brass-ink: #031c18;
+}
+:root[data-palette="copper"] {
+  --bg: #130f0d;
+  --bg-grad: radial-gradient(1200px 600px at 50% -10%, rgba(251, 146, 60, 0.16), rgba(217, 119, 6, 0.07) 55%, transparent 75%);
+  --surface: #1c1613;
+  --surface2: #271f1b;
+  --surface3: #362b25;
+  --line: #382c26;
+  --line-bright: #544238;
+  --fg: #f7efe8;
+  --muted: #ab9b91;
+  --green: #fb923c;
+  --green-glow: rgba(251, 146, 60, 0.25);
+  --green-ink: #1f0d02;
+  --red: #f87171;
+  --red-glow: rgba(248, 113, 113, 0.2);
+  --brass: #facc15;
+  --brass-glow: rgba(250, 204, 21, 0.2);
+  --brass-ink: #1f1702;
+}
+:root[data-palette="graphite"] {
+  --bg: #0b0c0f;
+  --bg-grad: radial-gradient(1200px 600px at 50% -10%, rgba(229, 231, 235, 0.07), transparent 70%);
+  --surface: #15171c;
+  --surface2: #1d2027;
+  --surface3: #272b34;
+  --line: #2a2e37;
+  --line-bright: #3f4450;
+  --fg: #f3f4f6;
+  --muted: #9aa1ad;
+  --green: #e5e7eb;
+  --green-glow: rgba(229, 231, 235, 0.16);
+  --green-ink: #0b0c0f;
+  --red: #f87171;
+  --red-glow: rgba(248, 113, 113, 0.2);
+  --brass: #fbbf24;
+  --brass-glow: rgba(251, 191, 36, 0.2);
+  --brass-ink: #1c1302;
+}
 
 :root[data-theme="light"] {
   --bg: #f1f3f7;
@@ -120,6 +196,38 @@
   --brass: #8c6a10;
   --brass-glow: rgba(140, 106, 16, 0.16);
   --brass-ink: #fdf8e8;
+}
+:root[data-theme="light"][data-palette="ruby"] {
+  --green: #be123c;
+  --green-glow: rgba(190, 18, 60, 0.16);
+  --green-ink: #ffffff;
+  --brass: #a16207;
+  --brass-glow: rgba(161, 98, 7, 0.14);
+  --brass-ink: #ffffff;
+}
+:root[data-theme="light"][data-palette="violet"] {
+  --green: #6d28d9;
+  --green-glow: rgba(109, 40, 217, 0.16);
+  --green-ink: #ffffff;
+  --brass: #0f766e;
+  --brass-glow: rgba(15, 118, 110, 0.14);
+  --brass-ink: #ffffff;
+}
+:root[data-theme="light"][data-palette="copper"] {
+  --green: #c2410c;
+  --green-glow: rgba(194, 65, 12, 0.16);
+  --green-ink: #ffffff;
+  --brass: #a16207;
+  --brass-glow: rgba(161, 98, 7, 0.14);
+  --brass-ink: #ffffff;
+}
+:root[data-theme="light"][data-palette="graphite"] {
+  --green: #111827;
+  --green-glow: rgba(17, 24, 39, 0.14);
+  --green-ink: #ffffff;
+  --brass: #b45309;
+  --brass-glow: rgba(180, 83, 9, 0.14);
+  --brass-ink: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -628,7 +736,7 @@ body.ingame .tabs, body.ingame .top-wrap { display: none; }
 .ttabs { justify-self: stretch; }
 @media (max-width: 899px) { .ttabs { position: sticky; top: var(--top-h); z-index: 9; } .bsec { scroll-margin-top: calc(var(--top-h) + 64px); } }
 .ttabs button { flex: 1; text-align: center; }
-.sws { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sws { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px 8px; }
 .sw { display: grid; justify-items: center; gap: 7px; padding: 6px 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--muted); }
 .sw i { width: 40px; height: 40px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent); }
 .sw:hover { color: var(--fg); }
@@ -812,7 +920,11 @@ const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16
 const PALETTES = [
   { id: 'amber', name: 'Янтарь', acc: ['#f59e0b', '#b45309'] },
   { id: 'sapphire', name: 'Сапфир', acc: ['#38bdf8', '#0369a1'] },
-  { id: 'emerald', name: 'Сукно', acc: ['#38b26f', '#1b7444'] }
+  { id: 'emerald', name: 'Сукно', acc: ['#38b26f', '#1b7444'] },
+  { id: 'ruby', name: 'Рубин', acc: ['#fb7185', '#be123c'] },
+  { id: 'violet', name: 'Аметист', acc: ['#a78bfa', '#6d28d9'] },
+  { id: 'copper', name: 'Медь', acc: ['#fb923c', '#c2410c'] },
+  { id: 'graphite', name: 'Графит', acc: ['#e5e7eb', '#111827'] }
 ];
 
 const SEED_PLAYERS = [
@@ -2389,6 +2501,8 @@ document.addEventListener('click', e => {
       render();
       break;
     }
+    case 'close-modal': closeModals(); render(); break;
+    case 'qm-save': saveQuickTourScore(); break;
     case 'qm-pick': {
       if (!S.quickModal) break;
       const [x, y] = v.split('|').map(Number);
