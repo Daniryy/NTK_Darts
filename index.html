@@ -424,82 +424,95 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .trow .r { color: var(--fg); font-weight: 600; white-space: nowrap; }
 
 .game { display: grid; gap: 10px; }
-@media (min-width: 820px) {
+@media (min-width: 700px) and (min-aspect-ratio: 1/1) {
   .game {
-    grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.12fr);
+    grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.12fr);
     grid-template-areas:
       "head pad"
       "players pad"
       "stats pad";
+    grid-template-rows: auto auto 1fr;
     align-items: start;
-    gap: 16px;
+    gap: 10px 16px;
   }
   .g-head-area { grid-area: head; }
   .g-players-area { grid-area: players; }
-  .g-pad-area { grid-area: pad; position: sticky; top: 76px; }
+  .g-pad-area { grid-area: pad; position: sticky; top: 8px; }
   .g-stats-area { grid-area: stats; }
 }
 .col { display: grid; gap: 10px; min-width: 0; }
-@media (min-width: 820px) { .col { gap: 14px; } }
-.ghead { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); padding: 9px 13px; border-radius: 12px; }
+.ghead { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); padding: 6px 6px 6px 13px; border-radius: 12px; }
 .ghead-acts { display: flex; gap: 6px; align-items: center; flex: none; }
-body.ingame { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
-body.ingame .tabs { display: none; }
-@media (max-width: 819px) {
-  body.ingame .top-wrap { display: none; }
-  body.ingame { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
-}
+.gh-t { display: grid; min-width: 0; font-size: 14px; line-height: 1.3; }
+.gh-t > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-t b { font-weight: 600; }
+.gh-t span { color: var(--muted); font-size: 12.5px; }
+body.ingame { padding-top: max(8px, env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+body.ingame .tabs, body.ingame .top-wrap { display: none; }
 .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .players { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; } }
-.pl { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; position: relative; overflow: hidden; transition: border-color .2s ease, box-shadow .2s ease; }
+.players.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.swap { justify-self: start; }
+.pl { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; position: relative; overflow: hidden; transition: border-color .2s ease, box-shadow .2s ease; }
 @media (min-width: 820px) { .pl { padding: 14px 16px; gap: 4px; border-radius: 14px; } }
-.pl.act { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green), 0 4px 16px var(--green-glow); }
-.pl .nm { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
-.pl .nm span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pl .legs { color: var(--fg); font-family: var(--display); font-size: 16px; padding: 1px 7px; border-radius: 6px; background: var(--surface2); flex: none; }
-.pl .big { font-size: clamp(36px, 8vw, 56px); line-height: 1; font-weight: 700; letter-spacing: .01em; margin-block: 2px; }
+.pl.act { border-color: var(--green); box-shadow: inset 4px 0 0 var(--green); }
+.pl .nm { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+.pl .nm .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl .nm .st { font-size: 8px; color: var(--fg); flex: none; }
+.pl .legs { color: var(--fg); background: var(--surface2); font-family: var(--display); font-size: 22px; line-height: 1.2; padding: 0 8px; border-radius: 7px; flex: none; }
+.pl .big { font-size: clamp(36px, 8vw, 56px); line-height: 1; font-weight: 700; letter-spacing: .01em; margin-block: 2px; color: color-mix(in srgb, var(--fg) 70%, var(--surface)); }
+.players.two .big { font-size: clamp(56px, 16vw, 76px); }
 .pl.act .big { color: var(--green); }
 .pl .sub { display: flex; justify-content: space-between; gap: 6px; color: var(--muted); font-size: 11.5px; margin-top: 1px; white-space: nowrap; }
-.pl .co-chip { font-family: var(--display); font-size: 12.5px; color: var(--brass); letter-spacing: .03em; min-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl .co-chip { font-family: var(--display); font-size: 18px; line-height: 1.25; color: var(--brass); letter-spacing: .03em; min-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 820px) {
+  .pl .legs { font-size: 30px; }
+  .players.two .big { font-size: clamp(84px, 9vw, 136px); }
+  .pl .co-chip { font-size: 22px; min-height: 28px; }
+}
 
-.visit { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; display: grid; gap: 9px; box-shadow: var(--shadow); }
-@media (min-width: 820px) { .visit { padding: 15px; gap: 12px; border-radius: 14px; } }
+.visit { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; box-shadow: var(--shadow); }
 .prev { font-size: 12.5px; color: var(--muted); padding: 5px 9px; border-radius: 8px; background: var(--surface2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prev b { color: var(--fg); font-weight: 600; }
-.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.prev b.bust, .tp .bad { color: var(--red); font-weight: 700; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 7px; align-items: center; }
 .slot { height: 46px; border-radius: 9px; border: 1px dashed var(--line-bright); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--display); font-size: 21px; font-weight: 600; position: relative; }
-@media (min-width: 820px) { .slot { height: 54px; font-size: 23px; } }
 .slot small { font-family: var(--body); font-size: 10px; color: var(--muted); font-weight: 500; line-height: 1; margin-top: 1px; }
 .slot.f { border-style: solid; border-color: var(--line-bright); background: var(--surface2); }
-.slot.target { border-color: color-mix(in srgb, var(--brass) 55%, transparent); color: color-mix(in srgb, var(--brass) 55%, transparent); }
+.slot.target { border-color: color-mix(in srgb, var(--brass) 55%, transparent); color: var(--brass); }
 .slot.dbl { color: var(--brass); border-color: color-mix(in srgb, var(--brass) 50%, transparent); }
 .slot.trp { color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, transparent); }
 .slot.zero { color: var(--muted); }
-.hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; flex-wrap: wrap; }
-.route { font-family: var(--display); font-size: 20px; font-weight: 600; color: var(--brass); letter-spacing: .04em; display: inline-flex; align-items: center; gap: 6px; }
-.note { color: var(--red); font-weight: 600; }
-.pad { display: grid; gap: 8px; }
-.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.seg.three { grid-template-columns: repeat(3, 1fr); }
-.seg button { padding: 10px 4px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface2); font-size: 13px; font-weight: 600; text-align: center; }
-.seg button:hover:not(:disabled) { border-color: var(--line-bright); }
-.seg button.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
-.seg button:disabled { opacity: .38; cursor: default; }
+.vsum { min-width: 46px; text-align: right; font-size: 17px; color: var(--muted); }
+.tot-disp { display: flex; align-items: center; gap: 4px; min-height: 48px; }
+.tot-disp .tb { font-size: 40px; line-height: 1; font-weight: 600; }
+.tot-disp .tb.ph { color: var(--muted); font-weight: 500; }
+.tdel { width: 44px; height: 44px; border-radius: 10px; color: var(--muted); font-size: 17px; display: grid; place-items: center; flex: none; }
+.tdel:hover { color: var(--fg); background: var(--surface2); }
+.tot-disp .tp { margin-left: auto; font-size: 15px; color: var(--muted); white-space: nowrap; }
+.tp b { color: var(--fg); }
+.note { color: var(--red); font-weight: 600; font-size: 14px; }
+.pad { display: grid; gap: 6px; }
+.seg2.ent { padding: 3px; }
+.seg2.ent button { height: 28px; min-height: 0; padding: 0 10px; font-size: 13px; }
 .keys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
 .key { height: 46px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--line); font-family: var(--display); font-size: 19px; font-weight: 600; text-align: center; position: relative; }
+.presets .key { font-size: 17px; padding: 0; }
+.numpad .key { height: clamp(48px, 7dvh, 60px); font-size: 24px; }
 @media (min-width: 820px) { .keys { gap: 7px; } .key { height: 50px; font-size: 20px; } }
 .key:hover:not(:disabled) { border-color: var(--line-bright); background: var(--surface3); }
 .key:active:not(:disabled) { background: var(--green); color: var(--green-ink); transform: scale(.96); }
 .key:disabled { opacity: .32; cursor: not-allowed; }
 .key.m2 { color: var(--brass); border-color: color-mix(in srgb, var(--brass) 35%, var(--line)); }
 .key.m3 { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.key.fn, .numpad .key.fn { font-family: var(--body); font-size: 14px; }
+.key.tg.on, .key.tg.on:hover { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.key.ok, .key.ok:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: var(--green-ink); }
 .key.rec { box-shadow: 0 0 0 2px var(--brass), 0 0 12px var(--brass-glow); border-color: var(--brass); }
 .keys3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .keys3 .key { font-size: 14.5px; font-family: var(--body); font-weight: 600; }
-.totrow { display: flex; gap: 8px; }
-.totrow input { flex: 1; min-width: 0; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font-family: var(--display); font-size: 26px; text-align: center; }
-.totrow .btn { width: auto; padding: 0 22px; font-size: 17px; }
-.presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .ask { display: grid; gap: 12px; padding: 16px; border-radius: 14px; border: 1px solid var(--green); background: var(--surface); box-shadow: var(--shadow); }
 .stats { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -507,19 +520,32 @@ body.ingame .tabs { display: none; }
 .stats th:first-child, .stats td:first-child { text-align: left; max-width: 120px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 .stats th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .stats tr:last-child td { border-bottom: 0; }
-.kbd-bar { display: none; font-size: 12px; color: var(--muted); justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 9px; background: color-mix(in srgb, var(--surface) 75%, transparent); border: 1px solid var(--line); }
-.kbd-bar kbd { padding: 1px 5px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line-bright); color: var(--fg); font-family: var(--body); font-size: 11px; }
-@media (min-width: 900px) and (hover: hover) { .kbd-bar { display: flex; } }
+/* низкий экран (телефон лёжа): всё до клавиатуры без прокрутки */
+@media (max-height: 520px) {
+  .slot { height: 34px; font-size: 18px; }
+  .key, .numpad .key { height: 38px; font-size: 17px; }
+  .players.two .big { font-size: 56px; }
+  .g-stats-area, .prev { display: none; }
+  .visit { padding: 6px 10px; }
+  .tot-disp { min-height: 38px; }
+  .tot-disp .tb { font-size: 32px; }
+  .tdel { height: 38px; }
+  .pl { padding: 8px 12px; gap: 0; }
+  .ocard.center .row2 { position: sticky; bottom: -24px; margin-bottom: -24px; padding-block: 10px 24px; background: var(--surface); }
+}
 
 .over { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: grid; place-items: end center; padding: 0; z-index: 25; overflow-y: auto; }
-.over .ocard { width: min(520px, 100%); background: var(--surface); border: 1px solid var(--line-bright); border-radius: 20px 20px 0 0; padding: 20px 18px calc(22px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; box-shadow: var(--shadow); max-height: 92dvh; overflow-y: auto; }
+.over .ocard { width: min(520px, 100%); background: var(--surface); border: 1px solid var(--line-bright); border-radius: 20px 20px 0 0; padding: 20px 18px calc(22px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; box-shadow: var(--shadow); max-height: 88dvh; overflow-y: auto; }
 @media (min-width: 600px) {
   .over { place-items: center; padding: 20px; }
-  .over .ocard { border-radius: 16px; padding: 24px; max-height: none; }
+  .over .ocard { border-radius: 16px; padding: 24px; }
 }
 .over .ocard.center { text-align: center; border-color: var(--green); }
 .over h2 { font-family: var(--display); font-size: 30px; text-transform: uppercase; letter-spacing: .04em; text-wrap: balance; line-height: 1.1; }
 .ohead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ocard.center .ohead { flex-wrap: wrap; }
+.ocard.center .ohead > * { white-space: nowrap; }
+.ocard.center .ohead .ghost.sm { padding-inline: 4px; margin: 0 -4px 0 auto; }
 @media (max-width: 599px) {
   .over h2 { font-size: 22px; }
   .row2 .btn { white-space: nowrap; font-size: 15px; padding-inline: 10px; overflow: hidden; text-overflow: ellipsis; }
@@ -571,7 +597,7 @@ body.ingame .tabs { display: none; }
 .cmp-row > span.hi { color: var(--fg); font-weight: 700; }
 .cmp-row > span.lo { color: var(--muted); font-weight: 500; }
 @media (pointer: coarse) {
-  .btn, .mini, .ghost, .chip, .fchip, .pick, .fmt, .set-row, .seg button, .seg2 button, .tabs button, .sw { min-height: 44px; }
+  .btn, .mini, .ghost, .chip, .fchip, .pick, .fmt, .set-row, .seg2 button, .tabs button, .sw { min-height: 44px; }
   .icon-btn { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -610,6 +636,8 @@ const FIRST = BOARD.slice().sort((a, b) => (b.v - a.v) || (a.d - b.d));
 const KIND_ORDER = x => (x.l[0] === 'T' ? 1 : x.d ? 2 : 0);
 const IMPOSSIBLE = new Set([163, 166, 169, 172, 173, 175, 176, 178, 179]);
 const cache = {};
+// канонические закрытия на дубль 61–170 (проверено скриптом)
+const CO3 = {170:'T20 T20 Bull',167:'T20 T19 Bull',164:'T20 T18 Bull',161:'T20 T17 Bull',160:'T20 T20 D20',158:'T20 T20 D19',157:'T20 T19 D20',156:'T20 T20 D18',155:'T20 T19 D19',154:'T20 T18 D20',153:'T20 T19 D18',152:'T20 T20 D16',151:'T20 T17 D20',150:'T20 T18 D18',149:'T20 T19 D16',148:'T20 T16 D20',147:'T20 T17 D18',146:'T20 T18 D16',145:'T20 T15 D20',144:'T20 T20 D12',143:'T20 T17 D16',142:'T20 T14 D20',141:'T20 T19 D12',140:'T20 T20 D10',139:'T20 T13 D20',138:'T20 T18 D12',137:'T20 T19 D10',136:'T20 T20 D8',135:'T20 T17 D12',134:'T20 T14 D16',133:'T20 T19 D8',132:'T20 T16 D12',131:'T20 T13 D16',130:'T20 T18 D8',129:'T19 T16 D12',128:'T18 T14 D16',127:'T20 T17 D8',126:'T19 T19 D6',125:'25 T20 D20',124:'T20 T16 D8',123:'T19 T16 D9',122:'T18 T18 D7',121:'T20 T11 D14',120:'T20 20 D20',119:'T19 T12 D13',118:'T20 18 D20',117:'T20 17 D20',116:'T20 16 D20',115:'T20 15 D20',114:'T20 14 D20',113:'T20 13 D20',112:'T20 12 D20',111:'T20 19 D16',110:'T20 Bull',109:'T20 9 D20',108:'T20 16 D16',107:'T19 Bull',106:'T20 10 D18',105:'T20 13 D16',104:'T18 Bull',103:'T19 6 D20',102:'T20 10 D16',101:'T17 Bull',100:'T20 D20',99:'T19 10 D16',98:'T20 D19',97:'T19 D20',96:'T20 D18',95:'T19 D19',94:'T18 D20',93:'T19 D18',92:'T20 D16',91:'T17 D20',90:'T20 D15',89:'T19 D16',88:'T20 D14',87:'T17 D18',86:'T18 D16',85:'T15 D20',84:'T20 D12',83:'T17 D16',82:'Bull D16',81:'T19 D12',80:'T20 D10',79:'T19 D11',78:'T18 D12',77:'T19 D10',76:'T20 D8',75:'T17 D12',74:'T14 D16',73:'T19 D8',72:'T16 D12',71:'T13 D16',70:'T18 D8',69:'T19 D6',68:'T20 D4',67:'T17 D8',66:'T10 D18',65:'T19 D4',64:'T16 D8',63:'T13 D12',62:'T10 D16',61:'T15 D8'};
 
 function routeFor(rem, left, dbl) {
   if (rem < 1 || left < 1 || rem > (dbl ? 170 : 180)) return null;
@@ -619,16 +647,20 @@ function routeFor(rem, left, dbl) {
   const min = dbl ? 2 : 1;
   let res = null;
   const one = r => finals.find(f => f.v === r) || null;
-  const two = r => {
+  // подводка без дублей и Bull, если такая есть
+  const twoBy = (r, ok) => {
     for (const f of finals) {
       const a = r - f.v;
       if (a < 1) continue;
-      const cands = BOARD.filter(x => x.v === a).sort((x, y) => KIND_ORDER(x) - KIND_ORDER(y));
+      const cands = BOARD.filter(x => x.v === a && ok(x)).sort((x, y) => KIND_ORDER(x) - KIND_ORDER(y));
       if (cands.length) return [cands[0], f];
     }
     return null;
   };
-  const o = one(rem);
+  const two = r => twoBy(r, x => !(dbl && x.d)) || twoBy(r, () => true);
+  const co = dbl && (CO3[rem] || (rem === 50 && left > 1 && '10 D20'));
+  if (co && co.split(' ').length <= left) res = co.split(' ').map(byLabel);
+  const o = !res && one(rem);
   if (o) res = [o];
   if (!res && left >= 2) res = two(rem);
   if (!res && left >= 3) {
@@ -1201,11 +1233,13 @@ const S = {
   theme: lsGet('oche2.theme') === 'light' ? 'light' : 'dark',
   palette: PALETTES.some(x => x.id === lsGet('oche2.palette')) ? lsGet('oche2.palette') : 'amber',
   sfx: lsGet('oche2.sfx') !== false,
-  modalMatch: null, quickModal: null, settings: false, clearRes: false, gf: 'all'
+  modalMatch: null, quickModal: null, settings: false, clearRes: false, gf: 'all',
+  buf: '' // ввод суммы в счётчике, не часть G
 };
 const closeModals = () => { S.modalMatch = null; S.quickModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
 const anyModal = () => !!(S.modalMatch || S.quickModal || S.settings);
 let G = null, undo = [];
+let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', S.theme);
@@ -1245,6 +1279,7 @@ window.addEventListener('storage', e => {
     const g = lsGet('oche2.game'), u = lsGet('oche2.undo');
     G = g && Array.isArray(g.players) && g.players.length ? g : null;
     undo = G && Array.isArray(u) ? u : [];
+    S.buf = '';
     if (!G) S.inGame = false;
   }
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
@@ -1896,10 +1931,10 @@ function newGame(list, o, ctx, starter) {
   const st = starter || 0;
   G = {
     id: 'g' + uid(), ctx: ctx || null, mode: o.mode, dbl: o.dbl, legsToWin: o.legsToWin, cur: st, starter: st, mstart: st,
-    visit: [], mult: 1, entry: 'darts', legNo: 1, over: null, winner: null, note: '', ask: null, prev: null, log: [], res: null,
+    visit: [], mult: 1, entry: lsGet('oche2.entry') === 'darts' ? 'darts' : 'total', legNo: 1, over: null, winner: null, note: '', ask: null, prev: null, log: [], res: null,
     players: list.map(x => ({ id: x.id || null, name: x.name, score: o.mode, legs: 0, darts: 0, points: 0, highest: 0, c100: 0, c140: 0, c180: 0, last: '', legDarts: 0, legVisits: 0, f9p: 0, f9d: 0, coa: 0, hco: 0, bl: 0 }))
   };
-  undo = []; S.inGame = true; S.confirmDrop = false;
+  undo = []; S.inGame = true; S.confirmDrop = false; S.buf = '';
   saveGame();
 }
 function startFromSetup() {
@@ -1968,7 +2003,7 @@ function throwDart(base, mult) {
   G.mult = 1; G.note = '';
   const rem = p.score - sum(G.visit);
   const bust = rem < 0 || (G.dbl && (rem === 1 || (rem === 0 && mult !== 2)));
-  if (bust) { playSfx('bust'); endVisit(true, false, G.visit.length); G.note = 'Перебор'; }
+  if (bust) { playSfx('bust'); endVisit(true, false, G.visit.length); }
   else if (rem === 0) { playSfx('win'); endVisit(false, true, G.visit.length); }
   else if (G.visit.length === 3) {
     const tot = sum(G.visit);
@@ -1985,7 +2020,9 @@ function endVisit(bust, win, n) {
   const start = p.score;
   const pts = bust ? 0 : sum(G.visit);
   if (G.entry === 'total') {
-    if (routeFor(start, 3, G.dbl)) p.coa++;
+    // попытки на дубль без лишних вопросов: при закрытии — дротики сверх минимального маршрута, иначе 3 при закрытии в один дротик
+    const min = (routeFor(start, 3, G.dbl) || []).length;
+    p.coa += win ? Math.max(1, n - (min - 1)) : routeFor(start, 1, G.dbl) ? 3 : 0;
   } else {
     const attempts = G.visit.reduce((acc, d) => acc + (d.coAttempt || 0), 0);
     p.coa += attempts;
@@ -2016,25 +2053,29 @@ function legWon() {
   const p = G.players[G.cur];
   p.legs++;
   G.winner = G.cur;
+  tapLock = Date.now() + 450;
   if (p.legs >= G.legsToWin) { G.over = 'match'; commitMatch(); }
   else G.over = 'leg';
 }
 
 function submitTotal(pts) {
   if (G.over || G.ask != null) return;
+  S.buf = '';
   if (!Number.isInteger(pts) || pts < 0 || pts > 180) { G.note = 'Введите целое число от 0 до 180'; return render(); }
   if (IMPOSSIBLE.has(pts)) { G.note = pts + ' нельзя набрать тремя дротиками'; return render(); }
   const p = G.players[G.cur];
   const rem = p.score - pts;
   if (rem === 0) {
-    if (!routeFor(pts, 3, G.dbl)) { G.note = pts + ' нельзя закрыть ' + (G.dbl ? 'через дубль' : 'тремя дротиками'); return render(); }
+    const ok = [1, 2, 3].filter(n => routeFor(pts, n, G.dbl));
+    if (!ok.length) { G.note = pts + ' нельзя закрыть ' + (G.dbl ? 'через дубль' : 'тремя дротиками'); return render(); }
     snap(); G.note = ''; G.ask = pts;
+    if (ok.length === 1) return finishAsk(ok[0]);
     saveGame(); return render();
   }
   snap();
   G.note = '';
   G.visit = [{ val: pts, m: 1, l: String(pts) }];
-  if (rem < 0 || (G.dbl && rem === 1)) { playSfx('bust'); endVisit(true, false, 3); G.note = 'Перебор'; }
+  if (rem < 0 || (G.dbl && rem === 1)) { playSfx('bust'); endVisit(true, false, 3); }
   else { playSfx(pts === 180 ? '180' : 'dart'); endVisit(false, false, 3); }
   saveGame(); render();
 }
@@ -2049,18 +2090,26 @@ function finishAsk(n) {
 }
 
 function nextLeg() {
+  if (!G || G.over !== 'leg') return;
   snap();
   G.players.forEach(p => { p.score = G.mode; p.last = ''; p.legDarts = 0; p.legVisits = 0; });
   G.starter = (G.starter + 1) % G.players.length;
   G.cur = G.starter; G.visit = []; G.over = null; G.winner = null; G.note = ''; G.prev = null; G.legNo++;
+  S.buf = ''; tapLock = Date.now() + 450;
   saveGame(); render();
 }
 
 function doUndo() {
   if (!G || !undo.length) return;
   if (G.over === 'match' && !uncommitMatch(G.id)) { toast('Нельзя отменить: следующие матчи сетки уже сыграны.'); return; }
-  G = JSON.parse(undo.pop());
-  saveGame(); render();
+  const prev = JSON.parse(undo.pop()), e = G.log[G.log.length - 1];
+  const dart = l => 'Отменено: ' + (l === '—' ? 'мимо' : l), who = (i, x) => 'Отменено: ' + G.players[i].name + ' — ' + x;
+  const msg = G.log.length > prev.log.length ? (e.d && e.d.length ? dart(e.d[e.d.length - 1]) : who(e.p, e.b ? 'перебор' : e.pts))
+    : G.visit.length > prev.visit.length ? dart(G.visit[G.visit.length - 1].l)
+    : G.ask != null ? who(G.cur, G.ask) : 'Отменено';
+  if (prev.entry !== G.entry) lsSet('oche2.entry', prev.entry === 'total' ? 'total' : 'darts'); // отменили переключение режима
+  G = prev; G.mult = 1; S.buf = '';
+  saveGame(); render(); toast(msg);
 }
 
 function commitMatch() {
@@ -2081,8 +2130,7 @@ function commitMatch() {
     x.g.res = { la, lb, w: G.players[G.winner].id, mid: m.id };
   }
   saveDb(); recalc();
-  G.res = { msg: t ? 'Результат записан в турнир «' + t.name + '» и в ленту.'
-    : (lost ? 'Этот матч турнира уже был внесён, поэтому игра сохранена как дружеская. ' : '') + 'Матч в ленте и в профиле.' };
+  G.res = { msg: lost ? 'Этот матч турнира уже был внесён, поэтому игра сохранена как дружеская.' : '' };
 }
 // false — результат нельзя снять (от него зависят сыгранные или идущие матчи)
 function uncommitMatch(id) {
@@ -2097,92 +2145,109 @@ function uncommitMatch(id) {
 }
 function leaveMatch(to) {
   const ctx = G && G.ctx;
-  G = null; undo = []; S.inGame = false; saveGame();
+  G = null; undo = []; S.inGame = false; S.buf = ''; saveGame();
   go(to === 'tour' && ctx ? 't.' + ctx.tid : to === 'feed' ? 'feed' : 'play');
 }
 function rematch() {
   const o = G, n = o.players.length, st = (o.mstart + 1) % n;
   newGame(o.players.map(p => ({ id: p.id, name: p.name })), { mode: o.mode, dbl: o.dbl, legsToWin: o.legsToWin }, null, st);
-  G.entry = o.entry;
-  saveGame(); render();
+  render();
 }
 
+// статистика для протокола/таблицы из текущей игры
+const gStat = q => ({ avg: avg3(q.points, q.darts), f9: avg3(q.f9p, q.f9d), coh: q.legs, coa: Math.max(q.legs, q.coa), c180: q.c180, c140: q.c140, c100: q.c100, bl: q.bl, hco: q.hco });
+const coShort = q => { const a = Math.max(q.legs, q.coa); return a ? Math.round(q.legs / a * 100) + '%' : '—'; };
+const gStatTable = ps => '<div class="stats"><table><thead><tr><th>Игрок</th><th>Ср.</th><th>Перв. 9</th><th>Закр. %</th><th>180</th></tr></thead><tbody>' +
+  ps.map(q => '<tr><td>' + esc(q.name) + '</td><td>' + avg3(q.points, q.darts) + '</td><td>' + avg3(q.f9p, q.f9d) + '</td><td>' + coShort(q) + '</td><td>' + q.c180 + '</td></tr>').join('') + '</tbody></table></div>';
+function tDig(d) {
+  const nb = String(+(S.buf + d));
+  if (S.buf.length >= 3 || +nb > 180) return;
+  S.buf = nb; render();
+}
+function tErase() { S.buf = S.buf.slice(0, -1); eraseT = Date.now(); render(); }
+
 function gameView() {
-  const g = G, p = g.players[g.cur];
+  const g = G, p = g.players[g.cur], n = g.players.length;
   if (g.entry !== 'total') g.entry = 'darts';
-  const vs = sum(g.visit);
+  const darts = g.entry === 'darts', vs = sum(g.visit);
   const t = g.ctx ? TBY[g.ctx.tid] : null;
   let h = '<div class="game">';
-  h += '<div class="ghead g-head-area"><div class="meta">' + (t ? '<b>' + esc(t.name) + '</b> · ' + gameLabel(t, gameAt(t, g.ctx.r, g.ctx.i)) + '<br>' : 'Матч ' + g.mode + ' · ') + (g.dbl ? 'дубль' : 'прямой') + ' · до ' + g.legsToWin + ' · лег ' + g.legNo + '</div>';
-  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="icon-btn" data-act="open-settings" title="Настройки" aria-label="Настройки">' + I.gear + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
+  h += '<div class="ghead g-head-area"><div class="gh-t">' + (t ? '<b>' + esc(t.name) + '</b><span>' + gameLabel(t, gameAt(t, g.ctx.r, g.ctx.i)) + ' · Лег ' + g.legNo + '</span>'
+    : '<b>' + g.mode + ' · до ' + g.legsToWin + ' ' + pl(g.legsToWin, 'победы', 'побед', 'побед') + ' · Лег ' + g.legNo + (g.dbl ? '' : ' · без дубля') + '</b>') + '</div>';
+  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
 
-  h += '<div class="players g-players-area">';
+  const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && n > 1;
+  h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
   g.players.forEach((q, i) => {
-    const act = i === g.cur;
-    const rem = act ? q.score - vs : q.score;
-    const pRoute = routeFor(rem, act && g.entry !== 'total' ? 3 - g.visit.length : 3, g.dbl);
-    h += '<div class="pl ' + (act ? 'act' : '') + '"><div class="nm"><span>' + esc(q.name) + '</span><span class="legs" title="Выиграно легов">' + q.legs + '</span></div><div class="num big">' + rem + '</div><div class="co-chip">' + (pRoute ? '🎯 ' + routeText(pRoute) : '') + '</div><div class="sub"><span>ср. ' + avg3(q.points, q.darts) + '</span><span>' + (q.last ? 'подх. ' + q.last : 'др. ' + q.legDarts) + '</span></div></div>';
+    const act = i === g.cur, rem = act ? q.score - vs : q.score;
+    const r = routeFor(rem, act && darts ? 3 - g.visit.length : 3, g.dbl);
+    h += '<div class="pl' + (act ? ' act' : '') + '"><div class="nm">' + (i === g.starter ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span><span class="legs" title="Выиграно легов">' + q.legs + '</span></div>' +
+      '<div class="num big">' + rem + '</div><div class="co-chip">' + (r ? routeText(r) : '') + '</div>' +
+      '<div class="sub"><span>ср. ' + avg3(q.points, q.darts) + '</span><span>' + (q.last ? 'посл. ' + q.last : q.legDarts + ' др.') + '</span></div></div>';
   });
-  h += '</div>';
+  h += '</div>' + (canSwap ? '<button class="ghost sm swap" data-act="swap-start">Начинает другой</button>' : '') + '</div>';
 
   const remNow = p.score - vs;
-  const left = g.entry !== 'total' ? 3 - g.visit.length : 3;
-  const r = routeFor(remNow, left, g.dbl);
-  const nextTarget = r && r.length ? r[0] : null;
-
-  const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && g.players.length > 1;
-  h += '<div class="col g-pad-area"><div class="visit"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="label">Бросает · дротик ' + Math.min(3, g.visit.length + 1) + ' из 3</span><span style="display:flex;align-items:center;gap:8px"><b>' + esc(p.name) + '</b>' + (canSwap ? '<button class="mini" data-act="swap-start" title="Кто начинает матч">Начинает другой</button>' : '') + '</span></div>';
-  if (g.prev && g.players[g.prev.i]) h += '<div class="prev">Пред. (' + esc(g.players[g.prev.i].name) + '): <b>' + (g.prev.d && g.prev.d.length ? esc(g.prev.d.join(' · ')) + ' = ' : '') + (g.prev.bust ? 'перебор' : g.prev.pts) + '</b></div>';
-  if (g.entry !== 'total') {
+  const r = darts ? routeFor(remNow, 3 - g.visit.length, g.dbl) : null, next = r ? r[0] : null;
+  h += '<div class="col g-pad-area"><div class="visit">';
+  const pv = g.prev;
+  if (pv && g.players[pv.i]) h += '<div class="prev">Пред. (' + esc(g.players[pv.i].name) + '): ' + (pv.bust ? (pv.d && pv.d.length ? esc(pv.d.join(' · ')) + ' <b class="bust">= ' : '<b class="bust">') + 'перебор</b>'
+    : '<b>' + (pv.d && pv.d.length ? esc(pv.d.join(' · ')) + ' = ' : '') + pv.pts + '</b>') + '</div>';
+  if (darts) {
     h += '<div class="slots">';
     for (let i = 0; i < 3; i++) {
-      const d = g.visit[i];
-      const hintStep = !d && r ? r[i - g.visit.length] : null;
-      const cls = d ? 'f ' + (d.m === 2 ? 'dbl' : d.m === 3 ? 'trp' : '') + (d.val === 0 ? ' zero' : '') : (hintStep ? 'target' : '');
-      h += '<div class="slot ' + cls + '">' + (d ? d.l + '<small>' + d.val + ' очк.</small>' : (hintStep ? hintStep.l + '<small>цель</small>' : '')) + '</div>';
+      const d = g.visit[i], tg = !d && r ? r[i - g.visit.length] : null;
+      h += d ? '<div class="slot f' + (d.m === 2 ? ' dbl' : d.m === 3 ? ' trp' : '') + (d.val === 0 ? ' zero' : '') + '">' + d.l + '<small>' + d.val + ' очк.</small></div>'
+        : tg ? '<div class="slot target">' + tg.l + '</div>' : '<div class="slot"><small>' + (i + 1) + '-й</small></div>';
     }
-    h += '</div>';
-  }
-  h += '<div class="hint">' + (g.note ? '<span class="note">' + esc(g.note) + '</span>' : (r ? '<span class="route">Закрытие: ' + routeText(r) + '</span>' : '<span class="meta">' + (remNow > 170 ? 'Набираем очки' : 'Закрытия с ' + left + ' др. нет') + '</span>')) + '<span class="meta">подход: <b>' + vs + '</b> · ост. <b>' + remNow + '</b></span></div></div>';
-
-  if (g.ask != null) {
-    h += '<div class="ask"><b>Закрытие ' + g.ask + '. Сколько дротиков ушло?</b><span class="meta">Нужно для точного расчёта среднего и лучшего лега.</span><div class="keys3">' + [1, 2, 3].map(n => '<button class="key" data-act="ask" data-v="' + n + '"' + (routeFor(g.ask, n, g.dbl) ? '' : ' disabled') + '>' + n + ' ' + pl(n, 'дротик', 'дротика', 'дротиков') + '</button>').join('') + '</div><button class="ghost" data-act="undo">Отменить ввод</button></div>';
+    h += '<span class="vsum num">= ' + vs + '</span></div>';
   } else {
-    h += '<div class="pad"><div class="seg three"><button class="' + (g.entry === 'darts' ? 'on' : '') + '" data-act="entry" data-v="darts">Кнопки</button><button class="' + (g.entry === 'total' ? 'on' : '') + '" data-act="entry" data-v="total">Сумма</button><button data-act="undo"' + (undo.length ? '' : ' disabled') + '>Отмена</button></div>';
-    if (g.entry === 'darts') {
-      const pref = g.mult === 2 ? 'D' : g.mult === 3 ? 'T' : '';
-      h += '<div class="seg three"><button class="' + (g.mult === 1 ? 'on' : '') + '" data-act="mult" data-v="1">×1 Одинарный</button><button class="' + (g.mult === 2 ? 'on' : '') + '" data-act="mult" data-v="2">×2 Дубль</button><button class="' + (g.mult === 3 ? 'on' : '') + '" data-act="mult" data-v="3">×3 Трипл</button></div>';
-      h += '<div class="keys">';
-      for (let n = 1; n <= 20; n++) {
-        const isRec = nextTarget && nextTarget.base === n && nextTarget.m === g.mult;
-        h += '<button class="key ' + (g.mult === 2 ? 'm2' : g.mult === 3 ? 'm3' : '') + (isRec ? ' rec' : '') + '" data-act="dart" data-v="' + n + '">' + pref + n + '</button>';
-      }
-      const isRecBull = nextTarget && nextTarget.base === 25 && nextTarget.m === g.mult;
-      h += '</div><div class="keys3"><button class="key' + (isRecBull ? ' rec' : '') + '" data-act="dart" data-v="25"' + (g.mult === 3 ? ' disabled' : '') + '>' + (g.mult === 2 ? 'Bull (50)' : '25') + '</button><button class="key" data-act="dart" data-v="0">Мимо (0)</button><button class="key" data-act="undo"' + (undo.length ? '' : ' disabled') + '>Назад</button></div>';
-      h += '<div class="kbd-bar"><span>Клавиатура ПК: <kbd>S</kbd> <kbd>D</kbd> <kbd>T</kbd> множитель · <kbd>B</kbd> Bull · <kbd>0</kbd> Мимо · <kbd>Backspace</kbd> Отмена</span></div>';
+    const b = S.buf, after = remNow - +b;
+    const prv = b === '' ? '' : after < 0 || (g.dbl && after === 1) ? '<span class="bad">перебор</span>'
+      : after === 0 ? (routeFor(+b, 3, g.dbl) ? '<b>закрытие</b>' : '<span class="bad">нет закрытия</span>') : 'ост. ' + after;
+    h += '<div class="tot-disp"><span class="tb num' + (b ? '' : ' ph') + '">' + (b || '0–180') + '</span>' + (b ? '<button class="tdel" data-act="tdel" aria-label="Стереть цифру">✕</button>' : '') + '<span class="tp">' + prv + '</span></div>';
+  }
+  if (g.note) h += '<div class="note">' + esc(g.note) + '</div>';
+  h += '</div>';
+
+  const ud = undo.length ? '' : ' disabled';
+  if (g.ask != null) {
+    h += '<div class="ask"><b>Закрытие ' + g.ask + ' — сколько дротиков?</b><div class="keys3">' + [1, 2, 3].map(k => '<button class="key" data-act="ask" data-v="' + k + '"' + (routeFor(g.ask, k, g.dbl) ? '' : ' disabled') + '>' + k + ' ' + pl(k, 'дротик', 'дротика', 'дротиков') + '</button>').join('') + '</div><button class="ghost" data-act="undo">Отменить ввод</button></div>';
+  } else {
+    h += '<div class="pad"><div class="seg2 full ent" role="group" aria-label="Ввод очков">' + [['total', 'Сумма'], ['darts', 'По дротикам']].map(([v, l]) => '<button class="' + (g.entry === v ? 'on' : '') + '" data-act="entry" data-v="' + v + '" aria-pressed="' + (g.entry === v) + '">' + l + '</button>').join('') + '</div>';
+    if (!darts) {
+      h += '<div class="presets">' + [0, 26, 45, 60, 100, 140, 180].map(v => '<button class="key" data-act="preset" data-v="' + v + '">' + v + '</button>').join('') + '</div>';
+      h += '<div class="numpad">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => '<button class="key" data-act="tdig" data-v="' + d + '">' + d + '</button>').join('') +
+        '<button class="key fn" data-act="undo"' + ud + '>Отмена</button><button class="key" data-act="tdig" data-v="0">0</button><button class="key ok" data-act="tok"' + (S.buf ? '' : ' disabled') + '>ОК</button></div>';
     } else {
-      h += '<div class="totrow"><input id="tot" type="number" inputmode="numeric" min="0" max="180" step="1" placeholder="0–180" aria-label="Сумма за подход"><button class="btn" data-act="total">Записать</button></div>';
-      h += '<div class="presets">' + [0, 26, 41, 45, 60, 81, 85, 100, 140, 180].map(v => '<button class="key" data-act="preset" data-v="' + v + '">' + v + '</button>').join('') + '</div>';
-      h += '<div class="kbd-bar"><span>На ПК: введите сумму с клавиатуры и нажмите <kbd>Enter</kbd></span></div>';
+      // нужен дубль/трипл, а он не включён — подсвечиваем переключатель, иначе саму цифру
+      const want = next && next.m > 1 && next.m !== g.mult ? next.m : 0, hit = x => next && next.base === x && next.m === g.mult ? ' rec' : '';
+      const pref = g.mult === 2 ? 'D' : g.mult === 3 ? 'T' : '', mc = g.mult === 2 ? ' m2' : g.mult === 3 ? ' m3' : '';
+      h += '<div class="keys">';
+      for (let k = 1; k <= 20; k++) h += '<button class="key' + mc + hit(k) + '" data-act="dart" data-v="' + k + '">' + pref + k + '</button>';
+      h += '<button class="key fn" data-act="undo"' + ud + '>Отмена</button><button class="key fn" data-act="dart" data-v="0">Мимо</button>' +
+        '<button class="key' + hit(25) + '" data-act="dart" data-v="25"' + (g.mult === 3 ? ' disabled' : '') + '>' + (g.mult === 2 ? 'Bull' : '25') + '</button>' +
+        [[2, 'Дубль'], [3, 'Трипл']].map(([m, l]) => '<button class="key fn tg' + (g.mult === m ? ' on' : '') + (want === m ? ' rec' : '') + '" data-act="mult" data-v="' + m + '" aria-pressed="' + (g.mult === m) + '">' + l + '</button>').join('') + '</div>';
     }
     h += '</div>';
   }
   h += '</div>';
-
-  h += '<div class="stats g-stats-area"><table><thead><tr><th>Игрок</th><th>Ср.</th><th>1–9</th><th>Макс.</th><th>180</th><th>Закр.</th></tr></thead><tbody>';
-  g.players.forEach(q => { h += '<tr><td>' + esc(q.name) + '</td><td>' + avg3(q.points, q.darts) + '</td><td>' + avg3(q.f9p, q.f9d) + '</td><td>' + (q.highest || '—') + '</td><td>' + q.c180 + '</td><td>' + q.legs + '/' + q.coa + '</td></tr>'; });
-  h += '</tbody></table></div></div>';
+  h += '<div class="g-stats-area">' + gStatTable(g.players) + '</div></div>';
 
   if (g.over) {
-    const w = g.players[g.winner];
-    h += '<div class="over" role="dialog" aria-modal="true"><div class="ocard center"><span class="label">' + (g.over === 'match' ? 'Матч окончен' : 'Лег ' + g.legNo + ' закрыт') + '</span><h2>' + esc(w.name) + (g.over === 'match' ? ' побеждает' : ' берёт лег') + '</h2><div class="score">' + g.players.map(q => '<span>' + esc(q.name) + ' <b>' + q.legs + '</b></span>').join('') + '</div>';
-    if (g.over === 'leg') h += '<button class="btn" data-act="next">Следующий лег</button>';
-    else {
-      if (g.res) h += '<p class="msg">' + esc(g.res.msg) + '</p>';
-      h += g.ctx ? '<div class="row2"><button class="btn" data-act="leave" data-v="tour">К турниру</button><button class="btn alt" data-act="leave" data-v="feed">В ленту</button></div>'
-        : '<div class="row2"><button class="btn" data-act="rematch">Реванш</button><button class="btn alt" data-act="leave" data-v="feed">В ленту</button></div><button class="ghost" data-act="leave" data-v="play">В меню</button>';
+    const w = g.players[g.winner], leg = g.over === 'leg';
+    h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (leg ? 'Лег ' + g.legNo + ' выигран' : 'Победитель матча') + '</span><button class="ghost sm" data-act="undo">Отменить последний бросок</button></div>' +
+      '<h2>' + esc(w.name) + '</h2><div class="score">' + g.players.map(q => '<span>' + esc(q.name) + ' <b>' + q.legs + '</b></span>').join('') + '</div>';
+    if (leg) {
+      const L = g.log.filter(e => e.leg === g.legNo && e.p === g.winner), lp = L.reduce((a, e) => a + e.pts, 0), ld = L.reduce((a, e) => a + e.n, 0);
+      h += '<p class="meta">' + ld + ' ' + pl(ld, 'дротик', 'дротика', 'дротиков') + (L.length ? ' · закрытие ' + L[L.length - 1].pts : '') + ' · ср. лега ' + avg3(lp, ld) + '</p>';
+      h += '<button class="btn" data-act="next">Лег ' + (g.legNo + 1) + ' · начинает ' + esc(g.players[(g.starter + 1) % n].name) + '</button>';
+    } else {
+      if (g.res && g.res.msg) h += '<p class="msg">' + esc(g.res.msg) + '</p>';
+      h += n === 2 ? '<div class="cmp">' + statRows(gStat(g.players[0]), gStat(g.players[1])) + '</div>' : gStatTable(g.players);
+      h += '<div class="row2">' + (g.ctx ? '<button class="btn" data-act="leave" data-v="tour">К турниру</button>' : '<button class="btn" data-act="rematch">Реванш</button>') + '<button class="btn alt" data-act="leave" data-v="play">Готово</button></div>';
     }
-    h += '<button class="ghost" data-act="undo">Отменить последний бросок</button></div></div>';
+    h += '</div></div>';
   }
   return h;
 }
@@ -2196,7 +2261,9 @@ function render() {
   mr.innerHTML = renderModals();
   if (anyModal() && !mr.contains(document.activeElement)) { const f = (fk && mr.querySelector(fk)) || mr.querySelector('[data-act="close-modal"]'); if (f) f.focus({ preventScroll: true }); }
   CHART = null;
-  document.body.classList.toggle('ingame', R === 'play' && S.inGame && !!G);
+  const ingame = R === 'play' && S.inGame && !!G;
+  document.body.classList.toggle('ingame', ingame);
+  if (ingame) wakeOn(); else wakeOff();
   app.innerHTML = R === 'feed' ? feedView()
     : R === 'tours' ? toursView()
     : R === 'new' ? newTourView()
@@ -2206,13 +2273,28 @@ function render() {
     : R.startsWith('p.') ? profileView(R.slice(2))
     : feedView();
   drawChart();
-  if (R === 'play' && S.inGame && G && G.entry === 'total' && !G.over && G.ask == null && !anyModal()) {
-    const totEl = $('tot');
-    if (totEl && window.matchMedia('(min-width: 900px)').matches) totEl.focus();
-  }
 }
+// экран не гаснет во время игры
+function wakeOn() {
+  if (wake || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+  wake = 'pending';
+  try {
+    navigator.wakeLock.request('screen').then(l => {
+      l.addEventListener('release', () => { if (wake === l) wake = null; });
+      if (wake === 'pending' && document.body.classList.contains('ingame')) wake = l;
+      else { l.release().catch(() => {}); if (wake === 'pending') wake = null; }
+    }).catch(() => { if (wake === 'pending') wake = null; });
+  } catch (e) { wake = null; }
+}
+function wakeOff() {
+  if (wake && wake !== 'pending') wake.release().catch(() => {});
+  wake = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && document.body.classList.contains('ingame')) wakeOn(); });
 
 document.addEventListener('click', e => {
+  // защита от двойного тапа на конце лега
+  if (R === 'play' && G && Date.now() < tapLock && e.target.closest && e.target.closest('.game, .over')) return;
   if (e.target && e.target.dataset && e.target.dataset.backdrop) {
     closeModals();
     render();
@@ -2228,7 +2310,7 @@ document.addEventListener('click', e => {
     case 'set-theme': S.theme = v; applyTheme(); render(); break;
     case 'open-settings': closeModals(); S.settings = true; render(); break;
     case 'set-palette': S.palette = v; applyTheme(); render(); break;
-    case 'sfx': S.sfx = !S.sfx; lsSet('oche2.sfx', S.sfx); toast(S.sfx ? 'Звук включён' : 'Звук выключен'); render(); break;
+    case 'sfx': S.sfx = !S.sfx; lsSet('oche2.sfx', S.sfx); if (!document.body.classList.contains('ingame')) toast(S.sfx ? 'Звук включён' : 'Звук выключен'); render(); break;
     case 'minfo': closeModals(); S.modalMatch = v; render(); break;
     case 'res-ask': S.clearRes = true; render(); break;
     case 'res-clear-no': S.clearRes = false; render(); break;
@@ -2324,19 +2406,18 @@ document.addEventListener('click', e => {
     case 'drop': S.confirmDrop = true; render(); break;
     case 'drop-no': S.confirmDrop = false; render(); break;
     case 'drop-yes': G = null; undo = []; S.confirmDrop = false; saveGame(); render(); break;
-    case 'menu': S.inGame = false; if (G && G.over === 'match') { G = null; undo = []; } saveGame(); render(); toTop(); break;
+    case 'menu': S.inGame = false; S.buf = ''; if (G && G.over === 'match') { G = null; undo = []; } saveGame(); render(); toTop(); break;
     case 'leave': leaveMatch(v); break;
     case 'entry':
-      if (!G) break;
-      if (v === 'total' && G.visit.length > 0) {
-        snap(); G.visit = []; G.mult = 1;
-        toast('Неполный подход сброшен. Вернуть его можно кнопкой «Отмена».');
-      }
-      G.entry = v; G.note = ''; saveGame(); render(); break;
+      if (!G || G.entry === v) break;
+      if (G.visit.length) { snap(); G.visit = []; toast('Неполный подход сброшен'); }
+      G.entry = v; G.mult = 1; G.note = ''; S.buf = ''; lsSet('oche2.entry', v); saveGame(); render(); break;
     case 'mult': if (G) { G.mult = G.mult === +v ? 1 : +v; render(); } break;
     case 'dart': if (G) throwDart(+v, v === '0' ? 1 : G.mult); break;
     case 'undo': doUndo(); break;
-    case 'total': { const el = $('tot'); submitTotal(el && el.value !== '' ? Number(el.value) : NaN); break; }
+    case 'tdig': if (G) tDig(v); break;
+    case 'tdel': tErase(); break;
+    case 'tok': if (G && S.buf) submitTotal(+S.buf); break;
     case 'preset': submitTotal(+v); break;
     case 'ask': finishAsk(+v); break;
     case 'next': nextLeg(); break;
@@ -2375,21 +2456,24 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   const inInput = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
   if (e.key === 'Enter' && t && t.id === 'nt-newp') { e.preventDefault(); addNtPlayer(); return; }
-  if (e.key === 'Enter' && t && t.id === 'tot') { submitTotal(t.value !== '' ? Number(t.value) : NaN); return; }
   if (e.key === 'Enter' && t && /^me-/.test(t.id)) { const sb = $('app').querySelector('[data-act="savename"]'); if (sb) sb.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button') { e.preventDefault(); t.click(); return; }
 
   if (!inInput && !anyModal() && !e.ctrlKey && !e.metaKey && !e.altKey && R === 'play' && S.inGame && G) {
-    if (G.over === 'leg' && e.key === 'Enter') { e.preventDefault(); nextLeg(); return; }
-    if (!G.over && G.ask == null && G.entry === 'darts') {
-      const k = e.key.toLowerCase();
-      if (k === 's' || k === 'ы') { G.mult = 1; render(); }
-      else if (k === 'd' || k === 'в') { G.mult = G.mult === 2 ? 1 : 2; render(); }
-      else if (k === 't' || k === 'е') { G.mult = G.mult === 3 ? 1 : 3; render(); }
-      else if (k === 'b' || k === 'и') { if (G.mult !== 3) throwDart(25, G.mult); }
-      else if (k === '0') { throwDart(0, 1); }
-      else if (e.key === 'Backspace' || k === 'z' || k === 'я') { e.preventDefault(); doUndo(); }
-    }
+    if (G.over === 'leg' && e.key === 'Enter') { e.preventDefault(); if (Date.now() >= tapLock) nextLeg(); return; }
+    if (G.over) return;
+    if (G.ask != null) { if (/^[123]$/.test(e.key)) finishAsk(+e.key); return; }
+    if (G.entry === 'total') {
+      if (/^[0-9]$/.test(e.key)) tDig(e.key);
+      else if (e.key === 'Enter') { e.preventDefault(); if (S.buf) submitTotal(+S.buf); }
+      else if (e.key === 'Backspace') {
+        e.preventDefault();
+        // зажатый Backspace стирает цифры, но не отменяет бросок
+        if (S.buf) tErase();
+        else if (!e.repeat && Date.now() - eraseT > 700) doUndo();
+      }
+    } else if (e.key === '0') throwDart(0, 1);
+    else if (e.key === 'Backspace') { e.preventDefault(); if (!e.repeat) doUndo(); }
   }
 });
 
