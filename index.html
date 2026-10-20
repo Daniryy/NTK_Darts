@@ -456,11 +456,31 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .gb-r.win, .gb-r.win .pn { color: var(--fg); font-weight: 600; }
 .gb-r.win .num { color: var(--green); }
 .src { color: var(--muted); font-size: 12.5px; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.bsecs { display: grid; gap: 22px; }
-.bsec { display: grid; gap: 8px; min-width: 0; scroll-margin-top: 76px; }
-.bsec-h { display: flex; align-items: baseline; gap: 4px 14px; flex-wrap: wrap; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.bsec-h h3 { font-family: var(--display); font-size: 20px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
-@media (max-width: 600px) { .bk { --bk-w: 168px; --bk-gap: 18px; } .gb-r { font-size: 13px; } }
+/* компактная сетка «с розыгрышем всех мест»: колонки — круги, строки — матчи; линии между группами */
+.pg { --pg-w: 176px; display: grid; grid-template-columns: repeat(var(--pg-n), minmax(var(--pg-w), 1fr)); min-width: calc(var(--pg-n) * var(--pg-w)); border: 1px solid var(--line-bright); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.pg-h { padding: 8px 10px; background: var(--surface2); border-bottom: 1px solid var(--line-bright); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pg-l { border-left: 2px solid var(--line-bright); }
+.pc { min-width: 0; padding: 4px 10px 5px; border-top: 1px solid var(--line); display: grid; align-content: center; gap: 1px; }
+.pc.first { border-top: 0; }
+.pc.sep { border-top: 2px solid var(--line-bright); }
+.pc[role=button] { cursor: pointer; }
+.pc[role=button]:hover { background: var(--surface2); }
+.pc.me { background: color-mix(in srgb, var(--green) 9%, transparent); }
+.pc.ready { background: color-mix(in srgb, var(--green) 7%, transparent); }
+.pc.live { background: color-mix(in srgb, var(--green) 16%, transparent); box-shadow: inset 0 0 0 1px var(--green); }
+.pc.void { place-items: center; color: var(--muted); opacity: .5; }
+.pc-h { display: flex; align-items: baseline; gap: 6px; min-height: 15px; font-size: 10.5px; line-height: 1.4; color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.pc-h .go { color: var(--green); }
+.pc-h .tg { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
+.pc-h .tg.fin { color: var(--fg); font-family: var(--display); font-size: 12.5px; letter-spacing: .04em; }
+.pc-r { display: grid; grid-template-columns: minmax(0, 1fr) 1.6em; gap: 6px; align-items: center; min-height: 22px; color: var(--muted); font-size: 13.5px; }
+.pc-r > span:first-child:not(.src) { min-width: 0; display: flex; }
+.pc-r .num { text-align: right; font-size: 16px; }
+.pc-r.win, .pc-r.win .pn { color: var(--fg); font-weight: 600; }
+.pc-r.win .num { color: var(--green); }
+.pc.bye .pc-r { grid-template-columns: minmax(0, 1fr) auto; }
+.pc.bye .pc-r .num { font-family: var(--body); font-size: 11.5px; color: var(--muted); }
+@media (max-width: 600px) { .bk { --bk-w: 168px; --bk-gap: 18px; } .gb-r { font-size: 13px; } .pg { --pg-w: 156px; } .pc { padding-inline: 8px; } }
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl th, .tbl td { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tbl th:nth-child(-n+2), .tbl td:nth-child(-n+2) { text-align: left; }
@@ -734,7 +754,7 @@ body.ingame .tabs, body.ingame .top-wrap { display: none; }
 @media (max-width: 899px) { .nt-foot { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 5; background: var(--surface); padding-top: 10px; box-shadow: 0 -12px 14px -12px rgba(0, 0, 0, .45); } }
 .note-box.warn { border-color: color-mix(in srgb, var(--red) 55%, transparent); color: var(--fg); }
 .ttabs { justify-self: stretch; }
-@media (max-width: 899px) { .ttabs { position: sticky; top: var(--top-h); z-index: 9; } .bsec { scroll-margin-top: calc(var(--top-h) + 64px); } }
+@media (max-width: 899px) { .ttabs { position: sticky; top: var(--top-h); z-index: 9; } }
 .ttabs button { flex: 1; text-align: center; }
 .sws { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px 8px; }
 .sw { display: grid; justify-items: center; gap: 7px; padding: 6px 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -1670,40 +1690,41 @@ function treeHTML(t, cx, cols) {
   });
   return h + '</div></div>';
 }
-// подсетки pl: основная, затем проигравших (за 3-е, 5–8, …); подсетки без 2 реальных игроков скрыты
-function plSections(t, rv) {
-  const out = [];
-  const walk = (r0, g, m) => {
-    const c = groupReal(t, rv, r0, g);
-    if (c >= 2) {
-      const cols = [];
-      for (let k = 0; 2 ** (k + 1) <= m; k++) {
-        const r = r0 + k, per = m / 2 ** (k + 1), gk = g * 2 ** k;
-        cols.push({ r, games: Array.from({ length: per }, (_, j) => gameAt(t, r, gk * per + j)) });
-      }
-      out.push({ r0, g, m, lo: g * m + 1, c, cols });
-    }
-    for (let k = 0; m / 2 ** (k + 1) >= 2; k++) walk(r0 + k + 1, g * 2 ** (k + 1) + 1, m / 2 ** (k + 1));
-  };
-  walk(0, 0, bSize(t));
-  return out.sort((x, y) => x.lo - y.lo);
-}
-const secShort = s => s.lo === 1 ? 'Основная' : s.c === 2 ? 'За ' + s.lo + '-е' : s.lo + '–' + (s.lo + s.c - 1);
-function sectionHTML(t, cx, sec) {
-  const n = sec.cols.length;
-  const title = sec.lo === 1 ? 'Основная сетка' : sec.c === 2 ? 'Матч за ' + sec.lo + '-е место' : 'Места ' + sec.lo + '–' + (sec.lo + sec.c - 1);
-  let sub = '', why = '';
-  if (sec.lo > 1) {
-    const pr = sec.r0 - 1, pg = sec.g >> 1, plo = pg * sec.m * 2 + 1;
-    why = 'Играют проигравшие ' + sec.r0 + '-го круга' + (pr > 0 ? ' в группе за ' + plo + '–' + (plo + groupReal(t, cx.rv, pr, pg) - 1) + ' места' : '');
-    const ns = [...new Set(sec.cols[0].games.flatMap(g => feeders(t, g.r, g.i).map(([fi]) => cx.nums.get(pr + ':' + fi)).filter(Boolean)))].sort((x, y) => x - y);
-    sub = !ns.length ? why : 'Проигравшие ' + (ns.length > 2 && ns[ns.length - 1] - ns[0] === ns.length - 1 ? '№' + ns[0] + '–' + ns[ns.length - 1] : ns.map(x => '№' + x).join(ns.length === 2 ? ' и ' : ', '));
+// компактная сетка «с розыгрышем всех мест»: в каждом круге S/2 матчей, поэтому матч i
+// всегда лежит в строке i, а группы (кто за какие места играет) делятся линиями
+function gameCell(t, g, cx, o) {
+  const cls = 'pc' + (o.first ? ' first' : '') + (o.sep ? ' sep' : '') + (g && g.r > 0 ? ' pg-l' : '');
+  if (!g) return '<div class="' + cls + ' void" aria-hidden="true">—</div>';
+  const { a, b, st } = gameState(t, g, cx.rv);
+  if (st === 'void') return '<div class="' + cls + ' void" aria-hidden="true">—</div>';
+  const me = a === 'me' || b === 'me' ? ' me' : '';
+  const tag = o.tag ? '<span class="tg' + (o.fin ? ' fin' : '') + '">' + esc(o.tag) + '</span>' : '';
+  if (st === 'bye') {
+    const side = a === BYE ? 1 : 0;
+    return '<div class="' + cls + ' bye' + me + '"><div class="pc-h">' + tag + '</div><div class="pc-r">' + slotWho(t, cx, g, side ? b : a, side, '', true) + '<span class="num">без игры</span></div></div>';
   }
-  const cols = sec.cols.map((c, k) => ({
-    games: c.games,
-    label: 'Круг ' + (c.r + 1) + (sec.lo === 1 ? ' · ' + koName(n - k) : n > 1 && k === n - 1 ? ' · за ' + sec.lo + '-е место' : '')
-  }));
-  return '<section class="bsec" id="bsec-' + sec.lo + '"><div class="bsec-h"><h3' + (why ? ' title="' + esc(why) + '"' : '') + '>' + title + '</h3>' + (sub ? '<span class="meta">' + esc(sub) + '</span>' : '') + '</div>' + treeHTML(t, cx, cols) + '</section>';
+  const n = cx.nums.get(g.r + ':' + g.i), ready = st === 'ready' && cx.live, live = ready && liveCtxIs(t.id, g.r, g.i);
+  const act = st === 'done' && MBY[g.res.mid] ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"'
+    : ready ? ' role="button" tabindex="0" data-act="' + (live ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
+  const row = (id, side) => '<div class="pc-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : '') + '</span></div>';
+  return '<div class="' + cls + me + (ready ? ' ready' : '') + (live ? ' live' : '') + '"' + act + '><div class="pc-h"><span>№' + n + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : 'играть') + '</span>' : '') + tag + '</div>' + row(a, 0) + row(b, 1) + '</div>';
+}
+function plGridHTML(t, cx) {
+  const R = bRounds(t), H = bSize(t) / 2;
+  let h = '<div class="scroll"><div class="pg" style="--pg-n:' + R + '">';
+  for (let r = 0; r < R; r++) h += '<div class="pg-h' + (r ? ' pg-l' : '') + '">Круг ' + (r + 1) + (r === R - 1 ? ' · места' : '') + '</div>';
+  for (let i = 0; i < H; i++) {
+    for (let r = 0; r < R; r++) {
+      const per = bSize(t) / 2 ** (r + 1), first = i % per === 0, fin = r === R - 1;
+      let tag = '';
+      if (first && (r > 0 || fin)) {
+        const { grp, lo } = plGroup(t, r, i), c = groupReal(t, cx.rv, r, grp);
+        if (c) tag = (fin ? '' : 'за ') + placesTxt(lo, lo + c - 1);
+      }
+      h += gameCell(t, gameAt(t, r, i), cx, { first: i === 0, sep: i > 0 && first, tag, fin });
+    }
+  }
+  return h + '</div></div>';
 }
 function bracketView(t) {
   const cx = bctx(t), R = bRounds(t), S = bSize(t), N = t.players.length;
@@ -1712,10 +1733,7 @@ function bracketView(t) {
     for (let r = 0; r < R; r++) cols.push({ label: roundLabel(t, r), games: Array.from({ length: S / 2 ** (r + 1) }, (_, i) => gameAt(t, r, i)) });
     return (S > N ? '<p class="meta">Свободных мест: ' + (S - N) + ' — соперники проходят первый круг без игры.</p>' : '') + treeHTML(t, cx, cols);
   }
-  const secs = plSections(t, cx.rv);
-  let h = '<p class="meta">Проигравшие не выбывают — разыгрываются все места 1–' + N + '.' + (S > N ? ' Свободных мест: ' + (S - N) + '.' : '') + '</p>';
-  if (secs.length > 1) h += '<div class="fchips" role="group" aria-label="Перейти к подсетке">' + secs.map(s => '<button class="fchip" data-act="jump" data-v="bsec-' + s.lo + '">' + secShort(s) + '</button>').join('') + '</div>';
-  return h + '<div class="bsecs">' + secs.map(s => sectionHTML(t, cx, s)).join('') + '</div>';
+  return '<p class="meta">Проигравшие не выбывают — разыгрываются все места 1–' + N + '.' + (S > N ? ' Свободных мест: ' + (S - N) + '.' : '') + ' Линии делят круг на группы: в каждой группе играют за свои места.</p>' + plGridHTML(t, cx);
 }
 function gameRow(t, g, cx) {
   const { a, b, st } = gameState(t, g, cx.rv);
