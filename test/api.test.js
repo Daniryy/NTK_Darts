@@ -1,6 +1,8 @@
 // Тесты API на настоящей PostgreSQL: база пересоздаётся из демо-данных.
 // TEST_DATABASE_URL=postgres://… npm test   (по умолчанию локальная база oche_test)
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://postgres@127.0.0.1:5432/oche_test';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
+// тест стирает базу целиком — только базы с «test» в имени
+if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
 process.env.VK_APP_ID = '5550001';
 const test = require('node:test');

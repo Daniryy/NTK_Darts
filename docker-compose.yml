@@ -1,0 +1,15 @@
+# Локальная база для разработки: docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oche
+      POSTGRES_PASSWORD: oche
+      POSTGRES_DB: oche
+    ports:
+      - "5432:5432"
+    volumes:
+      - oche-db:/var/lib/postgresql/data
+      - ./db/docker-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+volumes:
+  oche-db:
