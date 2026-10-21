@@ -1,0 +1,22 @@
+{
+  "name": "oche",
+  "private": true,
+  "description": "Oche: сервер турниров по дартсу",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env server/index.js",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "migrate": "node --env-file-if-exists=.env db/migrate.js",
+    "seed": "node --env-file-if-exists=.env db/seed.js",
+    "test": "node --test --test-concurrency=1 shared/bracket.test.js test/*.test.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.3",
+    "@fastify/rate-limit": "11.2.1",
+    "@fastify/static": "10.1.6",
+    "fastify": "5.12.7",
+    "pg": "8.23.1"
+  }
+}
