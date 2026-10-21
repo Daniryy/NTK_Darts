@@ -1,0 +1,20 @@
+[Unit]
+Description=Oche API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+User=oche
+WorkingDirectory=/srv/oche/app
+EnvironmentFile=/etc/oche.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=2
+# защита: только чтение системы, без новых привилегий
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
