@@ -32,6 +32,12 @@ function stateOf(m, visits) {
   return st;
 }
 
+// живое состояние для табло: лег, кто бросает, остатки, последний подход
+function liveState(m, visits) {
+  const st = stateOf(m, visits), v = visits[visits.length - 1];
+  return { leg: st.leg, cur: st.winner == null ? st.cur : null, scores: st.scores, last: v ? { p: v.p, pts: v.pts, n: v.n, b: v.b, d: v.d } : null };
+}
+
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 
 // ошибка — текст; иначе null. Подход должен совпасть с тем, что считает сервер.
@@ -78,4 +84,4 @@ const lineOf = (m, l, k) => ({
   c100: l.c100 || 0, coh: l.coh != null ? l.coh : l.legs, coa: Math.max(l.coa || 0, l.legs), bl: l.bl || 0
 });
 
-module.exports = { IMPOSSIBLE, stateOf, checkVisit, checkFinish, lineOf };
+module.exports = { IMPOSSIBLE, stateOf, liveState, checkVisit, checkFinish, lineOf };

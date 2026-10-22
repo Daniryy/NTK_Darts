@@ -328,17 +328,65 @@
 ```json
 { "id": "gq7p0c2mzt", "status": "live", "tid": "t4", "r": 1, "i": 3, "mode": 501, "ltw": 3, "dbl": true, "starter": 0,
   "players": [{ "id": "p1", "name": "Артём Волков" }, { "id": "p8", "name": "Павел Зуев" }],
-  "legs": [1, 0], "w": null, "lastSeq": 14, "version": 15, "started": 1760000000000, "finished": null,
+  "legs": [1, 0], "w": null, "state": { "leg": 2, "cur": 1, "scores": [321, 441], "last": { "p": 0, "pts": 180, "n": 3, "b": 0, "d": ["T20", "T20", "T20"] } },
+  "lastSeq": 14, "version": 15, "started": 1760000000000, "finished": null,
   "lock": { "mine": false, "by": "Денис Карпов", "until": 1760000600000 }, "card": null }
 ```
 - `status` — `live` или `done`.
 - `legs` — выигранные леги (сервер считает по подходам).
+- `state` — живой счёт:
+  - `leg` — номер лега;
+  - `cur` — кто бросает (`null`, когда матч выигран);
+  - `scores` — остатки;
+  - `last` — последний подход или `null`.
 - `card` — `MatchCard` после `finish`.
 - **`Event`** — то же, что в `/events`, плюс поле `t` (время приёма). Бывает ещё тип `reopen` (см. выше).
 
-Счёт у зрителя страница считает сама по подходам: остаток = `mode` − сумма `pts` игрока в текущем леге. Первым в леге `k` бросает игрок `(starter + k − 1) mod число игроков`.
+Счёт у зрителя можно брать из `state` или считать по подходам: остаток = `mode` − сумма `pts` игрока в текущем леге. Первым в леге `k` бросает игрок `(starter + k − 1) mod число игроков`.
 
 ---
+
+## Табло (живой счёт без задержки)
+
+Для телевизора у организатора и для страницы турнира. Сервер сам присылает изменения через Server-Sent Events, через 50–100 мс после записи подхода. Опрашивать ничего не нужно.
+
+### `GET /api/tournaments/:id/live`
+Снимок без потока:
+```json
+{ "version": 57, "matches": [LiveMatch] }
+```
+`version` — версия турнира, `matches` — идущие матчи.
+
+**`LiveMatch`**:
+```json
+{ "id": "gq7p0c2mzt", "r": 1, "i": 3, "status": "live", "mode": 501, "ltw": 3,
+  "players": [{ "id": "p1", "name": "Артём Волков" }, { "id": "p8", "name": "Павел Зуев" }],
+  "legs": [1, 0], "w": null, "state": { "leg": 2, "cur": 1, "scores": [321, 441], "last": { "p": 0, "pts": 180, "n": 3, "b": 0, "d": null } },
+  "version": 15, "lastSeq": 14, "by": "Денис Карпов" }
+```
+`by` — кто ведёт счёт.
+
+### `GET /api/tournaments/:id/stream` — поток `text/event-stream`
+События:
+
+| `event` | `data` | Что делать |
+|---|---|---|
+| `snapshot` | как у `/live` | приходит сразу при подключении и после сбоя связи сервера с базой; заменить всё |
+| `match` | `LiveMatch` | матч начался, новый подход, отмена, завершение (`status: "done"`); заменить матч по `id`, если `version` новее |
+| `match` | `{ "id": "…", "deleted": true }` | матч брошен или результат снят: убрать с табло |
+| `tour` | `{ "version": 58 }` | изменилась сетка: один раз запросить `GET /api/tournaments/:id` |
+| `tour` | `{ "deleted": true }` | турнир удалён |
+
+Пример:
+```js
+const es = new EventSource('/api/tournaments/' + id + '/stream');
+es.addEventListener('snapshot', e => showAll(JSON.parse(e.data)));
+es.addEventListener('match', e => showMatch(JSON.parse(e.data)));   // анимация 180, перебора и закрытия — по state.last
+es.addEventListener('tour', () => reloadBracket());
+```
+- `EventSource` сам переподключается при обрыве: через 3 с, сервер задаёт это в `retry`. После переподключения снова приходит `snapshot`.
+- Если табло открыто, сетку можно обновлять по событию `tour` вместо опроса раз в 30 с.
+- На телефонах, где поток не держится (свёрнутая вкладка), достаточно опроса `GET /api/tournaments/:id?since=` раз в 30 с.
 
 ## Права
 
