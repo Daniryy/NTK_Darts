@@ -2,7 +2,7 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { stateOf, checkVisit, checkFinish, lineOf } = require('../darts');
+const { stateOf, liveState, checkVisit, checkFinish, lineOf } = require('../darts');
 const { TOUR_SQL, loadTours, readyPair, canScoreGame, isOwner, canClear, refreshTour } = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards, lineJSON } = require('../cards');
@@ -15,7 +15,7 @@ const MATCH_SQL = 'SELECT m.*, lp.name AS lock_name FROM matches m LEFT JOIN pla
 
 const matchJSON = (m, req, card) => ({
   id: m.id, status: m.status, tid: m.tournament_id, r: m.r, i: m.i, mode: m.mode, ltw: m.ltw, dbl: m.dbl, starter: m.starter,
-  players: m.players, legs: m.legs, w: m.w, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished,
+  players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished,
   lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || null, until: m.lock_until }, card: card || null
 });
 const eventJSON = e => Object.assign({ seq: e.seq, type: e.type }, e.data, { t: e.t });
@@ -83,9 +83,10 @@ async function startFriendly(c, req, me, b, id) {
 
 function insertMatch(c, req, me, m) {
   const now = Date.now();
-  return c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, starter, players, legs, lock_device, lock_player, lock_until, created_by, started)
-    VALUES ($1, $2, $3, $4, 'live', $5, $6, $7, $8, $9, $10, $11, $12, $13, $12, $14)`,
-  [m.id, m.tid, m.r, m.i, m.mode, m.ltw, m.dbl, m.starter, JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)), req.device, me.id, now + LOCK_MS, now]);
+  return c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, starter, players, legs, state, lock_device, lock_player, lock_until, created_by, started)
+    VALUES ($1, $2, $3, $4, 'live', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $13, $15)`,
+  [m.id, m.tid, m.r, m.i, m.mode, m.ltw, m.dbl, m.starter, JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)),
+    JSON.stringify(liveState(m, [])), req.device, me.id, now + LOCK_MS, now]);
 }
 
 async function finishMatch(c, m, st, lines, now) {
@@ -160,8 +161,8 @@ module.exports = async function (app) {
         for (const [s, v, type, data] of add) {
           await c.query('INSERT INTO match_events (match_id, seq, ver, type, data, t) VALUES ($1, $2, $3, $4, $5, $6)', [m.id, s, v, type, JSON.stringify(data), now]);
         }
-        await c.query('UPDATE matches SET last_seq = $2, version = $3, legs = $4, lock_until = $5 WHERE id = $1',
-          [m.id, seq, ver, JSON.stringify(stateOf(m, visits).legs), now + LOCK_MS]);
+        await c.query('UPDATE matches SET last_seq = $2, version = $3, legs = $4, state = $5, lock_until = $6 WHERE id = $1',
+          [m.id, seq, ver, JSON.stringify(stateOf(m, visits).legs), JSON.stringify(liveState(m, visits)), now + LOCK_MS]);
         if (fin) await finishMatch(c, m, fin.st, fin.lines, now);
         forget('m', m.id);
       }

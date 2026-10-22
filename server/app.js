@@ -12,6 +12,13 @@ function build(opts = {}) {
     bodyLimit: 64 * 1024
   });
 
+  // пустое тело с Content-Type: application/json (так шлют DELETE многие клиенты) — не ошибка
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    if (body === '') return done(null, undefined);
+    try { done(null, JSON.parse(body)); } catch (e) { e.statusCode = 400; done(e); }
+  });
+
   app.register(require('@fastify/cookie'), { secret: config.cookieSecret });
   app.register(require('@fastify/rate-limit'), {
     max: config.rateMax, timeWindow: 2000,
@@ -36,6 +43,7 @@ function build(opts = {}) {
     api.register(require('./routes/players'));
     api.register(require('./routes/tournaments'));
     api.register(require('./routes/matches'));
+    api.register(require('./routes/live'));
   });
 
   if (config.serveStatic) {

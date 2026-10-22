@@ -72,6 +72,12 @@ test('чтение без входа и базовые ошибки', async () =
   err(await call(null, 'POST', '/api/tournaments', {}), 400, 'bad_request'); // нет X-Device-Id
   err(await call({ dev: dev(), cookie: '' }, 'POST', '/api/tournaments', {}), 401, 'unauthorized');
   err(await call(null, 'GET', '/api/tournaments/t999'), 404, 'not_found');
+  // битый JSON — 400; пустое тело с заголовком JSON — не ошибка
+  const bad = await app.inject({ method: 'POST', url: '/api/auth/logout', payload: '{oops', headers: { 'content-type': 'application/json', 'x-device-id': dev() } });
+  assert.equal(bad.statusCode, 400);
+  assert.equal(JSON.parse(bad.body).error.code, 'bad_request');
+  const empty = await app.inject({ method: 'POST', url: '/api/auth/logout', payload: '', headers: { 'content-type': 'application/json', 'x-device-id': dev() } });
+  assert.equal(empty.statusCode, 200);
   const list = ok(await call(null, 'GET', '/api/tournaments?status=reg'));
   assert.equal(list.total, 2);
   assert.ok(ok(await call(null, 'GET', '/api/players?q=волк')).players.some(p => p.id === 'p1'));
