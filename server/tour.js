@@ -160,6 +160,7 @@ function tourJSON(t, me) {
   const out = Object.assign({}, t, {
     org: orgOf(row), roster,
     can: {
+      org: owner,
       edit: owner && t.status === 'reg',
       delete: owner,
       launch: owner && t.status === 'reg',

@@ -81,6 +81,7 @@ bash /srv/oche/app/deploy/deploy.sh
 Настройки nginx `deploy.sh` не меняет. Если сервер ставили до появления `shared/games.js`, добавьте в `/etc/nginx/sites-available/oche` строку из `deploy/nginx.conf`:
 ```
 location = /shared/games.js { add_header Cache-Control "no-cache"; }
+location = /api.js { add_header Cache-Control "no-cache"; }
 ```
 и выполните `nginx -t && systemctl reload nginx`.
 
@@ -100,7 +101,7 @@ location = /shared/games.js { add_header Cache-Control "no-cache"; }
 - Вдобавок включите резервное копирование в панели провайдера.
 
 ## Как устроено
-- Страницу, `shared/bracket.js` и `shared/games.js` отдаёт nginx, остальные файлы репозитория наружу не видны. До Node доходит только `/api/`.
+- Страницу, `api.js`, `shared/bracket.js` и `shared/games.js` отдаёт nginx, остальные файлы репозитория наружу не видны. До Node доходит только `/api/`.
 - Сетку, места и рейтинг сервер считает тем же модулем, что и страница. На демо-данных результаты совпадают полностью.
 - Подходы проверяются при приёме:
   - верный игрок по очереди, остаток, допустимые очки, закрытие через дубль;

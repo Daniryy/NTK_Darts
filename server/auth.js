@@ -57,6 +57,8 @@ async function vkPost(path, query, body) {
 
 function routes(app) {
   app.get('/api/me', async req => ({ player: meJSON(req.player), admin: !!(req.player && req.player.admin) }));
+  // что умеет сервер: вход через VK, вход для разработки
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, dev: config.devLogin }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};

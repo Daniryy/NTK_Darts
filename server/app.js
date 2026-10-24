@@ -53,6 +53,7 @@ function build(opts = {}) {
     app.get('/index.html', (req, reply) => reply.sendFile('index.html'));
     app.get('/shared/bracket.js', (req, reply) => reply.sendFile('shared/bracket.js'));
     app.get('/shared/games.js', (req, reply) => reply.sendFile('shared/games.js'));
+    app.get('/api.js', (req, reply) => reply.sendFile('api.js'));
   }
   return app;
 }
