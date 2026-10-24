@@ -31,7 +31,54 @@ const NDL_PLAYERS = [
   ['p19', 'Алексей Козеев', 'kozeev_a', 'OCH-1019', 'Новоуральск', '«Новоуральская Дартс Лига»', 82, 0],
   ['p20', 'Ирина Сыханова', 'syhanova_i', 'OCH-1020', 'Новоуральск', '«Новоуральская Дартс Лига»', 63, 0]
 ];
-const ALL_PLAYERS = SEED_PLAYERS.concat(NDL_PLAYERS);
+// ещё игроки, чтобы показать большую сетку на 64 (как MORE_PLAYERS на странице)
+const MORE_PLAYERS = [
+  ['p21', 'Максим Захаров', 'zakharov_21', 'OCH-1021', 'Новосибирск', '«Сибирский дубль»', 66, 1],
+  ['p22', 'Иван Воробьёв', 'vorobiev_22', 'OCH-1022', 'Новосибирск', '«Сибирский дубль»', 71, 1],
+  ['p23', 'Кирилл Попов', 'popov_23', 'OCH-1023', 'Нижний Новгород', '', 67, 1],
+  ['p24', 'Екатерина Андреева', 'andreeva_24', 'OCH-1024', 'Краснодар', '', 69, 1],
+  ['p25', 'Андрей Богданов', 'bogdanov_25', 'OCH-1025', 'Москва', '«Тройная двадцатка»', 69, 1],
+  ['p26', 'Евгений Кузнецов', 'kuznetsov_26', 'OCH-1026', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p27', 'Роман Степанов', 'stepanov_27', 'OCH-1027', 'Новоуральск', '«Новоуральская Дартс Лига»', 60, 0],
+  ['p28', 'Вера Лебедева', 'lebedeva2_28', 'OCH-1028', 'Казань', '«Бычий глаз»', 59, 0],
+  ['p29', 'Илья Смирнов', 'smirnov_29', 'OCH-1029', 'Москва', '«Тройная двадцатка»', 63, 1],
+  ['p30', 'Григорий Козлов', 'kozlov_30', 'OCH-1030', 'Новоуральск', '«Новоуральская Дартс Лига»', 64, 1],
+  ['p31', 'Владимир Голубев', 'golubev_31', 'OCH-1031', 'Самара', '«Волжская стрела»', 57, 0],
+  ['p32', 'Ольга Новикова', 'novikova_32', 'OCH-1032', 'Нижний Новгород', '', 60, 0],
+  ['p33', 'Константин Морозов', 'morozov_33', 'OCH-1033', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p34', 'Степан Семёнов', 'semenov_34', 'OCH-1034', 'Москва', '«Тройная двадцатка»', 61, 0],
+  ['p35', 'Фёдор Беляев', 'belyaev_35', 'OCH-1035', 'Москва', '«Оче-бар»', 54, 0],
+  ['p36', 'Мария Морозова', 'morozova_36', 'OCH-1036', 'Самара', '«Волжская стрела»', 59, 0],
+  ['p37', 'Борис Михайлов', 'mikhailov_37', 'OCH-1037', 'Краснодар', '', 59, 0],
+  ['p38', 'Пётр Петров', 'petrov_38', 'OCH-1038', 'Краснодар', '', 57, 0],
+  ['p39', 'Арсений Зайцев', 'zaitsev_39', 'OCH-1039', 'Москва', '«Тройная двадцатка»', 53, 0],
+  ['p40', 'Полина Макарова', 'makarova_40', 'OCH-1040', 'Москва', '«Оче-бар»', 55, 0],
+  ['p41', 'Александр Петров', 'petrov_41', 'OCH-1041', 'Казань', '«Бычий глаз»', 51, 0],
+  ['p42', 'Максим Зайцев', 'zaitsev_42', 'OCH-1042', 'Самара', '«Волжская стрела»', 51, 0],
+  ['p43', 'Иван Фёдоров', 'fedorov_43', 'OCH-1043', 'Краснодар', '', 52, 0],
+  ['p44', 'Татьяна Егорова', 'egorova_44', 'OCH-1044', 'Санкт-Петербург', '«Северный дубль»', 50, 0],
+  ['p45', 'Михаил Захаров', 'zakharov_45', 'OCH-1045', 'Новосибирск', '«Сибирский дубль»', 49, 0],
+  ['p46', 'Андрей Воробьёв', 'vorobiev_46', 'OCH-1046', 'Санкт-Петербург', '«Северный дубль»', 52, 0],
+  ['p47', 'Евгений Попов', 'popov_47', 'OCH-1047', 'Нижний Новгород', '', 47, 0],
+  ['p48', 'Дарья Козлова', 'kozlova_48', 'OCH-1048', 'Самара', '«Волжская стрела»', 48, 0],
+  ['p49', 'Илья Кузнецов', 'kuznetsov_49', 'OCH-1049', 'Казань', '«Бычий глаз»', 48, 0],
+  ['p50', 'Григорий Степанов', 'stepanov_50', 'OCH-1050', 'Санкт-Петербург', '«Северный дубль»', 43, 0],
+  ['p51', 'Владимир Виноградов', 'vinogradov_51', 'OCH-1051', 'Новосибирск', '«Сибирский дубль»', 46, 0],
+  ['p52', 'Софья Волкова', 'volkova_52', 'OCH-1052', 'Екатеринбург', '«Уральский сектор»', 43, 0],
+  ['p53', 'Константин Козлов', 'kozlov_53', 'OCH-1053', 'Екатеринбург', '«Уральский сектор»', 41, 0],
+  ['p54', 'Степан Голубев', 'golubev_54', 'OCH-1054', 'Самара', '«Волжская стрела»', 41, 0],
+  ['p55', 'Фёдор Тарасов', 'tarasov_55', 'OCH-1055', 'Москва', '«Оче-бар»', 45, 0],
+  ['p56', 'Светлана Кузнецова', 'kuznetsova_56', 'OCH-1056', 'Нижний Новгород', '', 43, 0],
+  ['p57', 'Лев Семёнов', 'semenov_57', 'OCH-1057', 'Новоуральск', '«Новоуральская Дартс Лига»', 39, 0],
+  ['p58', 'Борис Беляев', 'belyaev_58', 'OCH-1058', 'Екатеринбург', '«Уральский сектор»', 39, 0],
+  ['p59', 'Пётр Новиков', 'novikov_59', 'OCH-1059', 'Нижний Новгород', '', 41, 0],
+  ['p60', 'Алина Попова', 'popova_60', 'OCH-1060', 'Санкт-Петербург', '«Северный дубль»', 36, 0],
+  ['p61', 'Александр Новиков', 'novikov_61', 'OCH-1061', 'Нижний Новгород', '', 34, 0],
+  ['p62', 'Максим Павлов', 'pavlov_62', 'OCH-1062', 'Санкт-Петербург', '«Северный дубль»', 39, 0],
+  ['p63', 'Иван Михайлов', 'mikhailov_63', 'OCH-1063', 'Самара', '«Волжская стрела»', 36, 0],
+  ['p64', 'Людмила Орлова', 'orlova_64', 'OCH-1064', 'Казань', '«Бычий глаз»', 36, 0]
+];
+const ALL_PLAYERS = SEED_PLAYERS.concat(NDL_PLAYERS, MORE_PLAYERS);
 const ME = 'p17';
 const CHECKOUTS = [16, 20, 24, 32, 36, 40, 32, 40, 50, 56, 60, 64, 68, 72, 76, 80, 81, 84, 87, 90, 96, 100, 104, 107, 110, 116, 121, 124, 130, 141, 150, 161, 167, 170];
 const MIN = 6e4, HOUR = 36e5, DAY = 864e5;
@@ -92,13 +139,28 @@ function makeData() {
   };
   const ALL16 = SEED_PLAYERS.slice(0, 16).map(p => p[0]);
   const LEAGUE = { official: true, orgName: 'Лига Oche', orgVer: true, owner: 'p1' };
-
-  [92, 61, 31].forEach((d, k) => {
-    const t = T(Object.assign({ name: 'Кубок Лиги Oche · этап ' + (k + 1), city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - d * DAY, ltw: 3 }, LEAGUE));
-    bracket(t, 'pl', ALL16, null, 20 * MIN);
-  });
-  const spb = T({ name: 'Открытый чемпионат Петербурга', official: true, orgName: 'Клуб «Северный дубль»', orgVer: true, owner: 'p2', city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3, cap: 8 });
-  bracket(spb, 'ko', ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], null, 35 * MIN);
+  const SCORE = { k: 'score', lim: 10 };
+  const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
+  const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [total(byId[id]), total(byId[id])] : [total(byId[id])]]));
+  // завершённый турнир по-новому: квалификация «Набор очков», места по квалификации, сетки по 8 мест, все матчи сыграны
+  const qualTour = (o, ids, gap) => {
+    const t = T(Object.assign({ cap: ids.length, split: 8, format: 'pl' }, o));
+    t.qual = { ex: SCORE, tries: 2, res: qualOf(ids) };
+    const order = ids.slice().sort((x, y) => Math.max(...t.qual.res[y]) - Math.max(...t.qual.res[x]));
+    B.setBracket(t, 'pl', order, 8);
+    t.nums = Object.fromEntries(order.map((id, k) => [id, k + 1]));
+    let k = 0;
+    t.games.forEach(g => { if (B.gameState(t, g).st === 'ready') { play(t, g, t.start + 60 * MIN + k * gap); k++; } });
+    return t;
+  };
+  const ALL64 = ALL16.concat([ME], NDL_PLAYERS.map(p => p[0]), MORE_PLAYERS.map(p => p[0]));
+  // большая сетка: 64 игрока, 8 сеток по 8 мест
+  qualTour(Object.assign({ name: 'Гран-при Oche · финал сезона', city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 92 * DAY, ltw: 2 }, LEAGUE), ALL64, 4 * MIN);
+  // средняя: 24 игрока, 3 сетки
+  qualTour(Object.assign({ name: 'Кубок Лиги Oche · этап 2', city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 61 * DAY, ltw: 2 }, LEAGUE), ALL16.concat(['p21', 'p22', 'p23', 'p24', 'p25', 'p29', 'p30', 'p33']), 7 * MIN);
+  qualTour(Object.assign({ name: 'Кубок Лиги Oche · этап 3', city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 31 * DAY, ltw: 3 }, LEAGUE), ALL16, 12 * MIN);
+  // маленькая: 8 игроков, одна сетка
+  qualTour({ name: 'Открытый чемпионат Петербурга', club: 'c2', official: true, orgName: 'Клуб «Северный дубль»', orgVer: true, owner: 'p2', city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3 }, ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], 25 * MIN);
   const fr = T({ name: 'Дартс и пицца у Анны', owner: 'p9', city: 'Москва', venue: 'Квартирник', start: NOW - 10 * DAY, ltw: 2, cap: 5 });
   bracket(fr, 'pl', [ME, 'p9', 'p12', 'p15', 'p6'], null, 30 * MIN);
   // идущий этап ведёт тестовый игрок, чтобы проверять права организатора
@@ -119,10 +181,8 @@ function makeData() {
   }
 
   // NDL: квалификация «Набор очков» (лучшая из двух попыток), затем сетки по 8 мест; матчи — «Набор очков» до 2 побед
-  const SCORE = { k: 'score', lim: 10 }, NDL_ORG = { official: true, orgName: 'Новоуральская Дартс Лига', orgVer: true, owner: ME };
+  const NDL_ORG = { official: true, orgName: 'Новоуральская Дартс Лига', orgVer: true, owner: ME };
   const NDL20 = ALL16.concat([ME, 'p18', 'p19', 'p20']);
-  const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
-  const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [total(byId[id]), total(byId[id])] : [total(byId[id])]]));
   const scoreMatch = (t, g, time) => {
     const [a, b] = B.gamePlayersIn(t, g), legs = [0, 0], sc = [[], []];
     while (legs[0] < t.ltw && legs[1] < t.ltw) {
@@ -153,18 +213,36 @@ function makeData() {
 
 async function seed(c) {
   const now = Date.now(), { tours, matches } = makeData();
+  // роли: тестовый игрок — тех. администратор (проверять всё), p4 — администратор, p1 и p2 — ведущие клубов
+  const ROLE = { [ME]: 'tech', p4: 'admin', p1: 'host', p2: 'host' };
   for (const [id, name, handle, code, city, club, , ver] of ALL_PLAYERS) {
-    // тестовый игрок — администратор, чтобы проверять создание аккаунтов
-    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, admin, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [id, name, handle, code, city, club, !!ver, id === ME, now]);
+    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, role, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [id, name, handle, code, city, club, !!ver, ROLE[id] || 'player', now]);
   }
   await c.query(`SELECT setval('player_seq', $1)`, [ALL_PLAYERS.length]);
+  // клубы: два подтверждённых с ведущими и одна заявка на рассмотрении
+  const CLUBS = [
+    ['c1', 'Клуб «Тройная двадцатка»', 'Москва', 'ул. Лесная, 5', '+7 495 000-00-20', 'Шесть мишеней, турниры по пятницам.', 'active', 'p1'],
+    ['c2', 'Клуб «Северный дубль»', 'Санкт-Петербург', 'Невский пр., 100', 'vk.com/north_double', 'Открытый чемпионат Петербурга.', 'active', 'p2'],
+    ['c3', 'Квартирник у Анны', 'Москва', '', '@melnikova_a', 'Домашние турниры для друзей.', 'pending', 'p9']
+  ];
+  for (const [id, name, city, address, contact, about, status, owner] of CLUBS) {
+    await c.query(`INSERT INTO clubs (id, name, city, address, contact, about, status, owner_id, decided_by, decided_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [id, name, city, address, contact, about, status, owner, status === 'active' ? 'p4' : null, status === 'active' ? now : null, now - 30 * 864e5]);
+    if (status === 'active') await c.query('INSERT INTO club_hosts (club_id, player_id) VALUES ($1, $2)', [id, owner]);
+  }
+  await c.query(`SELECT setval('club_seq', $1)`, [CLUBS.length]);
+  // пример баннера в ленте
+  await c.query(`INSERT INTO banners (place, title, body, link, active, created_by, created_at) VALUES ('feed', $1, $2, NULL, true, $3, $4)`,
+    ['Место для вашей рекламы', 'Баннеры показываются в ленте, на странице турнира и на табло. Ведёт тех. администратор.', ME, now]);
+  // свои номера у тестового игрока: постоянные игроки «Оче-бара»
+  for (const [n, pid] of [[1, 'p6'], [2, 'p9'], [3, 'p12'], [4, 'p15'], [5, 'p4'], [7, 'p35'], [8, 'p40'], [9, 'p55']]) await c.query('INSERT INTO host_nums (host_id, n, player_id) VALUES ($1, $2, $3)', [ME, n, pid]);
   const js = v => v == null ? null : JSON.stringify(v);
   for (const t of tours) {
     await c.query(`INSERT INTO tournaments (id, name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, ltw, cap, slots,
-      ex, qual, split, block, stage, boards, nums, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+      ex, qual, split, block, stage, boards, nums, club_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
     [t.id, t.name, t.official, t.owner, t.orgName, t.orgVer, t.city, t.venue, t.start, t.regUntil || null, t.status, t.format, t.mode, t.ltw, t.cap, js(t.slots),
-      js(t.ex), t.qual ? js({ ex: t.qual.ex, tries: t.qual.tries }) : null, t.split || null, t.block || null, t.stage || null, js(t.boards), js(t.nums), now]);
+      js(t.ex), t.qual ? js({ ex: t.qual.ex, tries: t.qual.tries }) : null, t.split || null, t.block || null, t.stage || null, js(t.boards), js(t.nums), t.club || null, now]);
     await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, t.players]);
     if (t.qual) for (const [pid, vs] of Object.entries(t.qual.res)) for (const [k, v] of vs.entries()) {
       await c.query('INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)', [t.id, pid, k, v, t.start + 5 * MIN]);

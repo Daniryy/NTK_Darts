@@ -129,7 +129,7 @@ test('администратор создаёт аккаунт, игрок пр�
   const ed = ok(await call(A, 'PATCH', '/api/admin/players/' + p2.id, { title: 'МС', claim: true })).player;
   assert.equal(ed.title, 'МС');
   assert.notEqual(ed.claim, p2.claim);
-  err(await call(A, 'PATCH', '/api/admin/players/' + ME, { admin: false }), 409);
+  err(await call(A, 'PATCH', '/api/admin/players/' + ME, { role: 'player' }), 409);
   // разряд в своём профиле
   assert.equal(ok(await call(X, 'PATCH', '/api/me', { title: '1 разряд' })).player.title, '1 разряд');
 });

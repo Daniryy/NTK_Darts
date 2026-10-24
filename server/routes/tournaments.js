@@ -5,6 +5,7 @@ const Games = require('../../shared/games.js');
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
+const { atLeast, isAdmin } = require('../roles');
 const T = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards } = require('../cards');
@@ -82,12 +83,22 @@ function tourFields(b, full, me) {
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
-    if (!me.admin) throw E.forbidden('Официальный статус задаёт администратор');
+    if (!isAdmin(me)) throw E.forbidden('Официальный статус задаёт администратор');
     if (b.official !== undefined) o.official = V.bool(b.official, 'official');
     if (b.orgName !== undefined) o.org_name = b.orgName == null ? null : V.str(b.orgName, 'orgName', 1, 60);
     if (b.orgVer !== undefined) o.org_ver = V.bool(b.orgVer, 'orgVer');
   }
   return o;
+}
+
+// турнир от имени клуба (его ведущий или администратор): официальный, подпись — название клуба; null — убрать
+async function clubFields(c, v, me) {
+  if (v === null) return { club_id: null, official: false, org_name: null, org_ver: false };
+  const id = V.id(v, 'clubId');
+  const club = await one(c, `SELECT * FROM clubs WHERE id = $1 AND status = 'active'`, [id]);
+  if (!club) throw E.notFound('Клуб не найден');
+  if (!isAdmin(me) && !await one(c, 'SELECT 1 FROM club_hosts WHERE club_id = $1 AND player_id = $2', [id, me.id])) throw E.forbidden('Турнир от имени клуба создаёт его ведущий');
+  return { club_id: id, official: true, org_name: club.name, org_ver: true };
 }
 
 module.exports = async function (app) {
@@ -139,10 +150,11 @@ module.exports = async function (app) {
     }
     const res = await tx(async c => {
       if (ids.length && (await all(c, 'SELECT id FROM players WHERE id = ANY($1)', [ids])).length !== ids.length) throw E.bad('Игрок не найден', 'players');
-      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+      if (b.clubId != null) Object.assign(f, await clubFields(c, b.clubId, me));
+      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
-        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, Date.now()]);
+        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, Date.now()]);
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
       // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
       else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
@@ -158,6 +170,7 @@ module.exports = async function (app) {
       needOwner(t, me);
       if (t.status !== 'reg') throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const b = req.body || {}, f = tourFields(b, false, me);
+      if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
       if ((f.qual || f.split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
       ['ex', 'qual'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
       if (b.cap !== undefined) f.cap = V.int(b.cap, 'cap', Math.max(3, t.players.length), T.maxPlayers(f.format || t.format));
@@ -201,6 +214,7 @@ module.exports = async function (app) {
       if (!Array.isArray(boards) || boards.length > 64 || boards.some(x => !Number.isInteger(x) || x < 1 || x > 64)) throw E.bad('Камера №' + (k + 1) + ': мишени — номера 1–64', 'streams');
       return { title: s.title == null || s.title === '' ? 'Камера ' + (k + 1) : V.str(s.title, 'streams', 1, 40), url: u.href, boards: [...new Set(boards)].sort((x, y) => x - y) };
     });
+    if (!atLeast(me, 'host')) throw E.forbidden('Камеры подключают ведущие клубов — подайте заявку на клуб');
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);

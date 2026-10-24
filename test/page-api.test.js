@@ -42,7 +42,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 test('режим, вход для разработки, выход', async () => {
   const w = browser(), Api = makeApi(w);
   assert.equal(await Api.detect(), 'server');
-  assert.deepEqual(Api.config, { vk: false, dev: true });
+  assert.deepEqual(Api.config, { vk: false, phone: true, dev: true });
   assert.equal(Api.me, null);
   await Api.devLogin(ME);
   assert.equal(Api.me.id, ME);

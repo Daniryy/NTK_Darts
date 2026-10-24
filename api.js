@@ -33,7 +33,7 @@
   const NET_MSG = 'Нет связи с сервером';
 
   const Api = {
-    mode: 'demo', config: { vk: false, dev: false }, me: null, admin: false, base: '',
+    mode: 'demo', config: { vk: false, phone: false, dev: false }, me: null, admin: false, role: null, clubs: [], base: '',
     ApiError,
     get device() { return deviceId(); },
 
@@ -86,26 +86,33 @@
         Api.offline = false;
         await Api.loadMe().catch(() => {});
         ls.set('oche.lastMode', 'server');
-        ls.set('oche.lastMe', Api.me ? { me: Api.me, admin: Api.admin, config: Api.config } : null);
       } catch (e) {
         // без сети страница, работавшая с сервером, остаётся на сервере: очередь счёта дождётся связи
         const last = ls.get('oche.lastMe');
         if (e.net && ls.get('oche.lastMode') === 'server') {
           Api.mode = 'server'; Api.offline = true;
-          if (last) { Api.me = last.me; Api.admin = !!last.admin; Api.config = last.config || Api.config; }
+          if (last) { Api.setMe(last); Api.config = last.config || Api.config; }
         } else Api.mode = 'demo';
       }
       return Api.mode;
     },
-    async loadMe() {
-      const r = await Api.get('/api/me');
-      Api.me = r.player; Api.admin = !!r.admin;
-      ls.set('oche.lastMe', Api.me ? { me: Api.me, admin: Api.admin, config: Api.config } : null);
+    // ответ «кто я» (/api/me, вход, правка профиля): игрок, роль, клубы ведущего; запоминается для входа без сети
+    setMe(r) {
+      Api.me = r.player || r.me || null; Api.admin = !!r.admin; Api.role = Api.me ? r.role || Api.me.role || 'player' : null; Api.clubs = r.clubs || [];
+      if (Api.mode === 'server') ls.set('oche.lastMe', Api.me ? { player: Api.me, admin: Api.admin, role: Api.role, clubs: Api.clubs, config: Api.config } : null);
       return r;
     },
-    loginUrl: ret => '/api/auth/vk?return=' + encodeURIComponent(ret || '/'),
+    async loadMe() { return Api.setMe(await Api.get('/api/me')); },
+    // роль не ниже: player < host < admin < tech
+    can: role => !!Api.me && ['player', 'host', 'admin', 'tech'].indexOf(Api.role) >= ['player', 'host', 'admin', 'tech'].indexOf(role),
+    // link — привязать VK к аккаунту, в который уже вошли
+    loginUrl: (ret, link) => '/api/auth/vk?return=' + encodeURIComponent(ret || '/') + (link ? '&link=1' : ''),
     async devLogin(playerId) { await Api.post('/api/auth/dev', { playerId }); return Api.loadMe(); },
-    async logout() { await Api.post('/api/auth/logout'); Api.me = null; Api.admin = false; ls.set('oche.lastMe', null); },
+    // вход по телефону: код в SMS, затем проверка; link — привязать номер к своему аккаунту
+    phoneStart: phone => Api.post('/api/auth/phone', { phone }),
+    async phoneVerify(phone, code, link) { return Api.setMe(await Api.post('/api/auth/phone/verify', { phone, code, link: !!link })); },
+    async codeLogin(code) { return Api.setMe(await Api.post('/api/auth/code', { code })); },
+    async logout() { await Api.post('/api/auth/logout'); Api.setMe({}); },
 
     /* ===== Очередь неотправленного =====
        item: { id, start: тело PUT или null, ev: [события с seq], acked: сколько принято, stop: null | { code, message, … }, done }
