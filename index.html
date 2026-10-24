@@ -702,6 +702,27 @@ body.deskw .wrap { max-width: none; }
 .qrbox { background: #fff; border-radius: 12px; padding: 10px; width: min(320px, 80vw); aspect-ratio: 1; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
+.idchip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-bright); background: var(--surface2); font-size: 12.5px; color: var(--muted); }
+.idchip b { font-family: var(--display); letter-spacing: .08em; color: var(--fg); font-size: 14px; }
+.idchip:hover { border-color: var(--green); }
+.rolechip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; background: var(--surface2); border: 1px solid var(--line); color: var(--muted); }
+.rolechip.r-host { color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, var(--line)); }
+.rolechip.r-admin, .rolechip.r-tech { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+.lrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.lrow:last-child { border-bottom: 0; }
+.ocard.login { max-width: 420px; }
+.inp.big { font-size: 18px; padding: 12px 14px; }
+.inp.code-inp { font-family: var(--display); letter-spacing: .25em; text-transform: uppercase; text-align: center; font-size: 22px; }
+.inp.sm { padding: 5px 8px; font-size: 12.5px; width: auto; }
+.gacts.wrap { flex-wrap: wrap; justify-content: flex-end; max-width: 330px; }
+.numb { min-width: 40px; height: 32px; padding: 0 6px; display: grid; place-items: center; border-radius: 8px; background: var(--surface2); border: 1px solid var(--line); font-family: var(--display); font-size: 18px; font-weight: 600; }
+.banner { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(120deg, color-mix(in srgb, var(--green) 10%, var(--surface)), var(--surface)); }
+button.banner:hover { border-color: var(--line-bright); }
+.banner img { width: 96px; height: 54px; object-fit: cover; border-radius: 8px; }
+.banner .bn-t { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.banner img { flex: none; }
+.banner .bn-t span { color: var(--muted); font-size: 13px; }
+.banner .bn-ad { align-self: start; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); opacity: .7; }
 .adm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .adm-row:last-child { border-bottom: 0; }
 .code { font-family: var(--display); font-size: 18px; letter-spacing: .12em; padding: 2px 8px; border-radius: 6px; background: var(--surface2); border: 1px dashed var(--line-bright); user-select: all; }
@@ -1071,6 +1092,7 @@ const I = {
   moon: '<svg viewBox="0 0 24 24" class="ic sm" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
   volOn: '<svg viewBox="0 0 24 24" class="ic sm" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
   volOff: '<svg viewBox="0 0 24 24" class="ic sm" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   gear: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
 const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#161922" stroke="var(--line-bright)" stroke-width="1"/><circle cx="16" cy="16" r="11.8" fill="#f0ead8"/><circle cx="16" cy="16" r="8.8" fill="var(--green)"/><circle cx="16" cy="16" r="5.6" fill="#f0ead8"/><circle cx="16" cy="16" r="3.2" fill="var(--red)"/><path d="M20 12 L29 3" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/></svg>';
@@ -1109,6 +1131,53 @@ const NDL_PLAYERS = [
   ['p18', 'Дмитрий Горбунов', 'gorbunov_d', 'OCH-1018', 'Новоуральск', '«Новоуральская Дартс Лига»', 77, 1],
   ['p19', 'Алексей Козеев', 'kozeev_a', 'OCH-1019', 'Новоуральск', '«Новоуральская Дартс Лига»', 82, 0],
   ['p20', 'Ирина Сыханова', 'syhanova_i', 'OCH-1020', 'Новоуральск', '«Новоуральская Дартс Лига»', 63, 0]
+];
+// ещё игроки, чтобы показать большую сетку на 64
+const MORE_PLAYERS = [
+  ['p21', 'Максим Захаров', 'zakharov_21', 'OCH-1021', 'Новосибирск', '«Сибирский дубль»', 66, 1],
+  ['p22', 'Иван Воробьёв', 'vorobiev_22', 'OCH-1022', 'Новосибирск', '«Сибирский дубль»', 71, 1],
+  ['p23', 'Кирилл Попов', 'popov_23', 'OCH-1023', 'Нижний Новгород', '', 67, 1],
+  ['p24', 'Екатерина Андреева', 'andreeva_24', 'OCH-1024', 'Краснодар', '', 69, 1],
+  ['p25', 'Андрей Богданов', 'bogdanov_25', 'OCH-1025', 'Москва', '«Тройная двадцатка»', 69, 1],
+  ['p26', 'Евгений Кузнецов', 'kuznetsov_26', 'OCH-1026', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p27', 'Роман Степанов', 'stepanov_27', 'OCH-1027', 'Новоуральск', '«Новоуральская Дартс Лига»', 60, 0],
+  ['p28', 'Вера Лебедева', 'lebedeva2_28', 'OCH-1028', 'Казань', '«Бычий глаз»', 59, 0],
+  ['p29', 'Илья Смирнов', 'smirnov_29', 'OCH-1029', 'Москва', '«Тройная двадцатка»', 63, 1],
+  ['p30', 'Григорий Козлов', 'kozlov_30', 'OCH-1030', 'Новоуральск', '«Новоуральская Дартс Лига»', 64, 1],
+  ['p31', 'Владимир Голубев', 'golubev_31', 'OCH-1031', 'Самара', '«Волжская стрела»', 57, 0],
+  ['p32', 'Ольга Новикова', 'novikova_32', 'OCH-1032', 'Нижний Новгород', '', 60, 0],
+  ['p33', 'Константин Морозов', 'morozov_33', 'OCH-1033', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p34', 'Степан Семёнов', 'semenov_34', 'OCH-1034', 'Москва', '«Тройная двадцатка»', 61, 0],
+  ['p35', 'Фёдор Беляев', 'belyaev_35', 'OCH-1035', 'Москва', '«Оче-бар»', 54, 0],
+  ['p36', 'Мария Морозова', 'morozova_36', 'OCH-1036', 'Самара', '«Волжская стрела»', 59, 0],
+  ['p37', 'Борис Михайлов', 'mikhailov_37', 'OCH-1037', 'Краснодар', '', 59, 0],
+  ['p38', 'Пётр Петров', 'petrov_38', 'OCH-1038', 'Краснодар', '', 57, 0],
+  ['p39', 'Арсений Зайцев', 'zaitsev_39', 'OCH-1039', 'Москва', '«Тройная двадцатка»', 53, 0],
+  ['p40', 'Полина Макарова', 'makarova_40', 'OCH-1040', 'Москва', '«Оче-бар»', 55, 0],
+  ['p41', 'Александр Петров', 'petrov_41', 'OCH-1041', 'Казань', '«Бычий глаз»', 51, 0],
+  ['p42', 'Максим Зайцев', 'zaitsev_42', 'OCH-1042', 'Самара', '«Волжская стрела»', 51, 0],
+  ['p43', 'Иван Фёдоров', 'fedorov_43', 'OCH-1043', 'Краснодар', '', 52, 0],
+  ['p44', 'Татьяна Егорова', 'egorova_44', 'OCH-1044', 'Санкт-Петербург', '«Северный дубль»', 50, 0],
+  ['p45', 'Михаил Захаров', 'zakharov_45', 'OCH-1045', 'Новосибирск', '«Сибирский дубль»', 49, 0],
+  ['p46', 'Андрей Воробьёв', 'vorobiev_46', 'OCH-1046', 'Санкт-Петербург', '«Северный дубль»', 52, 0],
+  ['p47', 'Евгений Попов', 'popov_47', 'OCH-1047', 'Нижний Новгород', '', 47, 0],
+  ['p48', 'Дарья Козлова', 'kozlova_48', 'OCH-1048', 'Самара', '«Волжская стрела»', 48, 0],
+  ['p49', 'Илья Кузнецов', 'kuznetsov_49', 'OCH-1049', 'Казань', '«Бычий глаз»', 48, 0],
+  ['p50', 'Григорий Степанов', 'stepanov_50', 'OCH-1050', 'Санкт-Петербург', '«Северный дубль»', 43, 0],
+  ['p51', 'Владимир Виноградов', 'vinogradov_51', 'OCH-1051', 'Новосибирск', '«Сибирский дубль»', 46, 0],
+  ['p52', 'Софья Волкова', 'volkova_52', 'OCH-1052', 'Екатеринбург', '«Уральский сектор»', 43, 0],
+  ['p53', 'Константин Козлов', 'kozlov_53', 'OCH-1053', 'Екатеринбург', '«Уральский сектор»', 41, 0],
+  ['p54', 'Степан Голубев', 'golubev_54', 'OCH-1054', 'Самара', '«Волжская стрела»', 41, 0],
+  ['p55', 'Фёдор Тарасов', 'tarasov_55', 'OCH-1055', 'Москва', '«Оче-бар»', 45, 0],
+  ['p56', 'Светлана Кузнецова', 'kuznetsova_56', 'OCH-1056', 'Нижний Новгород', '', 43, 0],
+  ['p57', 'Лев Семёнов', 'semenov_57', 'OCH-1057', 'Новоуральск', '«Новоуральская Дартс Лига»', 39, 0],
+  ['p58', 'Борис Беляев', 'belyaev_58', 'OCH-1058', 'Екатеринбург', '«Уральский сектор»', 39, 0],
+  ['p59', 'Пётр Новиков', 'novikov_59', 'OCH-1059', 'Нижний Новгород', '', 41, 0],
+  ['p60', 'Алина Попова', 'popova_60', 'OCH-1060', 'Санкт-Петербург', '«Северный дубль»', 36, 0],
+  ['p61', 'Александр Новиков', 'novikov_61', 'OCH-1061', 'Нижний Новгород', '', 34, 0],
+  ['p62', 'Максим Павлов', 'pavlov_62', 'OCH-1062', 'Санкт-Петербург', '«Северный дубль»', 39, 0],
+  ['p63', 'Иван Михайлов', 'mikhailov_63', 'OCH-1063', 'Самара', '«Волжская стрела»', 36, 0],
+  ['p64', 'Людмила Орлова', 'orlova_64', 'OCH-1064', 'Казань', '«Бычий глаз»', 36, 0]
 ];
 const CHECKOUTS = [16, 20, 24, 32, 36, 40, 32, 40, 50, 56, 60, 64, 68, 72, 76, 80, 81, 84, 87, 90, 96, 100, 104, 107, 110, 116, 121, 124, 130, 141, 150, 161, 167, 170];
 
@@ -1198,13 +1267,30 @@ function makeSeed() {
   };
   const ALL16 = SEED_PLAYERS.map(p => p[0]);
   const LEAGUE = { name: 'Лига Oche', ver: true };
-
-  [92, 61, 31].forEach((d, k) => {
-    const t = T({ name: 'Кубок Лиги Oche · этап ' + (k + 1), official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - d * DAY, ltw: 3 });
-    bracket(t, 'pl', ALL16, null, 20 * MIN);
-  });
-  const spb = T({ name: 'Открытый чемпионат Петербурга', official: true, org: { name: 'Клуб «Северный дубль»', ver: true }, city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3, cap: 8 });
-  bracket(spb, 'ko', ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], null, 35 * MIN);
+  NDL_PLAYERS.concat(MORE_PLAYERS).forEach(([id, name, handle, code, city, club, base, ver]) => { const p = { id, name, handle, code, city, club, base, ver: !!ver }; players.push(p); byId[id] = p; });
+  const SCORE = { k: 'score', lim: 10 };
+  const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
+  const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [{ v: total(byId[id]) }, { v: total(byId[id]) }] : [{ v: total(byId[id]) }]]));
+  const qBestOf = (t, id) => Math.max(...t.qual.res[id].map(x => x.v));
+  // завершённый турнир по-новому: квалификация «Набор очков», места по квалификации, сетки по 8 мест, все матчи сыграны
+  const qualTour = (o, ids, gap) => {
+    const t = T(Object.assign({ cap: ids.length, split: 8, format: 'pl' }, o));
+    t.qual = { ex: SCORE, tries: 2, res: qualOf(ids) };
+    const order = ids.slice().sort((x, y) => qBestOf(t, y) - qBestOf(t, x));
+    setBracket(t, 'pl', order, 8);
+    t.nums = Object.fromEntries(order.map((id, k) => [id, k + 1]));
+    let k = 0;
+    t.games.forEach(g => { if (gameState(t, g).st === 'ready') { play(t, g, t.start + 60 * MIN + k * gap); k++; } });
+    return t;
+  };
+  const ALL64 = ALL16.concat(['me'], NDL_PLAYERS.map(p => p[0]), MORE_PLAYERS.map(p => p[0]));
+  // большая сетка: 64 игрока, 8 сеток по 8 мест
+  qualTour({ name: 'Гран-при Oche · финал сезона', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 92 * DAY, ltw: 2 }, ALL64, 4 * MIN);
+  // средняя: 24 игрока, 3 сетки
+  qualTour({ name: 'Кубок Лиги Oche · этап 2', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 61 * DAY, ltw: 2 }, ALL16.concat(['p21', 'p22', 'p23', 'p24', 'p25', 'p29', 'p30', 'p33']), 7 * MIN);
+  qualTour({ name: 'Кубок Лиги Oche · этап 3', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 31 * DAY, ltw: 3 }, ALL16, 12 * MIN);
+  // маленькая: 8 игроков, одна сетка
+  qualTour({ name: 'Открытый чемпионат Петербурга', official: true, org: { name: 'Клуб «Северный дубль»', ver: true }, city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3 }, ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], 25 * MIN);
   const fr = T({ name: 'Дартс и пицца у Анны', official: false, org: { name: 'Анна Мельникова', ver: false }, city: 'Москва', venue: 'Квартирник', start: NOW - 10 * DAY, ltw: 2, cap: 5 });
   bracket(fr, 'pl', ['me', 'p9', 'p12', 'p15', 'p6'], null, 30 * MIN);
   const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3 });
@@ -1225,11 +1311,8 @@ function makeSeed() {
   }
 
   // NDL: квалификация «Набор очков» (лучшая из двух попыток), затем сетки по 8 мест; матчи — «Набор очков» до 2 побед
-  NDL_PLAYERS.forEach(([id, name, handle, code, city, club, base, ver]) => { const p = { id, name, handle, code, city, club, base, ver: !!ver }; players.push(p); byId[id] = p; });
-  const SCORE = { k: 'score', lim: 10 }, NDL_ORG = { name: 'Новоуральская Дартс Лига', ver: true };
+  const NDL_ORG = { name: 'Новоуральская Дартс Лига', ver: true };
   const NDL20 = ALL16.concat(['me', 'p18', 'p19', 'p20']);
-  const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
-  const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [{ v: total(byId[id]) }, { v: total(byId[id]) }] : [{ v: total(byId[id]) }]]));
   const scoreMatch = (t, g, time) => {
     const [a, b] = gamePlayersIn(t, g), legs = [0, 0], sc = [[], []];
     while (legs[0] < t.ltw && legs[1] < t.ltw) {
@@ -1259,7 +1342,7 @@ function makeSeed() {
   return { v: DB_V, players, tournaments: tours, matches };
 }
 
-const DB_V = 3;
+const DB_V = 4;
 let db = null, P = {}, TBY = {}, MBY = {}, RATING = {}, RANK = {};
 // кто «я»: в демо — игрок me, на сервере — вошедший игрок (null без входа)
 let ME = 'me';
@@ -1472,8 +1555,8 @@ const S = {
   modalMatch: null, quickModal: null, qualModal: null, settings: false, clearRes: false, gf: 'all', confirmQual: null, hp: null,
   buf: '' // ввод суммы в счётчике, не часть G
 };
-const closeModals = () => { S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -1548,7 +1631,7 @@ const avatar = (id, cls) => photoOf(id)
   : '<span class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(initials(P[id] ? P[id].name : '?')) + '</span>';
 const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая' };
 const venueOf = t => t.venue && t.venue !== 'место уточняется' ? t.venue : '';
-const fmtName = t => t.qual ? 'Квалификация + сетки по ' + (t.split || 8) : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
+const fmtName = t => t.qual ? 'Квалификация + ' + ((t.cap || (t.players || []).length) > (t.split || 8) ? 'сетки по ' + (t.split || 8) : 'сетка') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
 function fmtLine(t) {
   const n = t.status === 'reg' ? t.cap : t.players.length;
   return fmtName(t) + ' · ' + (t.status === 'reg' ? 'до ' : '') + n + ' ' + pl(n, 'игрок', 'игрока', 'игроков') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwTxt(t.ltw) + (t.qual ? ' · квалификация: ' + Games.label(t.qual.ex) : '');
@@ -1673,6 +1756,7 @@ function renderModals() {
     const t = TBY[S.qr], url = tourUrl(S.qr);
     return '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
   }
+  if (S.login) return loginModal();
   if (S.lbox) return '<div class="lbox" data-act="lbox-close" role="dialog" aria-modal="true" aria-label="Фото"><img src="' + esc(S.lbox) + '" alt=""></div>';
   if (S.settings) {
     let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Настройки"><div class="ocard">';
@@ -1704,6 +1788,7 @@ function topView() {
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
     (SRV && Api.ob.total() ? '<span class="pill" title="Подходы сохранены на телефоне и будут отправлены">не отправлено: ' + Api.ob.total() + '</span>' : '') +
     (SRV && !ME ? '<button class="mini go" data-act="login">Войти</button>' : '') +
+    (SRV && Api.can('host') ? '<button class="icon-btn" data-act="go" data-v="admin" title="Панель управления" aria-label="Панель управления">' + I.shield + '</button>' : '') +
     '<button class="icon-btn" data-act="open-settings" title="Настройки: тема, цвета, звук" aria-label="Настройки">' + I.gear + '</button>' +
     '</div>';
 }
@@ -2009,7 +2094,7 @@ function tourView(id) {
   else {
     h += '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
   }
-  return h;
+  return h + bannerHTML('tour');
 }
 function deleteTour(tid) {
   const t = TBY[tid];
@@ -2259,11 +2344,13 @@ function newTourView() {
   h += '<div class="field"><span class="label">' + (nt.fmt === 'ndl' ? 'Игра в сетках' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4, 5], nt.ltw, 'nt-ltw') + '</div></div>';
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
+  if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
   h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
   if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
-  h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока" aria-label="Найти или добавить игрока" autocomplete="off">';
+  if (SRV && Api.can('host')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
+  h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока: имя или ID" aria-label="Найти или добавить игрока" autocomplete="off">';
   h += '<button class="ghost addp" id="nt-add" data-act="nt-addp"' + (raw && !ntExact(raw) ? '' : ' hidden') + '>+ Добавить «' + esc(raw) + '»</button>';
   const order = p => p.id === ME ? 0 : /^x/.test(p.id) ? 1 : 2;
   if (SRV && !ntPool().length) h += svState(lz('psearch:' + (nt.qq || '').trim(), () => Api.get('/api/players?limit=40')), 'игроков') || '<p class="meta">Никого не нашли — добавьте игрока по имени.</p>';
@@ -2286,6 +2373,7 @@ function createTour() {
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
+    if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
     if (ndl) { body.qual = { ex: exFrom(nt.qk), tries: nt.tries }; body.split = 8; }
     nt.err = '';
     return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
@@ -2358,9 +2446,10 @@ function profileHTML(p, s, all, tours) {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
   if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + (p.title ? ' · ' + esc(p.title) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
+  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
   if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id] && RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
-  if (isMe && SRV && !all.n) h += claimBox();
+  if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
   h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   if (!s.n) {
     h += '<div class="note-box">' + (S.pf === 'off' ? 'Турнирных матчей пока нет.' : 'Матчей пока нет.') + '</div>';
@@ -2383,6 +2472,7 @@ function profileHTML(p, s, all, tours) {
   h += shown.length ? shown.map(mrow).join('') : '<div class="note-box">Нет матчей.</div>';
   h += '</div>' + (!S.pMore && s.ms.length > 6 ? '<button class="ghost more" data-act="pmore">Показать все ' + s.ms.length + '</button>' : '') + '</div>';
   h += '<div class="sec"><span class="label">Турниры</span>' + (tours.length ? '<div class="list">' + tours.map(t => '<div class="trow"><div style="display:grid;min-width:0"><button class="lnk" data-act="go" data-v="t.' + t.id + '" style="text-align:left">' + esc(t.name) + '</button><span class="meta">' + fmtDate(t.start) + '</span></div>' + t.badge + '</div>').join('') + '</div>' : '<div class="note-box">Турниров пока нет.</div>');
+  if (isMe && SRV) h += meCard();
   h += '</div></div>';
   return h;
 }
@@ -3221,8 +3311,9 @@ function camsPlace() {
 window.addEventListener('resize', () => camsPlace());
 // вкладка «Трансляция»: камеры и, для организатора, их настройка
 function streamView(t) {
-  const ss = streamsOf(t), org = canDo(t, 'org');
+  const ss = streamsOf(t), org = canDo(t, 'stream');
   let h = ss.length ? '<div class="cams">' + ss.map((s, k) => camHTML(s, 'tour' + k)).join('') + '</div>' : '<div class="note-box">' + (org ? 'Камер пока нет. Добавьте ссылки на трансляции — до 4 камер.' : 'Трансляции пока нет.') + '</div>';
+  if (!org && canDo(t, 'org')) return h + '<div class="note-box">Трансляции подключают ведущие клубов. Зарегистрируйте клуб в профиле — после подтверждения здесь появятся камеры.</div>';
   if (!org) return h;
   const ed = S.camEdit && S.camEdit.tid === t.id ? S.camEdit.list : ss.map(s => ({ title: s.title, url: s.url, boards: (s.boards || []).join(', ') }));
   if (!S.camEdit || S.camEdit.tid !== t.id) S.camEdit = { tid: t.id, list: ed };
@@ -3299,23 +3390,241 @@ function qrHTML(text) {
 function claimBox() {
   return '<div class="card sec"><span class="label">Аккаунт от организатора</span><p class="meta">Организатор завёл вас заранее и дал код? Введите его — матчи и турниры того аккаунта станут вашими.</p><div class="nrow"><input class="inp" id="claim-code" maxlength="16" placeholder="Код, например K7MQ2XRA" autocomplete="off" style="text-transform:uppercase"><button class="mini go" data-act="claim">Привязать</button></div></div>';
 }
-function adminView() {
-  if (!SRV) return '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><div class="note-box">В демо-режиме аккаунтов нет: все игроки хранятся в этом браузере. Создание аккаунтов и коды привязки работают с сервером.</div></div>';
-  if (!Api.admin) return '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><div class="note-box">Раздел для администратора.</div></div>';
-  const q = (S.admQ || '').trim(), e = lz('admin:' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '')));
-  let h = '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><p class="meta">Создайте аккаунт и передайте игроку код. Он войдёт через VK и введёт код в профиле — аккаунт со всеми матчами станет его.</p>';
-  h += '<div class="panel"><span class="h2">Новый игрок</span><input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб"></div><input class="inp" id="adm-title" maxlength="40" placeholder="Разряд или звание"><button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
-  if (S.admNew) h += '<div class="note-box"><b>' + esc(S.admNew.name) + '</b> — код привязки: <span class="code">' + esc(S.admNew.claim) + '</span></div>';
-  h += '</div><input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти игрока" aria-label="Найти игрока">';
-  const st = svState(e, 'игроков');
-  if (st) return h + st + '</div>';
-  h += '<div class="card" style="padding:4px 14px">' + (e.data.players.length ? e.data.players.map(p => {
-    svPlayer(p);
-    return '<div class="adm-row">' + avatar(p.id) + '<div style="min-width:0;display:grid">' + pid(p.id) + '<span class="meta">' + esc([p.city, p.club, p.title].filter(Boolean).join(' · ')) + (p.vk ? ' · VK привязан' : '') + (p.admin ? ' · админ' : '') + '</span>' + (p.claim ? '<span class="meta">код: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><div class="gacts">' +
-      '<button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button>' + (p.vk ? '' : '<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код' : 'Выдать код') + '</button>') +
-      '<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '" title="Подтверждённый игрок">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button></div></div>';
-  }).join('') : '<p class="meta" style="padding:10px 0">Никого не нашли.</p>') + '</div>';
+/* ===== Вход и роли: игрок, ведущий (клуб подтверждён), администратор, тех. администратор ===== */
+const ROLE_NAME = { player: 'игрок', host: 'ведущий', admin: 'администратор', tech: 'тех. администратор' };
+const roleChip = r => r && r !== 'player' ? '<span class="rolechip r-' + r + '">' + ROLE_NAME[r] + '</span>' : '';
+const showPhone = p => p ? p.replace(/^\+7(\d{3})(\d{3})(\d{2})(\d{2})$/, '+7 $1 $2-$3-$4') : '';
+// «1 4 7-12» → [1, 4, 7, 8, 9, 10, 11, 12]
+function parseNums(s) {
+  const out = [];
+  String(s || '').split(/[\s,;]+/).forEach(x => {
+    const m = x.match(/^(\d{1,4})(?:[-–](\d{1,4}))?$/);
+    if (!m) return;
+    const a = +m[1], b = m[2] ? +m[2] : a;
+    for (let n = Math.min(a, b); n <= Math.max(a, b) && out.length < 200; n++) if (n >= 1 && !out.includes(n)) out.push(n);
+  });
+  return out;
+}
+
+// окно входа: телефон (код из SMS), VK ID, код от ведущего; link — привязать телефон к своему аккаунту
+function loginOpen(o) {
+  closeModals();
+  const c = Api.config || {};
+  S.login = Object.assign({ tab: c.phone ? 'phone' : c.vk ? 'vk' : 'code', phone: '', otp: '', code: '', sent: false, dev: '', err: '', busy: false }, o || {});
+  render();
+  setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30);
+}
+const devBox = () => Api.config && Api.config.dev ? '<details class="meta"><summary>Вход для разработки</summary><div class="nrow" style="margin-top:8px"><input class="inp" id="dev-id" placeholder="id игрока, например p17" value="p17"><button class="mini go" data-act="dev-login">Войти</button></div></details>' : '';
+function loginModal() {
+  const L = S.login, c = Api.config || {};
+  const tabs = [['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === 'phone'));
+  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Вход"><div class="ocard login"><div class="ohead"><h2>' + (L.link ? 'Привязать телефон' : 'Вход в Oche') + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
+  if (!tabs.some(x => x[0] === L.tab)) L.tab = tabs[0][0];
+  if (tabs.length > 1) h += '<div class="seg2 full" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (L.tab === v) + '" class="' + (L.tab === v ? 'on' : '') + '" data-act="login-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  const dis = L.busy ? ' disabled' : '';
+  if (L.tab === 'phone' && !L.sent) {
+    h += '<div class="field"><label class="label" for="login-phone">Номер телефона</label><input class="inp big" id="login-phone" data-lf="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" value="' + esc(L.phone) + '"></div>';
+    h += '<button class="btn" data-act="login-send"' + dis + '>Получить код</button><span class="meta">Пришлём SMS с кодом из 6 цифр.' + (L.link ? '' : ' Номер новый — создадим аккаунт, имя укажете в профиле.') + '</span>';
+  } else if (L.tab === 'phone') {
+    h += '<p class="meta">Код отправлен на <b>' + esc(L.phone) + '</b>.</p><div class="field"><label class="label" for="login-otp">Код из SMS</label><input class="inp big code-inp" id="login-otp" data-lf="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="' + esc(L.otp) + '"></div>';
+    if (L.dev) h += '<div class="note-box">Разработка: SMS не отправляются, код <b>' + esc(L.dev) + '</b>.</div>';
+    h += '<button class="btn" data-act="login-verify"' + dis + '>' + (L.link ? 'Привязать' : 'Войти') + '</button><div class="row2"><button class="ghost sm" data-act="login-back">Другой номер</button><button class="ghost sm" data-act="login-send"' + dis + '>Прислать код ещё раз</button></div>';
+  } else if (L.tab === 'vk') {
+    h += '<button class="btn" data-act="login-vk">Войти через VK ID</button><span class="meta">Откроется VK: подтвердите вход и вернётесь обратно.</span>';
+  } else {
+    h += '<p class="meta">Ведущий завёл вам аккаунт и дал код из 8 букв и цифр? Введите его — вход сразу, без SMS и VK.</p><input class="inp big code-inp" id="login-code" data-lf="code" autocomplete="off" maxlength="16" placeholder="K7MQ2XRA" aria-label="Код от ведущего" value="' + esc(L.code) + '"><button class="btn" data-act="login-code"' + dis + '>Войти</button>';
+  }
+  if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
+  if (!L.link) h += devBox();
+  return h + '</div></div>';
+}
+async function loginDo(p, ok) {
+  const L = S.login;
+  if (!L) return;
+  L.busy = true; L.err = ''; render();
+  try { const r = await p; L.busy = false; ok(r); }
+  catch (e) { L.busy = false; L.err = e.net ? 'Нет связи с сервером — проверьте интернет.' : e.message; }
+  render();
+}
+function loggedIn(msg) {
+  ME = Api.me.id; svPlayer(Api.me); meInSetup();
+  Object.keys(SVC).forEach(k => { SVC[k].at = 0; });
+  closeModals(); toast(msg || 'Вы вошли как ' + Api.me.name + '.');
+}
+function loginAct(a) {
+  const L = S.login;
+  if (!L) return;
+  const val = id => { const el = $(id); return el ? el.value.trim() : ''; };
+  if (a === 'send') {
+    if (!L.sent) L.phone = val('login-phone');
+    if (!L.phone) { L.err = 'Введите номер телефона.'; return render(); }
+    return loginDo(Api.phoneStart(L.phone), r => { L.sent = true; L.otp = ''; L.dev = r.devCode || ''; setTimeout(() => { const el = $('login-otp'); if (el) el.focus(); }, 30); });
+  }
+  if (a === 'verify') {
+    L.otp = val('login-otp');
+    return loginDo(Api.phoneVerify(L.phone, L.otp, L.link), r => {
+      if (L.link) { svPlayer(Api.me); svStale('player:'); closeModals(); toast('Телефон привязан.'); return; }
+      loggedIn(r.created ? 'Аккаунт создан. Укажите имя и город.' : null);
+      if (r.created) { S.editName = true; go('p.me'); }
+    });
+  }
+  if (a === 'code') { L.code = val('login-code'); return loginDo(Api.codeLogin(L.code), () => loggedIn()); }
+}
+
+// профиль: способы входа, клуб, панель управления
+function meCard() {
+  const me = Api.me, c = Api.config || {};
+  if (!me) return '';
+  const row = (name, val, act) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + act + '</div>';
+  let h = '<div class="card sec"><span class="label">Вход в аккаунт</span><div>';
+  h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? (me.vk ? '<button class="ghost sm" data-act="unlink" data-v="phone">Отвязать</button>' : '') : c.phone ? '<button class="mini" data-act="link-phone">Привязать</button>' : '');
+  h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
+  h += '</div>' + (!me.phone && !me.vk ? '<p class="meta">Привяжите телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
+  h += clubCard();
+  if (Api.can('host')) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
+  return h;
+}
+function clubCard() {
+  const e = lz('clubs:mine', () => Api.get('/api/clubs/mine'), 60000);
+  if (!e.data) return '';
+  const cl = e.data.clubs, act = cl.filter(c => c.status === 'active'), pend = cl.find(c => c.status === 'pending');
+  let h = '<div class="card sec"><span class="label">Клуб</span>';
+  h += act.map(c => '<div class="lrow"><span><b>' + esc(c.name) + '</b><br><span class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ')) + ' · вы ведущий</span></span></div>').join('');
+  if (pend) h += '<div class="note-box">Заявка на клуб <b>' + esc(pend.name) + '</b> на рассмотрении. Администратор свяжется с вами' + (pend.contact ? ': ' + esc(pend.contact) : '') + '.</div>';
+  cl.filter(c => c.status === 'rejected' || c.status === 'closed').slice(0, 2).forEach(c => { h += '<p class="meta">«' + esc(c.name) + '»: ' + (c.status === 'rejected' ? 'заявка отклонена' : 'клуб закрыт') + (c.note ? ' — ' + esc(c.note) : '') + '</p>'; });
+  if (!pend && !S.clubForm) h += '<p class="meta">' + (act.length ? 'Открываете ещё один клуб?' : 'Проводите игры в клубе или баре? Зарегистрируйте клуб: после подтверждения вы станете ведущим — турниры от имени клуба, трансляции, свои номера игроков и аккаунты для тех, кто не может войти сам.') + '</p><button class="mini" data-act="club-form">Зарегистрировать клуб</button>';
+  else if (!pend) h += '<div class="field"><input class="inp" id="club-name" maxlength="60" placeholder="Название клуба" aria-label="Название клуба"><div class="nrow"><input class="inp" id="club-city" maxlength="40" placeholder="Город" aria-label="Город" value="' + esc(meP().city || '') + '"><input class="inp" id="club-address" maxlength="120" placeholder="Адрес" aria-label="Адрес"></div><input class="inp" id="club-contact" maxlength="120" placeholder="Как с вами связаться: телефон, VK, Telegram" aria-label="Контакт"><textarea class="inp" id="club-about" maxlength="500" rows="3" placeholder="Пара слов о клубе: сколько мишеней, когда игры" aria-label="О клубе"></textarea><div style="display:flex;gap:8px"><button class="btn sm" data-act="club-send">Отправить заявку</button><button class="ghost sm" data-act="club-form">Отмена</button></div></div>';
   return h + '</div>';
+}
+
+/* ===== Панель управления: вкладки по роли ===== */
+function adminView() {
+  const head = '<h1 class="h1">Управление</h1>';
+  if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
+  if (!Api.can('host')) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
+  const tabs = [['acc', 'Аккаунты'], ['nums', 'Мои номера']].concat(Api.can('admin') ? [['clubs', 'Клубы'], ['stats', 'Сводка']] : [], Api.can('tech') ? [['banners', 'Баннеры']] : []);
+  if (!tabs.some(x => x[0] === S.admTab)) S.admTab = 'acc';
+  let h = '<div class="narrow"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
+  h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += S.admTab === 'nums' ? admNums() : S.admTab === 'clubs' ? admClubs() : S.admTab === 'stats' ? admStats() : S.admTab === 'banners' ? admBanners() : admAccounts();
+  return h + '</div>';
+}
+const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
+function admAccounts() {
+  const admin = Api.can('admin'), q = (S.admQ || '').trim(), f = admin ? S.admF || '' : '';
+  const e = lz('admin:' + f + ':' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '') + (f === 'blocked' ? '&blocked=1' : f === 'mine' ? '&mine=1' : f ? '&role=' + f : '')));
+  let h = '<div class="panel"><span class="h2">Новый аккаунт</span><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Игрок вводит код от вас и сразу играет со своего телефона, участвует в турнирах. Позже сможет привязать телефон или VK.</p>';
+  h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
+  h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон"><input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px"></div>';
+  h += '<input class="inp" id="adm-title" maxlength="40" placeholder="Разряд или звание" aria-label="Разряд"><button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
+  if (S.admNew) h += codeNote(S.admNew);
+  h += '</div>';
+  if (admin) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон" aria-label="Найти игрока">';
+  const st = svState(e, 'игроков');
+  if (st) return h + st;
+  const rows = e.data.players;
+  if (!rows.length) return h + '<div class="note-box">' + (q || f ? 'Никого не нашли.' : admin ? 'Игроков пока нет.' : 'Вы ещё не заводили аккаунты.') + '</div>';
+  return h + '<div class="card" style="padding:4px 14px">' + rows.map(admRow).join('') + '</div>';
+}
+function admRow(p) {
+  svPlayer(p);
+  const admin = Api.can('admin'), tech = Api.can('tech'), mine = p.owner === ME;
+  const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.blocked ? ' · <b style="color:var(--red)">заблокирован</b>' : '');
+  let a = '';
+  if (admin || (mine && !p.vk && !p.phone)) a += '<button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button>';
+  if (!p.vk && (admin || mine)) a += '<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код' : 'Код входа') + '</button>';
+  if (admin) {
+    a += '<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '" title="Подтверждённый игрок">' + (p.ver ? '✓ подтв.' : 'Подтвердить') + '</button>';
+    const locked = p.id === ME || (!tech && (p.role === 'admin' || p.role === 'tech'));
+    if (!locked) {
+      a += '<select class="inp sm" data-role-of="' + p.id + '" aria-label="Роль">' + (tech ? ['player', 'host', 'admin', 'tech'] : ['player', 'host']).map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + ROLE_NAME[r] + '</option>').join('') + '</select>';
+      a += '<button class="mini' + (p.blocked ? ' go' : '') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Блок') + '</button>';
+    }
+  }
+  return '<div class="adm-row">' + avatar(p.id) + '<div style="min-width:0;display:grid">' + '<span>' + pid(p.id) + ' ' + roleChip(p.role) + '</span><span class="meta">' + meta + '</span>' + (p.claim ? '<span class="meta">код входа: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><div class="gacts wrap">' + a + '</div></div>';
+}
+function admNums() {
+  const e = lz('hostnums', () => Api.get('/api/host/nums'), 60000);
+  const st = svState(e, 'номеров');
+  if (st) return st;
+  const nums = e.data.nums;
+  let free = 1;
+  while (nums.some(x => x.n === free)) free++;
+  let h = '<p class="meta">Свои номера постоянных игроков — видите только вы. В новом турнире наберите «1 4 7-12», и участники добавятся сразу, без поиска по именам.</p>';
+  h += '<div class="panel"><span class="h2">Назначить номер</span><div class="nrow"><input class="inp" id="num-n" inputmode="numeric" maxlength="4" aria-label="Номер" style="max-width:90px" value="' + esc(S.numN || free) + '"><input class="inp" id="num-q" data-numq="1" placeholder="Игрок: имя или ID (OCH-1234)" aria-label="Игрок" value="' + esc(S.numQ || '') + '" autocomplete="off"></div>';
+  if ((S.numQQ || '').trim()) {
+    const r = lz('psearch:' + S.numQQ.trim(), () => Api.get('/api/players?limit=40&q=' + encodeURIComponent(S.numQQ.trim())), 60000);
+    h += svState(r, 'игроков') || (r.data.players.length ? '<div class="picks">' + r.data.players.slice(0, 12).map(p => { svPlayer(p); return '<button class="pick" data-act="num-set" data-v="' + p.id + '">' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc([p.code, p.city].filter(Boolean).join(' · ')) + '</span></span></button>'; }).join('') + '</div>' : '<p class="meta">Никого не нашли. Нет аккаунта — заведите его во вкладке «Аккаунты».</p>');
+  }
+  h += '</div>';
+  h += nums.length ? '<div class="card" style="padding:4px 14px">' + nums.map(x => { svPlayer(x.player); return '<div class="adm-row"><span class="numb">' + x.n + '</span><div style="min-width:0;display:grid">' + pid(x.player.id) + '<span class="meta">' + esc([x.player.code, x.player.city, x.player.club].filter(Boolean).join(' · ')) + '</span></div><button class="ghost sm" data-act="num-del" data-v="' + x.n + '" aria-label="Убрать номер ' + x.n + '">Убрать</button></div>'; }).join('') + '</div>' : '<div class="note-box">Номеров пока нет.</div>';
+  return h;
+}
+const CLUB_ST = { pending: 'заявка', active: 'подтверждён', rejected: 'отклонён', closed: 'закрыт' };
+function admClubs() {
+  const f = S.clubF || 'pending', e = lz('aclubs:' + f, () => Api.get('/api/admin/clubs' + (f === 'all' ? '' : '?status=' + f)));
+  let h = '<div class="seg2">' + [['pending', 'Заявки'], ['active', 'Клубы'], ['all', 'Все']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="club-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  const st = svState(e, 'клубов');
+  if (st) return h + st;
+  if (!e.data.clubs.length) return h + '<div class="note-box">' + (f === 'pending' ? 'Новых заявок нет.' : 'Клубов нет.') + '</div>';
+  return h + e.data.clubs.map(c => {
+    let x = '<div class="card sec"><div class="tstat"><b>' + esc(c.name) + '</b><span class="rolechip' + (c.status === 'active' ? ' r-host' : '') + '">' + CLUB_ST[c.status] + '</span></div>';
+    x += '<span class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ') || 'адрес не указан') + (c.contact ? ' · ' + esc(c.contact) : '') + '</span>';
+    if (c.about) x += '<p class="meta">' + esc(c.about) + '</p>';
+    if (c.owner) x += '<span class="meta">Заявка от ' + (svPlayer(c.owner), pid(c.owner.id)) + (c.created ? ' · ' + fmtDate(c.created) : '') + '</span>';
+    if (c.note) x += '<span class="meta">Ответ: ' + esc(c.note) + '</span>';
+    if (c.hosts.length) x += '<div class="selchips">' + c.hosts.map(p => '<button class="selchip" data-act="club-host-rm" data-v="' + c.id + '|' + p.id + '" aria-label="Убрать ведущего: ' + esc(p.name) + '"><span>' + esc(p.name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
+    if (c.status === 'pending') x += '<input class="inp" id="club-note-' + c.id + '" maxlength="300" placeholder="Комментарий (виден заявителю)" aria-label="Комментарий"><div class="gacts"><button class="mini go" data-act="club-st" data-v="' + c.id + '|active">Подтвердить</button><button class="mini" data-act="club-st" data-v="' + c.id + '|rejected">Отклонить</button></div>';
+    else if (c.status === 'active') x += '<div class="nrow"><input class="inp" id="club-host-' + c.id + '" placeholder="ID игрока, например OCH-1005" aria-label="ID нового ведущего"><button class="mini" data-act="club-host-add" data-v="' + c.id + '">+ Ведущий</button></div><div class="gacts"><button class="ghost sm dng" data-act="club-st" data-v="' + c.id + '|closed">Закрыть клуб</button></div>';
+    else x += '<div class="gacts"><button class="mini" data-act="club-st" data-v="' + c.id + '|active">Открыть снова</button></div>';
+    return x + '</div>';
+  }).join('');
+}
+function admStats() {
+  const e = lz('astats', () => Api.get('/api/admin/stats'), 30000);
+  const st = svState(e, 'сводки');
+  if (st) return st;
+  const d = e.data, t = (l, v, s) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span>' + (s ? '<span class="s">' + s + '</span>' : '') + '</div>';
+  return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
+}
+const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', tv: 'Табло' };
+function admBanners() {
+  const e = lz('abanners', () => Api.get('/api/admin/banners'));
+  const b = S.bnr || (S.bnr = { place: 'feed', title: '', body: '', link: '', image: '' });
+  let h = '<div class="panel"><span class="h2">Новый баннер</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (b.place === v ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '">' + BN_PLACE[v] + '</button>').join('') + '</div>';
+  h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '"><input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link) + '">';
+  h += '<div class="nrow"><input class="inp" data-bnr="image" placeholder="Картинка: ссылка https://… или загрузите" aria-label="Картинка" value="' + esc(b.image) + '"><label class="mini" style="cursor:pointer">Загрузить<input type="file" id="bnr-file" accept="image/jpeg,image/png,image/webp" hidden></label></div>';
+  if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b), true);
+  h += '<button class="btn sm" data-act="bnr-add">Добавить баннер</button></div>';
+  const st = svState(e, 'баннеров');
+  if (st) return h + st;
+  return h + (e.data.banners.length ? e.data.banners.map(x => '<div class="card sec">' + bannerBox(x, true) + '<div class="tstat"><span class="meta">' + BN_PLACE[x.place] + ' · переходов: ' + x.clicks + (x.ends ? ' · до ' + fmtDate(x.ends) : '') + '</span><div class="gacts"><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>').join('') : '<div class="note-box">Баннеров пока нет.</div>');
+}
+
+/* Баннеры: лента, страница турнира, табло. Переход считается на сервере. */
+const BANNERS = {};
+function bannerBox(b, preview) {
+  BANNERS[b.id] = b;
+  const tag = b.link && !preview ? 'button' : 'div';
+  return '<' + tag + ' class="banner"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span><span class="bn-ad">реклама</span></' + tag + '>';
+}
+function bannerHTML(place) {
+  if (!SRV) return '';
+  const e = lz('banners:' + place, () => Api.get('/api/banners?place=' + place), 300000), list = e.data && e.data.banners;
+  if (!list || !list.length) return '';
+  return bannerBox(list[Math.floor(Date.now() / 60000) % list.length]);
+}
+async function bannerUpload(file) {
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) return toast('Картинка больше 3 МБ — уменьшите её.');
+  try {
+    const bm = await createImageBitmap(file);
+    const r = await Api.upload('/api/photos?kind=banner&w=' + bm.width + '&h=' + bm.height, file);
+    S.bnr.image = r.photo.url; toast('Картинка загружена.');
+  } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message || 'Не удалось прочитать картинку.'); }
+  render();
 }
 
 /* ===== Табло для ТВ и экран организатора ===== */
@@ -3425,6 +3734,7 @@ function tvView(id) {
   } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
   if (O.stages) h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div>';
   if (O.qr) h += '<div class="tvbox tvqr"><h2>Сетка и счёт на телефоне</h2>' + qrHTML(tourUrl(t.id)) + '<span class="meta">Наведите камеру телефона</span></div>';
+  h += bannerHTML('tv');
   h += '</div>';
   return h;
 }
@@ -3705,11 +4015,7 @@ async function svDo(p, ok) {
   render();
 }
 function svAuthLost() { if (Api.me) toast('Нужно войти заново.'); Api.me = null; ME = null; }
-function svLogin() {
-  if (Api.config.vk) { location.href = Api.loginUrl(location.pathname + location.hash); return; }
-  closeModals(); S.settings = true; render();
-  if (!Api.config.dev) toast('Вход через VK на сервере ещё не настроен.');
-}
+function svLogin() { loginOpen(); }
 
 /* Поток турнира: живой счёт и обновление сетки без перезагрузки */
 let STREAM = null;
@@ -3764,7 +4070,7 @@ const listE = st => lz('list:' + st, () => Api.get('/api/tournaments?status=' + 
 function feedViewS() {
   const lv = listE('live'), f = S.feedF === 'my' && ME ? 'my' : 'all';
   const fd = lz('feed:' + f, () => Api.get('/api/feed?limit=50' + (f === 'my' ? '&scope=my' : '')));
-  let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">';
+  let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">' + bannerHTML('feed');
   if (lv.data && lv.data.tournaments.length) h += '<div class="sec"><span class="label">Сейчас идут</span><div class="tgrid">' + lv.data.tournaments.map(tourCardS).join('') + '</div></div>';
   h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все']].concat(ME ? [['my', 'Мои матчи']] : []).map(([v, l]) => '<button class="fchip' + (f === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const st = svState(fd, 'ленты');
@@ -3833,12 +4139,8 @@ function accountBox() {
   if (!SRV) h += '<span class="meta">Демо: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Сервер выключен вручную.' : ' Сервер не отвечает.') + '</span>';
   h += '</div>';
   if (!SRV) return h;
-  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.admin ? ' · администратор' : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (Api.admin ? '<button class="btn alt" data-act="go" data-v="admin">Аккаунты игроков</button>' : '');
-  else {
-    if (Api.config.vk) h += '<button class="btn" data-act="login">Войти через VK</button>';
-    else h += '<span class="meta">Вход через VK на сервере не настроен.</span>';
-    if (Api.config.dev) h += '<div class="field"><span class="label">Вход для разработки</span><div class="nrow"><input class="inp" id="dev-id" placeholder="id игрока, например p17" value="p17"><button class="mini go" data-act="dev-login">Войти</button></div></div>';
-  }
+  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + ROLE_NAME[Api.role] : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (Api.can('host') ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
+  else h += '<button class="btn" data-act="login">Войти</button><span class="meta">По номеру телефона, через VK ID или по коду от ведущего.</span>';
   return h;
 }
 
@@ -3987,7 +4289,75 @@ document.addEventListener('click', e => {
     case 'sv-retry': svNow(v); render(); break;
     case 'login': svLogin(); break;
     case 'logout': svDo(Api.logout(), () => { ME = null; Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); closeModals(); toast('Вы вышли.'); }); break;
-    case 'dev-login': { const el = $('dev-id'); svDo(Api.devLogin(el ? el.value.trim() : ''), () => { ME = Api.me.id; svPlayer(Api.me); meInSetup(); Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); closeModals(); toast('Вы вошли как ' + Api.me.name + '.'); }); break; }
+    case 'dev-login': { const el = $('dev-id'); svDo(Api.devLogin(el ? el.value.trim() : ''), () => loggedIn()); break; }
+    case 'login-tab': if (S.login) { S.login.tab = v; S.login.err = ''; render(); setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30); } break;
+    case 'login-send': loginAct('send'); break;
+    case 'login-verify': loginAct('verify'); break;
+    case 'login-code': loginAct('code'); break;
+    case 'login-back': if (S.login) { S.login.sent = false; S.login.err = ''; render(); } break;
+    case 'login-vk': location.href = Api.loginUrl(location.pathname + location.hash); break;
+    case 'link-phone': loginOpen({ tab: 'phone', link: true }); break;
+    case 'link-vk': location.href = Api.loginUrl(location.pathname + location.hash, true); break;
+    case 'unlink': svDo(Api.del('/api/me/login/' + v), r => { Api.setMe(r); svPlayer(r.player); toast(v === 'phone' ? 'Телефон отвязан.' : 'VK отвязан.'); }); break;
+    case 'copy-id': copyText(v, 'ID скопирован: ' + v); break;
+    case 'club-form': S.clubForm = !S.clubForm; render(); break;
+    case 'club-send': {
+      const val = k => { const el = $('club-' + k); return el ? el.value.trim() : ''; };
+      if (val('name').length < 2) { toast('Введите название клуба.'); break; }
+      svDo(Api.post('/api/clubs', { name: val('name'), city: val('city'), address: val('address'), contact: val('contact'), about: val('about') }), () => { S.clubForm = false; svStale('clubs:'); toast('Заявка отправлена. Администратор свяжется с вами.'); });
+      break;
+    }
+    case 'adm-tab': S.admTab = v; render(); break;
+    case 'adm-f': S.admF = v; render(); break;
+    case 'adm-block': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { blocked: on === '1' }), () => { svStale('admin:'); toast(on === '1' ? 'Игрок заблокирован: вход закрыт.' : 'Игрок разблокирован.'); }); break; }
+    case 'num-set': {
+      const el = $('num-n'), n = el ? +el.value : 0;
+      if (!Number.isInteger(n) || n < 1 || n > 9999) { toast('Номер — от 1 до 9999.'); break; }
+      svDo(Api.put('/api/host/nums/' + n, { playerId: v }), r => { SVC.hostnums && (SVC.hostnums.data = r); S.numN = ''; S.numQ = ''; S.numQQ = ''; toast('№' + n + ' — ' + (P[v] ? P[v].name : 'игрок') + '.'); });
+      break;
+    }
+    case 'num-del': svDo(Api.del('/api/host/nums/' + v), r => { if (SVC.hostnums) SVC.hostnums.data = r; }); break;
+    case 'club-f': S.clubF = v; render(); break;
+    case 'club-st': {
+      const [id, st] = v.split('|'), el = $('club-note-' + id), body = { status: st };
+      if (el && el.value.trim()) body.note = el.value.trim();
+      svDo(Api.patch('/api/admin/clubs/' + id, body), () => { svStale('aclubs:'); svStale('astats'); toast(st === 'active' ? 'Клуб подтверждён: заявитель стал ведущим.' : st === 'rejected' ? 'Заявка отклонена.' : 'Клуб закрыт.'); });
+      break;
+    }
+    case 'club-host-add': {
+      const el = $('club-host-' + v), q = el ? el.value.trim() : '';
+      if (!q) { toast('Введите ID игрока, например OCH-1005.'); break; }
+      svDo(Api.get('/api/players?limit=5&q=' + encodeURIComponent(q)).then(r => {
+        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(p => p.code.toLowerCase() === k || 'och-' + k === p.code.toLowerCase() || p.handle === k.replace(/^@/, '') || p.id === k);
+        const p = hit.length === 1 ? hit[0] : r.players.length === 1 ? r.players[0] : null;
+        if (!p) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (OCH-…)');
+        return Api.post('/api/admin/clubs/' + v + '/hosts', { playerId: p.id });
+      }), () => { svStale('aclubs:'); toast('Ведущий добавлен.'); });
+      break;
+    }
+    case 'club-host-rm': { const [cid, pid2] = v.split('|'); svDo(Api.del('/api/admin/clubs/' + cid + '/hosts/' + pid2), () => { svStale('aclubs:'); toast('Ведущий убран.'); }); break; }
+    case 'bnr-place': S.bnr.place = v; render(); break;
+    case 'bnr-add': {
+      const b = S.bnr, body = { place: b.place, title: b.title.trim(), body: b.body.trim(), link: b.link.trim() || null, image: b.image.trim() || null };
+      svDo(Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast('Баннер добавлен.'); });
+      break;
+    }
+    case 'bnr-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/banners/' + id, { active: on === '1' }), () => { svStale('abanners'); svStale('banners:'); }); break; }
+    case 'bnr-del': svDo(Api.del('/api/admin/banners/' + v), () => { svStale('abanners'); svStale('banners:'); toast('Баннер удалён.'); }); break;
+    case 'banner': { const b = BANNERS[v]; if (b && b.link) { Api.post('/api/banners/' + v + '/click').catch(() => {}); window.open(b.link, '_blank', 'noopener'); } break; }
+    case 'nt-club': if (S.nt) { S.nt.club = v; render(); } break;
+    case 'nt-nums': {
+      const el = $('nt-nums'), list = parseNums(el ? el.value : '');
+      if (!list.length) { toast('Введите номера, например 1 4 7-12.'); break; }
+      svDo(Api.get('/api/host/nums'), r => {
+        const by = Object.fromEntries(r.nums.map(x => [x.n, x.player])), miss = [];
+        list.forEach(n => { const p = by[n]; if (!p) return miss.push(n); svPlayer(p); if (!S.nt.sel.includes(p.id)) S.nt.sel.push(p.id); });
+        if (SVC.hostnums) SVC.hostnums.data = r;
+        S.nt.err = miss.length ? 'Нет таких номеров в вашем списке: ' + miss.join(', ') : '';
+        if (el) el.value = '';
+      });
+      break;
+    }
     case 'set-mode':
       if ((v === 'server') === SRV) break;
       Api.setMode(v === 'demo' ? 'demo' : null);
@@ -4038,7 +4408,7 @@ document.addEventListener('click', e => {
       const nv = val('name'), city = val('city'), club = val('club'), title = val('title');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '', title: title || '' }), r => { Api.me = r.player; svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '', title: title || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;
@@ -4098,13 +4468,15 @@ document.addEventListener('click', e => {
     case 'claim': {
       const el = $('claim-code'), code = el ? el.value.trim() : '';
       if (code.length < 4) { toast('Введите код от организатора.'); break; }
-      svDo(Api.post('/api/me/claim', { code }), r => { Api.me = r.player; Api.admin = r.admin; ME = r.player.id; svPlayer(r.player); Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); toast('Аккаунт привязан: ' + r.player.name + '.'); go('p.me'); });
+      svDo(Api.post('/api/me/claim', { code }), r => { Api.setMe(r); ME = r.player.id; svPlayer(r.player); Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); toast('Аккаунт привязан: ' + r.player.name + '.'); go('p.me'); });
       break;
     }
     case 'adm-new': {
       const val = k => { const el = $('adm-' + k); return el ? el.value.trim() : ''; };
       if (val('name').length < 2) { toast('Введите имя игрока.'); break; }
-      svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title') }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); ['name', 'city', 'club', 'title'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку код.'); });
+      const n = val('n') ? +val('n') : null;
+      if (n != null && !(Number.isInteger(n) && n >= 1 && n <= 9999)) { toast('Номер — от 1 до 9999.'); break; }
+      svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title'), phone: val('phone') || null, n }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); if (n) svStale('hostnums'); ['name', 'city', 'club', 'title', 'phone', 'n'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку код.'); });
       break;
     }
     case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); toast('Новый код готов.'); }); break;
@@ -4177,6 +4549,10 @@ document.addEventListener('input', e => {
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
+  if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
+  if (t.dataset && t.dataset.bnr && S.bnr) { S.bnr[t.dataset.bnr] = t.value; return; }
+  if (t.id === 'num-n') { S.numN = t.value; return; }
+  if (t.dataset && t.dataset.numq) { S.numQ = t.value; clearTimeout(S.numT); S.numT = setTimeout(() => { S.numQQ = S.numQ; render(); const el = $('num-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 300); return; }
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
     S.rsearch = t.value;
@@ -4193,6 +4569,12 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset && t.dataset.roleOf) {
+    const role = t.value;
+    svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('astats'); toast('Роль: ' + ROLE_NAME[role] + '.'); });
+    return;
+  }
+  if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
   if (SRV && t.dataset && t.dataset.num) {
     const [tid, id] = t.dataset.num.split('|'), n = +t.value;
     if (Number.isInteger(n) && n >= 1 && n <= 999) setNum(tid, id, n);
@@ -4210,6 +4592,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
+  if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
+  if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
+  if (e.key === 'Enter' && t && t.id === 'dev-id') { e.preventDefault(); const b = document.querySelector('[data-act="dev-login"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && t && /^me-/.test(t.id)) { const sb = $('app').querySelector('[data-act="savename"]'); if (sb) sb.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button') { e.preventDefault(); t.click(); return; }
 
@@ -4310,7 +4695,8 @@ async function boot() {
     db = { v: DB_V, players: [], tournaments: [], matches: [] };
     Api.ob.onchange = () => { if (!(R === 'play' && S.inGame)) $('top').innerHTML = topView(); else if (typeof obChanged === 'function') obChanged(); };
     Api.ob.clean(); Api.ob.kick();
-    if (/[?&]login=fail/.test(location.search)) toast('Не удалось войти через VK. Попробуйте ещё раз.');
+    const lg = (location.search.match(/[?&]login=(\w+)/) || [])[1];
+    if (lg) toast({ fail: 'Не удалось войти через VK. Попробуйте ещё раз.', vk_taken: 'Этот VK уже привязан к другому аккаунту.', linked: 'VK привязан к аккаунту.', blocked: 'Аккаунт заблокирован администратором.' }[lg] || 'Вход не выполнен.');
   } else loadDb();
   const su = lsGet('oche2.setup');
   S.setup = su && Array.isArray(su.names) && su.names.length ? su : defaultSetup();

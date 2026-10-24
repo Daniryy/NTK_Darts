@@ -32,6 +32,7 @@ function build(opts = {}) {
   });
 
   app.setErrorHandler((err, req, reply) => {
+    if (err instanceof ApiError && err.extra && err.extra.retryAfter) reply.header('Retry-After', String(err.extra.retryAfter));
     if (err instanceof ApiError) return reply.code(err.status).send({ error: Object.assign({ code: err.code, message: err.message }, err.extra) });
     if (err.validation || err.statusCode === 400 || err.statusCode === 415 || err.statusCode === 413) {
       return reply.code(err.statusCode || 400).send({ error: { code: 'bad_request', message: 'Неверный запрос: ' + err.message } });
@@ -51,6 +52,9 @@ function build(opts = {}) {
     api.register(require('./routes/live'));
     api.register(require('./routes/photos'));
     api.register(require('./routes/admin'));
+    api.register(require('./routes/clubs'));
+    api.register(require('./routes/host'));
+    api.register(require('./routes/banners'));
   });
 
   if (config.serveStatic) {

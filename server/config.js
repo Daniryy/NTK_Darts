@@ -17,6 +17,13 @@ module.exports = {
   // загруженные фото; на VPS — /srv/oche/uploads (nginx отдаёт их по /uploads/)
   uploadDir: env.UPLOAD_DIR || (prod ? '/srv/oche/uploads' : require('node:path').join(__dirname, '..', 'uploads')),
   vk: { appId: env.VK_APP_ID || '', domain: env.VK_DOMAIN || 'id.vk.ru' },
+  // вход по телефону: SMS_PROVIDER=smsru и SMS_RU_API_ID; в разработке по умолчанию log — код пишется в журнал
+  sms: {
+    provider: env.SMS_PROVIDER || (prod ? '' : 'log'),
+    smsruId: env.SMS_RU_API_ID || '',
+    from: env.SMS_FROM || '',
+    dayMax: +env.SMS_DAY_MAX || 300 // SMS за сутки на весь сервер: защита от счёта за рассылку
+  },
   rateMax: +env.RATE_MAX || 20, // запросов за 2 с с одного устройства
   logLevel: env.LOG_LEVEL || (prod ? 'info' : 'warn')
 };

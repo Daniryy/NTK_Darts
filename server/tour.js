@@ -1,6 +1,7 @@
 // Турнир из базы в том виде, в каком его хранит страница, и всё, что из него вычисляется.
 const B = require('../shared/bracket.js');
 const { all } = require('./db');
+const { atLeast, isAdmin } = require('./roles');
 
 const RR_MAX = 10, BR_MAX = 64;
 // строки турниров всегда берём с именем владельца
@@ -130,7 +131,7 @@ function gameLabel(t, g, rv) {
   return 'круг ' + (g.r + 1) + ' · за ' + placesTxt(lo, lo + c - 1);
 }
 
-const isOwner = (t, me) => !!me && (me.admin || t._row.owner_id === me.id);
+const isOwner = (t, me) => !!me && (isAdmin(me) || t._row.owner_id === me.id);
 
 // игроки игры сетки, если её можно начать: { a, b } или null
 function readyPair(t, r, i) {
@@ -158,7 +159,7 @@ function qualOrder(t) {
   return t.players.slice().sort((a, b) => { const ka = key(a), kb = key(b); return kb[0] - ka[0] || kb[1] - ka[1] || r[b] - r[a] || (a < b ? -1 : 1); });
 }
 
-const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver });
+const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver, club: row.club_id || null });
 
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me);
@@ -168,6 +169,7 @@ function tourJSON(t, me) {
     org: orgOf(row), roster,
     can: {
       org: owner,
+      stream: owner && atLeast(me, 'host'),
       edit: owner && t.status === 'reg',
       delete: owner,
       launch: owner && t.status === 'reg',

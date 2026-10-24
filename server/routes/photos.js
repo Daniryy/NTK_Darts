@@ -9,6 +9,7 @@ const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
 const { playerShort } = require('../players');
 const { isOwner, TOUR_SQL, loadTours } = require('../tour');
+const { atLeast, isAdmin } = require('../roles');
 const { forget } = require('../versions');
 const { clearCache } = require('../auth');
 
@@ -34,12 +35,12 @@ async function tourOwned(c, id, me) {
   if (!isOwner(t, me)) throw E.forbidden('Фото к итогам добавляет организатор');
   return t;
 }
-// чей аватар можно менять: свой, гостя, которого я создал, любой — администратору
+// чей аватар можно менять: свой, гостя или аккаунта, который я завёл, любой — администратору
 async function avatarTarget(c, me, pid) {
   if (!pid || pid === me.id) return me;
   const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p) throw E.notFound('Игрок не найден');
-  if (!me.admin && !(p.vk_id == null && p.owner_id === me.id)) throw E.forbidden('Менять фото можно себе, своим гостям или администратору');
+  if (!isAdmin(me) && !(p.vk_id == null && p.phone == null && p.owner_id === me.id)) throw E.forbidden('Менять фото можно себе, своим гостям или администратору');
   return p;
 }
 
@@ -49,13 +50,14 @@ module.exports = async function (app) {
     app.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_BYTES }, (req, body, done) => done(null, body));
   }
 
-  // POST /api/photos?kind=avatar[&playerId=] | kind=tour&tournamentId=…; w и h — размер после обрезки
+  // POST /api/photos?kind=avatar[&playerId=] | kind=tour&tournamentId=… | kind=banner (тех. администратор); w и h — размер после обрезки
   app.post('/api/photos', { bodyLimit: MAX_BYTES }, async (req, reply) => {
     const me = needPlayer(req), q = req.query, buf = req.body;
     if (!Buffer.isBuffer(buf) || !buf.length) throw E.bad('Нужна картинка: JPEG, WebP или PNG', 'body');
     const ext = kindOf(buf);
     if (!ext) throw E.bad('Это не JPEG, WebP или PNG', 'body');
-    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour']);
+    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'banner']);
+    if (kind === 'banner' && !atLeast(me, 'tech')) throw E.forbidden('Баннеры ведёт тех. администратор');
     const w = V.int(+q.w, 'w', 16, 4096), h = V.int(+q.h, 'h', 16, 4096);
     const id = crypto.randomBytes(12).toString('hex'), file = id + '.' + ext;
     await fs.promises.mkdir(config.uploadDir, { recursive: true });
@@ -70,6 +72,11 @@ module.exports = async function (app) {
             [id, file, me.id, p.id, w, h, buf.length, Date.now()]);
           const pl = await one(c, 'UPDATE players SET photo = $2 WHERE id = $1 RETURNING *', [p.id, urlOf(file)]);
           return { photo: photoJSON(row), player: playerShort(pl) };
+        }
+        if (kind === 'banner') {
+          const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'banner', $3, $4, $5, $6, $7) RETURNING *`,
+            [id, file, me.id, w, h, buf.length, Date.now()]);
+          return { photo: photoJSON(row) };
         }
         const t = await tourOwned(c, V.id(q.tournamentId, 'tournamentId'), me);
         if ((await one(c, 'SELECT count(*) AS n FROM photos WHERE tournament_id = $1', [t.id])).n >= TOUR_MAX) throw E.conflict('conflict', 'У турнира уже ' + TOUR_MAX + ' фото');

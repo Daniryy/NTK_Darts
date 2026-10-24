@@ -26,16 +26,17 @@ async function uniqueCode(c) {
   }
 }
 
-// p: { name, city, club, vk_id, owner_id }; в транзакции, чтобы handle и code не заняли параллельно
+// p: { name, city, club, vk_id, phone, owner_id }; в транзакции, чтобы handle и code не заняли параллельно
 async function createPlayer(c, p) {
   await c.query('LOCK TABLE players IN SHARE ROW EXCLUSIVE MODE');
   const handle = await uniqueHandle(c, p.name), code = await uniqueCode(c);
-  return one(c, `INSERT INTO players (name, handle, code, city, club, vk_id, owner_id, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-  [p.name, handle, code, p.city || '', p.club || '', p.vk_id || null, p.owner_id || null, Date.now()]);
+  return one(c, `INSERT INTO players (name, handle, code, city, club, vk_id, phone, owner_id, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+  [p.name, handle, code, p.city || '', p.club || '', p.vk_id || null, p.phone || null, p.owner_id || null, Date.now()]);
 }
 
-const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '' });
-const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '' } : null;
+const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '', role: p.role });
+// свой профиль: ещё способы входа (телефон целиком — только себе)
+const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, phone: p.phone || null, vk: p.vk_id != null } : null;
 
 module.exports = { createPlayer, playerShort, meJSON };
