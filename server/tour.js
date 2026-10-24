@@ -23,6 +23,7 @@ async function loadTours(c, rows) {
     const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
     t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
     t.links = row.links || [];
+    t.streams = row.streams || [];
     return t;
   });
 }

@@ -678,6 +678,17 @@ body.deskw .wrap { max-width: none; }
 .dpan-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dpan-h b { font-family: var(--display); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
 .dpan .tvt { box-shadow: none; }
+/* камеры: плееры живут в отдельном слое поверх страницы и встают на место своих рамок */
+.cam { display: grid; gap: 6px; min-width: 0; }
+.cam-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cam-h b { font-weight: 600; }
+.cam-slot { aspect-ratio: 16 / 9; border-radius: 12px; background: #000; display: grid; place-items: center; color: #888; font-size: 13px; }
+.cams { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+#cam-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 5; }
+.cam-fl { position: absolute; border-radius: 12px; overflow: hidden; background: #000; }
+.cam-fl iframe { width: 100%; height: 100%; border: 0; display: block; }
+.cam-edit { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--line); }
+.tvcams { display: grid; gap: 1.2vw; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
 .tvopt { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-bright); }
 .tvqr { display: grid; justify-items: center; gap: 6px; text-align: center; }
 .qrbox { background: #fff; border-radius: 12px; padding: 10px; width: min(320px, 80vw); aspect-ratio: 1; }
@@ -901,6 +912,7 @@ img.av { object-fit: cover; padding: 0; }
 <main class="wrap" id="app"></main>
 <nav class="tabs" id="tabs" aria-label="Разделы"></nav>
 <div id="modal-root"></div>
+<div id="cam-layer" aria-live="off"></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="shared/bracket.js"></script>
@@ -1476,7 +1488,7 @@ const toTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
 const motionOk = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function go(r, fromHash) {
   if (r !== R) {
-    if (r.startsWith('t.')) { S.ttab = null; S.gf = 'all'; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
+    if (r.startsWith('t.')) { S.camEdit = null; S.ttab = null; S.gf = 'all'; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
     if (r.startsWith('p.')) { S.pMore = false; S.editName = false; }
   }
   // матч уже записан: без этого «отмена» могла бы снять результат после следующих матчей
@@ -1936,7 +1948,7 @@ function tourView(id) {
   const tabs = st === 'reg' ? [['people', 'Участники']]
     : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']]
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']] : [['table', 'Таблица'], ['games', 'Матчи']])
-      .concat(t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : []);
+      .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : []);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -1981,6 +1993,7 @@ function tourView(id) {
   } else if (tab === 'games') h += gamesList(t);
   else if (tab === 'places') h += placesView(t) + tourDelLink(t);
   else if (tab === 'media') h += mediaView(t);
+  else if (tab === 'stream') h += streamView(t);
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
   else if (st !== 'reg') h += numsView(t);
   else {
@@ -3132,6 +3145,127 @@ function linksSave(t, links, msg) {
   t.links = links; S.linkErr = ''; saveDb(); toast(msg); render();
 }
 
+/* ===== Камеры: трансляции VK (а также YouTube, RuTube). Видео отстаёт от счёта — на табло счёт можно задержать ===== */
+// ссылка на трансляцию или код вставки → адрес плеера; null — встроить нельзя, будет просто ссылка
+function streamSrc(raw) {
+  let s = String(raw || '').trim();
+  const fr = s.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+  if (fr) s = fr[1].replace(/&amp;/g, '&');
+  if (s.startsWith('//')) s = 'https:' + s;
+  let u;
+  try { u = new URL(s); } catch (e) { return null; }
+  if (u.protocol !== 'https:') return null;
+  const host = u.hostname.replace(/^(www|m)\./, '');
+  if (/^(vk\.com|vk\.ru|vkvideo\.ru)$/.test(host)) {
+    let oid = u.searchParams.get('oid'), id = u.searchParams.get('id');
+    const hash = u.searchParams.get('hash');
+    if (u.pathname !== '/video_ext.php') {
+      const v = (u.pathname + ' ' + (u.searchParams.get('z') || '')).match(/video(-?\d+)_(\d+)/);
+      oid = v && v[1]; id = v && v[2];
+    }
+    if (!/^-?\d+$/.test(oid || '') || !/^\d+$/.test(id || '')) return null;
+    return 'https://' + (host === 'vk.ru' ? 'vk.com' : host) + '/video_ext.php?oid=' + oid + '&id=' + id + (hash && /^\w+$/.test(hash) ? '&hash=' + hash : '') + '&hd=2&autoplay=1';
+  }
+  if (/^(youtube\.com|youtu\.be|youtube-nocookie\.com)$/.test(host)) {
+    const id = host === 'youtu.be' ? u.pathname.slice(1) : u.searchParams.get('v') || (u.pathname.match(/^\/(?:live|embed|shorts)\/([\w-]+)/) || [])[1];
+    return /^[\w-]{6,20}$/.test(id || '') ? 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=1&playsinline=1' : null;
+  }
+  if (host === 'rutube.ru') {
+    const id = (u.pathname.match(/\/(?:video|live\/video|play\/embed)\/([0-9a-f]{20,40})/) || [])[1];
+    return id ? 'https://rutube.ru/play/embed/' + id : null;
+  }
+  return null;
+}
+const streamsOf = t => (t && t.streams) || [];
+// камера, которая снимает мишень
+const camFor = (t, board) => board ? streamsOf(t).find(s => (s.boards || []).includes(board)) || null : null;
+// рамка камеры: сам плеер подставит camsPlace(); place — чтобы одна камера могла стоять в двух местах
+function camHTML(s, place, opt) {
+  const src = streamSrc(s.url);
+  const head = opt && opt.bare ? '' : '<div class="cam-h"><b>' + esc(s.title) + '</b><span class="meta">' + ((s.boards || []).length ? 'мишени ' + s.boards.join(', ') : 'общий план') + ' · <a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">открыть</a></span></div>';
+  return '<div class="cam">' + head + (src ? '<div class="cam-slot" data-cam="' + esc(src) + '" data-place="' + esc(place) + '">видео загружается…</div>' : '<div class="note-box">Эту ссылку нельзя встроить — <a class="lnk" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">открыть трансляцию</a>.</div>') + '</div>';
+}
+// плееры не пересоздаются при перерисовке страницы: иначе видео перезапускалось бы на каждом подходе
+const CAMS = new Map();
+function camsPlace() {
+  const layer = $('cam-layer');
+  if (!layer) return;
+  const used = new Set();
+  document.querySelectorAll('[data-cam]').forEach(sl => {
+    const key = sl.dataset.cam + '|' + sl.dataset.place;
+    used.add(key);
+    let c = CAMS.get(key);
+    if (!c) {
+      c = document.createElement('div');
+      c.className = 'cam-fl';
+      c.innerHTML = '<iframe src="' + esc(sl.dataset.cam) + '" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="Трансляция"></iframe>';
+      layer.appendChild(c);
+      CAMS.set(key, c);
+    }
+    const r = sl.getBoundingClientRect(), hidden = !r.width || !r.height;
+    c.style.display = hidden ? 'none' : '';
+    if (!hidden) Object.assign(c.style, { left: r.left + window.scrollX + 'px', top: r.top + window.scrollY + 'px', width: r.width + 'px', height: r.height + 'px' });
+  });
+  CAMS.forEach((c, key) => { if (!used.has(key)) { c.remove(); CAMS.delete(key); } });
+}
+window.addEventListener('resize', () => camsPlace());
+// вкладка «Трансляция»: камеры и, для организатора, их настройка
+function streamView(t) {
+  const ss = streamsOf(t), org = canDo(t, 'org');
+  let h = ss.length ? '<div class="cams">' + ss.map((s, k) => camHTML(s, 'tour' + k)).join('') + '</div>' : '<div class="note-box">' + (org ? 'Камер пока нет. Добавьте ссылки на трансляции — до 4 камер.' : 'Трансляции пока нет.') + '</div>';
+  if (!org) return h;
+  const ed = S.camEdit && S.camEdit.tid === t.id ? S.camEdit.list : ss.map(s => ({ title: s.title, url: s.url, boards: (s.boards || []).join(', ') }));
+  if (!S.camEdit || S.camEdit.tid !== t.id) S.camEdit = { tid: t.id, list: ed };
+  h += '<div class="panel"><span class="h2">Камеры</span><p class="meta">Запустите трансляцию в VK (приложение VK на телефоне или OBS — см. подсказку ниже) и вставьте ссылку на неё или код вставки. Укажите мишени, которые снимает камера: при просмотре матча на этой мишени покажется её видео.</p>';
+  ed.forEach((c, k) => {
+    const ok = streamSrc(c.url);
+    h += '<div class="cam-edit"><div class="nrow"><input class="inp" data-cam-f="' + k + '|title" maxlength="40" value="' + esc(c.title) + '" placeholder="Камера ' + (k + 1) + '"><button class="x" data-act="cam-rm" data-v="' + k + '" aria-label="Убрать камеру">×</button></div><input class="inp" data-cam-f="' + k + '|url" value="' + esc(c.url) + '" placeholder="https://vk.com/video-… или код вставки &lt;iframe…&gt;"><input class="inp" data-cam-f="' + k + '|boards" value="' + esc(c.boards) + '" placeholder="Мишени через запятую, например 1, 2 (пусто — общий план)" inputmode="numeric">' + (c.url && !ok ? '<span class="meta" style="color:var(--red)">Не похоже на трансляцию VK, YouTube или RuTube — покажем просто ссылкой.</span>' : '') + '</div>';
+  });
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (ed.length < 4 ? '<button class="ghost" data-act="cam-add">+ Камера</button>' : '') + '<button class="btn sm" data-act="cam-save" data-v="' + t.id + '">Сохранить камеры</button></div>';
+  h += '<details class="meta"><summary>Как запустить трансляцию в VK</summary><p>С телефона: приложение VK → сообщество клуба → «Видео» → «Начать трансляцию». Телефон на штативе — это и есть камера. Откройте трансляцию, нажмите «Поделиться» → «Скопировать ссылку» и вставьте сюда.</p><p>С камер и компьютера: VK Видео → «Создать трансляцию» → возьмите адрес сервера и ключ потока, вставьте их в OBS (Настройки → Трансляция). Две камеры — две трансляции (две сцены или два OBS) или одна трансляция с двумя камерами в кадре.</p><p>Видео VK отстаёт от счёта на 5–15 секунд. На табло в «Настроить» можно задержать счёт, чтобы он совпадал с видео.</p></details></div>';
+  return h;
+}
+function camsSave(tid) {
+  const t = TBY[tid], ed = S.camEdit && S.camEdit.tid === tid ? S.camEdit.list : [];
+  if (!t) return;
+  const list = [];
+  for (const [k, c] of ed.entries()) {
+    let url = String(c.url || '').trim();
+    if (!url) continue;
+    const fr = url.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    if (fr) url = fr[1].replace(/&amp;/g, '&');
+    if (url.startsWith('//')) url = 'https:' + url;
+    if (!/^https:\/\//.test(url)) { toast('Камера ' + (k + 1) + ': нужна ссылка, которая начинается с https://'); return; }
+    const boards = String(c.boards || '').split(/[\s,;]+/).filter(Boolean).map(Number);
+    if (boards.some(x => !Number.isInteger(x) || x < 1 || x > 64)) { toast('Камера ' + (k + 1) + ': мишени — номера от 1 до 64.'); return; }
+    list.push({ title: String(c.title || '').trim() || 'Камера ' + (list.length + 1), url, boards: [...new Set(boards)].sort((a, b) => a - b) });
+  }
+  const done = () => { S.camEdit = null; toast(list.length ? 'Камеры сохранены.' : 'Камеры убраны.'); };
+  if (SRV) return svDo(Api.patch('/api/tournaments/' + tid + '/streams', { streams: list }), r => { svTourSet(r); done(); });
+  t.streams = list; saveDb(); done(); render();
+}
+
+/* Задержка счёта под видео (табло): снимки идущих матчей с временем прихода, показываем снимок «как N секунд назад» */
+const LIVEH = {};
+function liveHist(tid, m, del) {
+  const H = LIVEH[tid] || (LIVEH[tid] = {}), a = H[m.id] || (H[m.id] = []), now = Date.now();
+  a.push({ at: now, m: del ? null : JSON.parse(JSON.stringify(m)) });
+  while (a.length > 1 && a[1].at < now - 60000) a.shift();
+}
+function liveDelayed(t, sec) {
+  const H = LIVEH[t.id] || {}, cut = Date.now() - sec * 1000, out = [];
+  let next = 0;
+  Object.keys(H).forEach(id => {
+    const a = H[id];
+    let pick = null;
+    for (const x of a) { if (x.at <= cut) pick = x; else { next = next ? Math.min(next, x.at) : x.at; break; } }
+    if (pick && pick.m) out.push(pick.m);
+  });
+  // следующий снимок созреет — перерисовать
+  if (next) { clearTimeout(liveDelayed.t); liveDelayed.t = setTimeout(() => { if (/^(tv|desk)\./.test(R)) render(); }, Math.max(50, next - cut + 20)); }
+  return out;
+}
+
 /* QR-код: библиотека vendor/qrcode.js грузится при первом показе */
 const tourUrl = id => location.origin + location.pathname + '#t.' + id;
 let qrLoading = false;
@@ -3176,8 +3310,8 @@ function adminView() {
 
 /* ===== Табло для ТВ и экран организатора ===== */
 // идущие матчи турнира: на сервере — из потока, в демо — игра этого телефона (видна и в соседней вкладке)
-function liveOf(t) {
-  if (SRV) return Object.values(SV.live[t.id] || {});
+function liveOf(t, delay) {
+  if (SRV) return delay ? liveDelayed(t, delay) : Object.values(SV.live[t.id] || {});
   if (!G || !G.ctx || G.ctx.tid !== t.id || G.over === 'match') return [];
   const ex = G.kind === 'ex' ? G.ex : Object.assign(Games.x01(G.mode, G.dbl), { lim: G.lim || 0 });
   let state, legs;
@@ -3206,7 +3340,8 @@ function tvFx(m) {
 // плитка идущего матча
 /* Что показывать на табло и экране организатора — организатор включает и выключает, выбор хранится на устройстве */
 const TVO_LIST = [['photos', 'Фото игроков'], ['avg', 'Средний набор'], ['last', 'Последний подход'], ['progress', 'Подходы и лег'], ['boards', 'Мишени'], ['nums', 'Номера игроков'], ['fx', 'Вспышки 180 и закрытий'],
-  ['calls', 'К мишеням'], ['recent', 'Последние результаты'], ['stages', 'Ход турнира'], ['qr', 'QR-код турнира'], ['clock', 'Часы']];
+  ['calls', 'К мишеням'], ['recent', 'Последние результаты'], ['stages', 'Ход турнира'], ['cams', 'Камеры'], ['qr', 'QR-код турнира'], ['clock', 'Часы']];
+const TVO_DELAYS = [0, 3, 5, 8, 12, 15];
 const TVO_OFF = ['qr'];
 function tvo() {
   const o = lsGet('oche.tvopt') || {};
@@ -3215,7 +3350,8 @@ function tvo() {
 }
 function tvoPanel() {
   const o = tvo();
-  return '<div class="tvopt"><span class="label">Показывать</span>' + TVO_LIST.map(([k, l]) => '<button class="fchip' + (o[k] ? ' on' : '') + '" data-act="tvo" data-v="' + k + '" aria-pressed="' + !!o[k] + '">' + l + '</button>').join('') + '</div>';
+  return '<div class="tvopt"><span class="label">Показывать</span>' + TVO_LIST.map(([k, l]) => '<button class="fchip' + (o[k] ? ' on' : '') + '" data-act="tvo" data-v="' + k + '" aria-pressed="' + !!o[k] + '">' + l + '</button>').join('') +
+    (SRV ? '<span class="label" style="margin-left:8px">Счёт позже на</span>' + TVO_DELAYS.map(d => '<button class="fchip' + ((o.delay || 0) === d ? ' on' : '') + '" data-act="tvo-delay" data-v="' + d + '" title="Видео VK отстаёт — задержите счёт, чтобы совпадал с видео">' + (d ? d + ' с' : 'без задержки') + '</button>').join('') : '') + '</div>';
 }
 function liveTile(t, m) {
   tvFx(m);
@@ -3267,10 +3403,11 @@ function tvView(id) {
   if (!t) return wait || '<div class="note-box">Турнир не найден.</div>';
   const O = tvo();
   if (!tvClock) tvClock = setInterval(() => { if (R.startsWith('tv.')) { const el = $('tv-clock'); if (el) el.textContent = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); } else { clearInterval(tvClock); tvClock = 0; } }, 10000);
-  const live = liveOf(t).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
+  const live = liveOf(t, O.delay || 0).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
   let h = '<div class="tvh"><div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div><div class="tvx">' + (O.clock ? '<span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<button class="mini" data-act="tvo-show">Настроить</button><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
   if (S.tvoOpen) h += tvoPanel();
   h += live.length ? '<div class="tvg">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<div class="tvbox"><h2>Сейчас матчей нет</h2><p class="meta">Как только маркер начнёт матч, счёт появится здесь.' + (SRV ? '' : ' В демо табло показывает игру, которую ведут в соседней вкладке этого браузера.') + '</p></div>';
+  if (O.cams && streamsOf(t).length) h += '<div class="tvcams">' + streamsOf(t).slice(0, 2).map((s, k) => camHTML(s, 'tv' + k, { bare: true })).join('') + '</div>';
   h += '<div class="tvside">';
   if (t.stage === 'qual') {
     const order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, 10);
@@ -3291,6 +3428,7 @@ function deskPanels(t) {
     else out.push(['grid', 'Сетка']);
   }
   if (t.games && t.games.length) out.push(['recent', 'Последние результаты']);
+  streamsOf(t).forEach((s, k) => out.push(['cam' + k, s.title]));
   liveOf(t).forEach(m => out.push(['m:' + m.id, m.players.map(p => p.name.split(' ').pop()).join(' — ')]));
   return out;
 }
@@ -3305,7 +3443,7 @@ function deskView(id) {
   h += tvoPanel();
   h += '<div class="desk-tools">' + all.map(([k, l]) => '<button class="fchip' + (on.includes(k) ? ' on' : '') + '" data-act="desk-toggle" data-v="' + esc(id + '|' + k) + '" aria-pressed="' + on.includes(k) + '">' + esc(l) + '</button>').join('') + '<button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button></div>';
   if (!on.length) return h + '<div class="note-box">Окна не выбраны.</div>';
-  const cx = t.games && t.games.length ? bctx(t) : null, live = liveOf(t);
+  const cx = t.games && t.games.length ? bctx(t) : null, live = liveOf(t, tvo().delay || 0);
   h += '<div class="desk">' + on.map(k => {
     const l = (all.find(x => x[0] === k) || [k, k])[1];
     let body = '', wide = false;
@@ -3316,6 +3454,7 @@ function deskView(id) {
     else if (k === 'grid') { body = bracketView(t); wide = true; }
     else if (k.startsWith('part')) { body = plGridHTML(t, cx, +k.slice(4)); wide = true; }
     else if (k === 'recent') body = recentHTML(t, 12);
+    else if (k.startsWith('cam')) { const s = streamsOf(t)[+k.slice(3)]; body = s ? camHTML(s, 'desk' + k, { bare: true }) : ''; }
     else if (k.startsWith('m:')) { const m = live.find(x => x.id === k.slice(2)); body = m ? liveTile(t, m) : '<p class="meta">Матч закончился.</p>'; }
     return '<section class="dpan' + (wide ? ' wide' : '') + '"><div class="dpan-h"><b>' + esc(l) + '</b><button class="ghost sm" data-act="desk-toggle" data-v="' + esc(id + '|' + k) + '" aria-label="Закрыть окно">✕</button></div>' + body + '</section>';
   }).join('') + '</div>';
@@ -3337,6 +3476,8 @@ function matchView(mid) {
   const t = m.tid ? TBY[m.tid] : null, N = Games.perLeg(ex), np = m.players.length;
   h += '<div class="narrow"><div class="thead"><div class="row">' + (m.status === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : '<span class="pill">Сыгран</span>') + (t ? ' <button class="lnk meta" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + '</button>' : '') + '</div>';
   h += '<div class="meta">' + esc(Games.label(ex)) + (np > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (m.q ? ' · квалификация, попытка ' + (m.q.k + 1) : '') + (t && m.r != null && boardOf(t, m.r, m.i) ? ' · мишень ' + boardOf(t, m.r, m.i) : '') + '</div></div>';
+  const cam = t && m.status === 'live' && m.r != null ? camFor(t, boardOf(t, m.r, m.i)) : null;
+  if (cam) h += S.mcam === false ? '<button class="ghost sm" data-act="mcam">Показать видео: ' + esc(cam.title) + '</button>' : camHTML(cam, 'match') + '<button class="ghost sm" data-act="mcam">Скрыть видео</button>';
   h += '<div class="players' + (np === 2 ? ' two' : '') + '">' + m.players.map((p, i) => {
     const act = m.status === 'live' && s.cur === i, vis = s.vis ? s.vis[i] : null;
     if (p.photo && p.id) svPlayer({ id: p.id, name: p.name, photo: p.photo });
@@ -3569,11 +3710,17 @@ function svStream(tid) {
   STREAM = null;
   if (!tid) return;
   const s = Api.stream(tid, {
-    snapshot: x => { SV.live[tid] = Object.fromEntries((x.matches || []).map(m => [m.id, m])); liveRender(); },
+    snapshot: x => {
+      const prev = SV.live[tid] || {};
+      SV.live[tid] = Object.fromEntries((x.matches || []).map(m => [m.id, m]));
+      Object.keys(prev).forEach(id => { if (!SV.live[tid][id]) liveHist(tid, { id }, true); });
+      (x.matches || []).forEach(m => liveHist(tid, m));
+      liveRender();
+    },
     match: m => {
       const L = SV.live[tid] || (SV.live[tid] = {});
-      if (m.deleted || m.status === 'done') delete L[m.id];
-      else if (!L[m.id] || L[m.id].version <= m.version) L[m.id] = m;
+      if (m.deleted || m.status === 'done') { delete L[m.id]; liveHist(tid, m, true); }
+      else if (!L[m.id] || L[m.id].version <= m.version) { L[m.id] = m; liveHist(tid, m); }
       if (m.status === 'done' || m.deleted) svNow('tour:' + tid);
       liveRender(m);
     },
@@ -3719,6 +3866,9 @@ function render() {
   if (fid) { const el = $(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
   drawChart();
   cropDraw();
+  camsPlace();
+  // картинки и шрифты догружаются — рамки камер сдвигаются
+  clearTimeout(render.camT); render.camT = setTimeout(camsPlace, 400);
 }
 // свежие данные на открытом экране: раз в 30 с, только в видимой вкладке
 setInterval(() => { if (SRV && document.visibilityState === 'visible' && !anyModal() && !(R === 'play' && S.inGame)) render(); }, 30000);
@@ -3925,6 +4075,11 @@ document.addEventListener('click', e => {
       linksSave(t, (t.links || []).concat([{ title: title || hostOf(url), url }]), 'Ссылка добавлена.'); break;
     }
     case 'link-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (t) linksSave(t, (t.links || []).filter((_, j) => j !== +k), 'Ссылка убрана.'); break; }
+    case 'tvo-delay': { const o = tvo(); o.delay = +v; lsSet('oche.tvopt', o); render(); break; }
+    case 'mcam': S.mcam = S.mcam === false; render(); break;
+    case 'cam-add': if (S.camEdit) { S.camEdit.list.push({ title: '', url: '', boards: '' }); render(); } break;
+    case 'cam-rm': if (S.camEdit) { S.camEdit.list.splice(+v, 1); render(); } break;
+    case 'cam-save': camsSave(v); break;
     case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); render(); break; }
     case 'tvo-show': S.tvoOpen = !S.tvoOpen; render(); break;
     case 'qr-show': closeModals(); S.qr = v; loadQr(); render(); break;
@@ -4009,6 +4164,7 @@ document.addEventListener('input', e => {
   }
   if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); }
   if (t.id === 'crop-z') cropZoom(+t.value);
+  if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {

@@ -91,6 +91,12 @@ test('фото и ссылки к итогам турнира: только ор
   err(await call(X, 'PATCH', '/api/tournaments/' + tour.id + '/links', { links: [] }), 403);
   t = ok(await call(A, 'PATCH', '/api/tournaments/' + tour.id + '/links', { links: [{ title: 'Трансляция', url: 'https://vk.com/video-1_2' }, { url: 'https://example.org/res' }] })).tournament;
   assert.deepEqual(t.links, [{ title: 'Трансляция', url: 'https://vk.com/video-1_2' }, { title: 'example.org', url: 'https://example.org/res' }]);
+  // камеры: до 4, только https, мишени — номера
+  err(await call(A, 'PATCH', '/api/tournaments/' + tour.id + '/streams', { streams: [{ url: 'http://vk.com/video-1_2' }] }), 400);
+  err(await call(A, 'PATCH', '/api/tournaments/' + tour.id + '/streams', { streams: [{ url: 'https://vk.com/video-1_2', boards: [0] }] }), 400);
+  err(await call(X, 'PATCH', '/api/tournaments/' + tour.id + '/streams', { streams: [] }), 403);
+  t = ok(await call(A, 'PATCH', '/api/tournaments/' + tour.id + '/streams', { streams: [{ url: 'https://vk.com/video-1_2', boards: [2, 1, 2] }, { title: 'Общий план', url: 'https://vkvideo.ru/video-1_3' }] })).tournament;
+  assert.deepEqual(t.streams, [{ title: 'Камера 1', url: 'https://vk.com/video-1_2', boards: [1, 2] }, { title: 'Общий план', url: 'https://vkvideo.ru/video-1_3', boards: [] }]);
   ok(await call(A, 'DELETE', '/api/tournaments/' + tour.id));
   await new Promise(r => setTimeout(r, 50));
   assert.ok(!fs.existsSync(fileOf(p.url)), 'файлы турнира удалены');

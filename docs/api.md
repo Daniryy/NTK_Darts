@@ -347,6 +347,9 @@
 
 `409 bad_state` — игра не готова. Ответ `{ "tournament": Tour }`.
 
+### `PATCH /api/tournaments/:id/streams` — организатор, в любой момент
+Камеры: `{ "streams": [{ "title": "Камера 1", "url": "https://vk.com/video-123_456", "boards": [1, 2] }] }` — до 4, ссылка `https` (трансляция VK, YouTube, RuTube или адрес из кода вставки), `boards` — какие мишени снимает камера (может быть пусто — общий план). Без `title` — «Камера N». Ответ `{ "tournament": Tour }`; в `Tour` — поле `streams`.
+
 ### `PATCH /api/tournaments/:id/links` — организатор, в любой момент
 `{ "links": [{ "title": "Трансляция", "url": "https://vk.com/video…" }] }` — до 20 ссылок, только `http(s)`; без `title` подписью станет домен. Ответ `{ "tournament": Tour }`.
 

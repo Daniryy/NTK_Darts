@@ -188,6 +188,28 @@ module.exports = async function (app) {
     return { ok: true };
   });
 
+  // камеры (организатор): { streams: [{ title, url, boards: [номера мишеней] }] } — до 4, ссылка https
+  app.patch('/api/tournaments/:id/streams', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    if (!Array.isArray(b.streams) || b.streams.length > 4) throw E.bad('streams: до 4 камер', 'streams');
+    const streams = b.streams.map((s, k) => {
+      const url = V.str(s && s.url, 'streams', 8, 1000);
+      let u;
+      try { u = new URL(url); } catch (e) { throw E.bad('Камера №' + (k + 1) + ': ссылка не похожа на адрес', 'streams'); }
+      if (u.protocol !== 'https:') throw E.bad('Камера №' + (k + 1) + ': нужна ссылка https', 'streams');
+      const boards = s.boards == null ? [] : s.boards;
+      if (!Array.isArray(boards) || boards.length > 64 || boards.some(x => !Number.isInteger(x) || x < 1 || x > 64)) throw E.bad('Камера №' + (k + 1) + ': мишени — номера 1–64', 'streams');
+      return { title: s.title == null || s.title === '' ? 'Камера ' + (k + 1) : V.str(s.title, 'streams', 1, 40), url: u.href, boards: [...new Set(boards)].sort((x, y) => x - y) };
+    });
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      await c.query('UPDATE tournaments SET streams = $2 WHERE id = $1', [t.id, JSON.stringify(streams)]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
   // ссылки к итогам (организатор, в любой момент): { links: [{ title, url }] } — до 20, только http(s)
   app.patch('/api/tournaments/:id/links', async req => {
     const me = needPlayer(req), b = req.body || {};
