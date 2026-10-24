@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Oche Дартс — Клубная экосистема и счётчик</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1015">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Oche">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -327,6 +333,8 @@ h1, h2, h3, p { margin: 0; }
 
 .wrap { max-width: 1140px; margin: 0 auto; display: grid; gap: 20px; }
 .narrow { max-width: 680px; width: 100%; margin: 0 auto; display: grid; gap: 16px; }
+.net { position: fixed; left: 0; right: 0; top: 0; z-index: 35; padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 6px; background: var(--red); color: #fff; font-size: 13px; font-weight: 600; text-align: center; }
+.net[hidden], body.ingame .net { display: none; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px)); pointer-events: none; background: var(--fg); color: var(--bg); padding: 11px 18px; border-radius: 10px; z-index: 30; width: max-content; max-width: calc(100% - 32px); font-size: 14px; font-weight: 600; box-shadow: var(--shadow); }
 @media (min-width: 900px) { .toast { bottom: 28px; } }
 body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)); }
@@ -914,6 +922,7 @@ img.av { object-fit: cover; padding: 0; }
 <div id="modal-root"></div>
 <div id="cam-layer" aria-live="off"></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="net" id="net" role="status" hidden>Нет сети. Счёт сохраняется на телефоне и уйдёт сам, когда связь вернётся.</div>
 
 <script src="shared/bracket.js"></script>
 <script src="shared/games.js"></script>
@@ -1673,6 +1682,7 @@ function renderModals() {
     h += '<button class="set-row" data-act="sfx" aria-pressed="' + S.sfx + '"><b>Звук и вибрация</b><span class="switch' + (S.sfx ? ' on' : '') + '" aria-hidden="true"></span></button>';
     h += '<button class="set-row" data-act="photos-tg" aria-pressed="' + S.photos + '"><b>Фото игроков в счётчике</b><span class="switch' + (S.photos ? ' on' : '') + '" aria-hidden="true"></span></button>';
     h += accountBox();
+    h += installBox();
     if (!SRV) h += S.confirmReset
       ? '<div class="set-foot"><span class="meta">Ваши матчи и турниры будут удалены.</span><div class="row2"><button class="ghost dng" data-act="reset-yes">Да, сбросить</button><button class="ghost" data-act="reset-no">Отмена</button></div></div>'
       : '<button class="ghost dng sm set-foot" data-act="reset">Сбросить демо-данные</button>';
@@ -4075,6 +4085,7 @@ document.addEventListener('click', e => {
       linksSave(t, (t.links || []).concat([{ title: title || hostOf(url), url }]), 'Ссылка добавлена.'); break;
     }
     case 'link-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (t) linksSave(t, (t.links || []).filter((_, j) => j !== +k), 'Ссылка убрана.'); break; }
+    case 'install': if (installEv) { installEv.prompt(); installEv.userChoice.finally(() => { installEv = null; render(); }); } break;
     case 'tvo-delay': { const o = tvo(); o.delay = +v; lsSet('oche.tvopt', o); render(); break; }
     case 'mcam': S.mcam = S.mcam === false; render(); break;
     case 'cam-add': if (S.camEdit) { S.camEdit.list.push({ title: '', url: '', boards: '' }); render(); } break;
@@ -4271,10 +4282,26 @@ function addNtPlayer() {
   if (ne) ne.focus();
 }
 
+/* Без сети и установка на экран телефона */
+function netBar() { const el = $('net'); if (el) el.hidden = navigator.onLine !== false; }
+window.addEventListener('online', () => { netBar(); if (SRV) { Object.keys(SVC).forEach(k => { if (SVC[k].err) svNow(k); }); render(); } });
+window.addEventListener('offline', netBar);
+let installEv = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; });
+window.addEventListener('appinstalled', () => { installEv = null; toast('Oche на экране телефона.'); });
+function installBox() {
+  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return '';
+  if (installEv) return '<button class="btn alt" data-act="install">Установить на экран телефона</button>';
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return '<p class="meta">На экран iPhone: «Поделиться» → «На экран Домой».</p>';
+  return '<p class="meta">На экран телефона: меню браузера → «Добавить на главный экран».</p>';
+}
 // первый игрок дружеского матча — я (после входа имя меняется на своё)
 function meInSetup() { const su = S.setup; if (su && ME && P[ME] && (!su.names[0] || su.names[0] === 'Вы')) { su.names[0] = P[ME].name; lsSet('oche2.setup', su); } }
 async function boot() {
   applyTheme();
+  netBar();
+  // страница открывается и без сети (sw.js); на http без localhost браузер не даст его поставить
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
   app.innerHTML = '<div class="note-box">Загрузка…</div>';
   if (await Api.detect() === 'server') {
     SRV = true;

@@ -53,6 +53,11 @@ test('режим, вход для разработки, выход', async () =>
   w.net = false;
   const w2 = browser(); w2.net = false;
   assert.equal(await makeApi(w2).detect(), 'demo', 'без сервера — демо');
+  // работала с сервером, перезагрузилась без сети — остаётся на сервере с прежним входом
+  w.net = false;
+  const A2 = makeApi(w);
+  assert.equal(await A2.detect(), 'server');
+  assert.equal(A2.offline, true);
   const w3 = browser(); w3.localStorage.setItem('oche.mode', '"demo"');
   assert.equal(await makeApi(w3).detect(), 'demo', 'закреплённое демо');
   assert.equal(w3.calls.length, 0);

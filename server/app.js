@@ -57,6 +57,9 @@ function build(opts = {}) {
     app.get('/shared/games.js', (req, reply) => reply.sendFile('shared/games.js'));
     app.get('/api.js', (req, reply) => reply.sendFile('api.js'));
     app.get('/vendor/qrcode.js', (req, reply) => reply.sendFile('vendor/qrcode.js'));
+    app.get('/sw.js', (req, reply) => reply.sendFile('sw.js'));
+    app.get('/manifest.webmanifest', (req, reply) => reply.type('application/manifest+json').sendFile('manifest.webmanifest'));
+    app.get('/icons/:f', (req, reply) => /^[\w-]+\.png$/.test(req.params.f) ? reply.sendFile('icons/' + req.params.f) : reply.code(404).send());
     app.register(require('@fastify/static'), { root: config.uploadDir, prefix: '/uploads/', decorateReply: false });
   }
   return app;

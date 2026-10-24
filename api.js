@@ -83,20 +83,29 @@
       try {
         Api.config = await Api.get('/api/config', { timeout: 3000 });
         Api.mode = 'server';
+        Api.offline = false;
         await Api.loadMe().catch(() => {});
+        ls.set('oche.lastMode', 'server');
+        ls.set('oche.lastMe', Api.me ? { me: Api.me, admin: Api.admin, config: Api.config } : null);
       } catch (e) {
-        Api.mode = 'demo';
+        // без сети страница, работавшая с сервером, остаётся на сервере: очередь счёта дождётся связи
+        const last = ls.get('oche.lastMe');
+        if (e.net && ls.get('oche.lastMode') === 'server') {
+          Api.mode = 'server'; Api.offline = true;
+          if (last) { Api.me = last.me; Api.admin = !!last.admin; Api.config = last.config || Api.config; }
+        } else Api.mode = 'demo';
       }
       return Api.mode;
     },
     async loadMe() {
       const r = await Api.get('/api/me');
       Api.me = r.player; Api.admin = !!r.admin;
+      ls.set('oche.lastMe', Api.me ? { me: Api.me, admin: Api.admin, config: Api.config } : null);
       return r;
     },
     loginUrl: ret => '/api/auth/vk?return=' + encodeURIComponent(ret || '/'),
     async devLogin(playerId) { await Api.post('/api/auth/dev', { playerId }); return Api.loadMe(); },
-    async logout() { await Api.post('/api/auth/logout'); Api.me = null; Api.admin = false; },
+    async logout() { await Api.post('/api/auth/logout'); Api.me = null; Api.admin = false; ls.set('oche.lastMe', null); },
 
     /* ===== Очередь неотправленного =====
        item: { id, start: тело PUT или null, ev: [события с seq], acked: сколько принято, stop: null | { code, message, … }, done }
