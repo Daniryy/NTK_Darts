@@ -10,7 +10,7 @@
     "start": "node --env-file-if-exists=.env server/index.js",
     "migrate": "node --env-file-if-exists=.env db/migrate.js",
     "seed": "node --env-file-if-exists=.env db/seed.js",
-    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 shared/bracket.test.js test/*.test.js"
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 shared/*.test.js test/*.test.js"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.3",
