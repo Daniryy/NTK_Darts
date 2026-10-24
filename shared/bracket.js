@@ -13,6 +13,9 @@
      t.players  id игроков в порядке посева
      t.slots    первый круг сеток: id или null (null = свободное место); у старых ko берётся players
      t.games    [{ r, i, res }]; у rr ещё a и b
+     t.block    только pl: размер части сетки (например 8). Сетка — несколько независимых частей:
+                игроки 1–8 играют за места 1–8, 9–16 — за 9–16 и т. д. Номер игры i сквозной:
+                часть k занимает i от k·block/2 до (k+1)·block/2 − 1 в каждом круге.
      g.res      null или { w: id победителя, la, lb: леги игрока a и b, mid? }
    Результаты хранятся только в g.res. Кто играет в матче, всегда вычисляет resolver(t). */
 (function (root, factory) {
@@ -25,39 +28,49 @@
   const isReal = x => !!x && x !== BYE;
   const isBracket = t => t.format === 'ko' || t.format === 'pl';
   const slotsOf = t => t.slots || t.players;
-  const bSize = t => slotsOf(t).length;
+  // размер одной части сетки; без частей — вся сетка
+  const bSize = t => (t.format === 'pl' && t.block) || slotsOf(t).length;
+  const bParts = t => slotsOf(t).length / bSize(t);
   const bRounds = t => Math.round(Math.log2(bSize(t)));
 
   function seedOrder(n) { let o = [1, 2]; while (o.length < n) { const m = o.length * 2; o = o.flatMap(s => [s, m + 1 - s]); } return o; }
   function bracketSize(n) { let s = 2; while (s < n) s *= 2; return s; }
-  function bracketGames(fmt, size) {
-    const rounds = Math.round(Math.log2(size)), games = [];
+  // size — мест во всей сетке, block — в одной части (pl)
+  function bracketGames(fmt, size, block) {
+    const rounds = Math.round(Math.log2(fmt === 'pl' && block ? block : size)), games = [];
     for (let r = 0; r < rounds; r++) {
       const cnt = fmt === 'pl' ? size / 2 : size / 2 ** (r + 1);
       for (let i = 0; i < cnt; i++) games.push({ r, i, res: null });
     }
     return games;
   }
-  // ids — игроки по посеву (сильнейший первым); заполняет t.format, players, slots, games
-  function setBracket(t, fmt, ids) {
-    const size = bracketSize(ids.length);
+  // ids — игроки по посеву (сильнейший первым); заполняет t.format, players, slots, games.
+  // block (только pl) — делить сетку на части по block мест: посев 1..block в первой части и т. д.
+  function setBracket(t, fmt, ids, block) {
+    const n = ids.length, B = fmt === 'pl' && block ? Math.min(block, bracketSize(n)) : bracketSize(n);
+    const parts = Math.ceil(n / B), order = seedOrder(B);
     t.format = fmt;
     t.players = ids.slice();
-    t.slots = seedOrder(size).map(k => k <= ids.length ? ids[k - 1] : null);
-    t.games = bracketGames(fmt, size);
+    t.slots = [];
+    for (let k = 0; k < parts; k++) order.forEach(s => t.slots.push(k * B + s <= n ? ids[k * B + s - 1] : null));
+    if (parts > 1) t.block = B; else delete t.block;
+    t.games = bracketGames(fmt, t.slots.length, t.block);
   }
-  const roundGames = (t, r) => t.format === 'pl' ? bSize(t) / 2 : bSize(t) / 2 ** (r + 1);
+  const roundGames = (t, r) => t.format === 'pl' ? slotsOf(t).length / 2 : bSize(t) / 2 ** (r + 1);
 
-  // группа матча в круге r у pl: grp — номер группы, per — матчей в группе, lo — первое место группы
+  // группа матча в круге r у pl: grp — сквозной номер группы, per — матчей в группе, lo — первое место группы,
+  // part — часть сетки, lg — номер группы внутри части
   function plGroup(t, r, i) {
-    const per = bSize(t) / 2 ** (r + 1), grp = Math.floor(i / per);
-    return { grp, per, lo: grp * per * 2 + 1 };
+    const B = bSize(t), half = B / 2, part = Math.floor(i / half);
+    const per = B / 2 ** (r + 1), lg = Math.floor((i % half) / per);
+    return { grp: part * 2 ** r + lg, per, lo: part * B + lg * per * 2 + 1, part, lg };
   }
+  const partOf = (t, i) => t.format === 'pl' && t.block ? Math.floor(i / (t.block / 2)) : 0;
   // откуда берутся игроки матча (r, i): [[i в круге r-1, 'w' | 'l'], ...]
   function feeders(t, r, i) {
     if (t.format === 'pl') {
-      const { grp, per } = plGroup(t, r, i), j = i % per;
-      const base = (grp >> 1) * per * 2 + 2 * j, take = grp & 1 ? 'l' : 'w';
+      const { per, part, lg } = plGroup(t, r, i), j = i % per;
+      const base = part * bSize(t) / 2 + (lg >> 1) * per * 2 + 2 * j, take = lg & 1 ? 'l' : 'w';
       return [[base, take], [base + 1, take]];
     }
     return [[2 * i, 'w'], [2 * i + 1, 'w']];
@@ -115,10 +128,11 @@
 
   // номера стабильны: бай известен заранее и не нумеруется
   function gameNums(t, rv) {
-    const m = new Map(), last = t.format === 'pl' ? bRounds(t) - 1 : -1;
+    const m = new Map(), last = t.format === 'pl' ? bRounds(t) - 1 : -1, half = bSize(t) / 2;
+    // в последнем круге pl финал части получает последний номер в её части
+    const key = g => g.r === last ? partOf(t, g.i) * half + half - 1 - g.i % half : g.i;
     let n = 0;
-    // в последнем круге pl финал получает последний номер
-    (last < 0 ? t.games : t.games.slice().sort((x, y) => x.r - y.r || (x.r === last ? y.i - x.i : x.i - y.i))).forEach(g => { const [a, b] = rv.players(g.r, g.i); if (a !== BYE && b !== BYE) m.set(g.r + ':' + g.i, ++n); });
+    (last < 0 ? t.games : t.games.slice().sort((x, y) => x.r - y.r || key(x) - key(y))).forEach(g => { const [a, b] = rv.players(g.r, g.i); if (a !== BYE && b !== BYE) m.set(g.r + ':' + g.i, ++n); });
     return m;
   }
 
@@ -142,6 +156,19 @@
     let done = 0, total = 0;
     t.games.forEach(g => { const s = gameState(t, g, rv).st; if (s === 'void' || s === 'bye') return; total++; if (s === 'done') done++; });
     return { done, total };
+  }
+  // прогресс по кругам: [{ r, done, total }]; круги без игр не попадают
+  function roundProgress(t, rv) {
+    rv = rv || resolver(t);
+    const out = [];
+    t.games.forEach(g => {
+      const s = gameState(t, g, rv).st;
+      if (s === 'void' || s === 'bye') return;
+      let x = out.find(o => o.r === g.r);
+      if (!x) out.push(x = { r: g.r, done: 0, total: 0 });
+      x.total++; if (s === 'done') x.done++;
+    });
+    return out.sort((a, b) => a.r - b.r);
   }
 
   // можно ли убрать результат матча g: после этого все остальные результаты должны остаться верными.
@@ -203,8 +230,8 @@
   }
 
   return {
-    BYE, isReal, isBracket, slotsOf, bSize, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
-    roundGames, plGroup, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
-    srcText, tProgress, canClear, rrGames, finalGame, placeRange, places
+    BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
+    roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
+    srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places
   };
 });
