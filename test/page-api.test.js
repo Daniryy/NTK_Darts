@@ -85,6 +85,18 @@ test('очередь: без сети копится, при появлении 
   assert.equal((await Api.get('/api/matches/' + id)).match.lastSeq, 3);
 });
 
+test('повтор старта до первого подхода меняет начинающего', async () => {
+  const w = browser(), Api = makeApi(w);
+  await Api.detect(); await Api.devLogin(ME);
+  const id = mid(), body = { mode: 501, ltw: 1, starter: 0, players: [{ id: ME }, { name: 'Гость' }] };
+  assert.equal((await Api.put('/api/matches/' + id, body)).match.starter, 0);
+  const m = (await Api.put('/api/matches/' + id, Object.assign({}, body, { starter: 1 }))).match;
+  assert.equal(m.starter, 1);
+  assert.equal(m.state.cur, 1);
+  await Api.post('/api/matches/' + id + '/events', { events: [{ seq: 1, type: 'visit', leg: 1, p: 1, s: 501, pts: 60, n: 3, b: 0, d: null }] });
+  assert.equal((await Api.put('/api/matches/' + id, body)).match.starter, 1, 'после подходов начинающий не меняется');
+});
+
 test('очередь: замок у другого устройства останавливает отправку; забрать — и дальше', async () => {
   const a = browser(), A = makeApi(a), b = browser(), Bp = makeApi(b);
   await A.detect(); await A.devLogin(ME);

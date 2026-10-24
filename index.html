@@ -1394,6 +1394,7 @@ function defaultSetup() { return { names: [meP().name, ''], mode: 501, legsToWin
 function saveGame() {
   lsSet('oche2.game', G && G.over !== 'match' ? G : null);
   lsSet('oche2.undo', G && G.over !== 'match' ? undo : null);
+  syncGame();
 }
 function toast(msg) {
   const el = $('toast'); el.textContent = msg; el.hidden = false;
@@ -2396,7 +2397,7 @@ function newGame(list, o, ctx, starter) {
   const st = starter || 0, ex = Games.norm(o.ex || Games.x01(o.mode, o.dbl));
   if (ex.k !== 'x01') {
     G = {
-      id: 'g' + uid(), kind: 'ex', ctx: ctx || null, ex, legsToWin: o.legsToWin, starter: st, mstart: st, legNo: 1,
+      id: gameId(), kind: 'ex', srv: !!o.srv, ctx: ctx || null, ex, legsToWin: o.legsToWin, starter: st, mstart: st, legNo: 1,
       visit: [], mult: 1, entry: ex.k === 'cricket' ? 'darts' : lsGet('oche2.xentry') === 'darts' ? 'darts' : 'total',
       over: null, winner: null, note: '', log: [], res: null, players: list.map(x => ({ id: x.id || null, name: x.name }))
     };
@@ -2404,9 +2405,9 @@ function newGame(list, o, ctx, starter) {
     saveGame();
     return;
   }
-  o = { mode: ex.mode, dbl: ex.dbl, legsToWin: o.legsToWin };
+  o = { mode: ex.mode, dbl: ex.dbl, legsToWin: o.legsToWin, srv: o.srv };
   G = {
-    id: 'g' + uid(), ctx: ctx || null, mode: o.mode, dbl: o.dbl, lim: ex.lim || 0, tb: null, legsToWin: o.legsToWin, cur: st, starter: st, mstart: st,
+    id: gameId(), srv: !!o.srv, ctx: ctx || null, mode: o.mode, dbl: o.dbl, lim: ex.lim || 0, tb: null, legsToWin: o.legsToWin, cur: st, starter: st, mstart: st,
     visit: [], mult: 1, entry: lsGet('oche2.entry') === 'darts' ? 'darts' : 'total', legNo: 1, over: null, winner: null, note: '', ask: null, prev: null, log: [], res: null,
     players: list.map(x => ({ id: x.id || null, name: x.name, score: o.mode, legs: 0, darts: 0, points: 0, highest: 0, c100: 0, c140: 0, c180: 0, last: '', legDarts: 0, legVisits: 0, f9p: 0, f9d: 0, coa: 0, hco: 0, bl: 0 }))
   };
@@ -2426,7 +2427,8 @@ function startFromSetup() {
   lsSet('oche2.setup', su);
   const ex = exFrom(su.exk || String(su.mode || 501), su.lim);
   if (ex.k === 'x01') ex.dbl = su.dbl;
-  newGame(list, { legsToWin: su.legsToWin, ex }, null, 0);
+  // на сервер уходит матч, где есть вошедший игрок или другой игрок из базы
+  newGame(list, { legsToWin: su.legsToWin, ex, srv: SRV && !!ME && list.some(x => x.id) }, null, 0);
   render();
 }
 // попытка квалификации: один игрок, один лег упражнения квалификации
@@ -2436,7 +2438,8 @@ function startQualGame(v) {
   if (G && G.ctx && G.ctx.q && G.ctx.tid === tid && G.ctx.q.id === id && G.ctx.q.k === k && hasLiveGame()) { S.inGame = true; return go('play'); }
   if (hasLiveGame()) { toast('Сначала закончите или удалите текущую игру.'); S.inGame = false; return go('play'); }
   if (!t || t.stage !== 'qual' || !P[id] || qRes(t, id)[k] || (k > 0 && !qRes(t, id)[k - 1])) { toast('Эту попытку сейчас сдать нельзя.'); return render(); }
-  newGame([{ id, name: P[id].name }], { legsToWin: 1, ex: t.qual.ex }, { tid, q: { id, k } }, 0);
+  if (SRV && !ME) { toast('Войдите, чтобы сдать попытку.'); return svLogin(); }
+  newGame([{ id, name: P[id].name }], { legsToWin: 1, ex: t.qual.ex, srv: SRV }, { tid, q: { id, k } }, 0);
   go('play');
 }
 const qualCtxOk = c => { const t = c && c.q && TBY[c.tid]; return !!(t && t.stage === 'qual' && !qRes(t, c.q.id)[c.q.k] && (c.q.k === 0 || qRes(t, c.q.id)[c.q.k - 1])); };
@@ -2453,7 +2456,8 @@ function startTourGame(v) {
   if (hasLiveGame()) { toast('Сначала закончите или удалите текущую игру.'); S.inGame = false; return go('play'); }
   const x = readyGame(tid, r, i);
   if (!x) { toast('Этот матч сейчас нельзя начать.'); return render(); }
-  newGame([{ id: x.a, name: P[x.a].name }, { id: x.b, name: P[x.b].name }], { legsToWin: x.t.ltw, ex: exOf(x.t) }, { tid, r, i }, 0);
+  if (SRV && !ME) { toast('Войдите, чтобы вести счёт.'); return svLogin(); }
+  newGame([{ id: x.a, name: P[x.a].name }, { id: x.b, name: P[x.b].name }], { legsToWin: x.t.ltw, ex: exOf(x.t), srv: SRV }, { tid, r, i }, 0);
   go('play');
 }
 function saveQuickTourScore() {
@@ -2688,7 +2692,7 @@ function leaveMatch(to) {
 }
 function rematch() {
   const o = G, n = o.players.length, st = (o.mstart + 1) % n;
-  newGame(o.players.map(p => ({ id: p.id, name: p.name })), { legsToWin: o.legsToWin, ex: o.kind === 'ex' ? o.ex : Object.assign(Games.x01(o.mode, o.dbl), { lim: o.lim || 0 }) }, null, st);
+  newGame(o.players.map(p => ({ id: p.id, name: p.name })), { legsToWin: o.legsToWin, ex: o.kind === 'ex' ? o.ex : Object.assign(Games.x01(o.mode, o.dbl), { lim: o.lim || 0 }), srv: o.srv }, null, st);
   render();
 }
 
@@ -2714,6 +2718,7 @@ function gameView() {
   h += '<div class="ghead g-head-area"><div class="gh-t">' + (t ? '<b>' + esc(t.name) + '</b><span>' + gameLabel(t, gameAt(t, g.ctx.r, g.ctx.i)) + ' · Лег ' + g.legNo + '</span>'
     : '<b>' + g.mode + (g.lim ? ' · ' + g.lim + ' подходов' : '') + ' · до ' + g.legsToWin + ' ' + pl(g.legsToWin, 'победы', 'побед', 'побед') + ' · Лег ' + g.legNo + (g.dbl ? '' : ' · без дубля') + '</b>') + '</div>';
   h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
+  h += obBar();
 
   const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && n > 1;
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
@@ -2792,6 +2797,155 @@ function gameView() {
   return h;
 }
 
+/* ===== Счётчик ↔ сервер: подходы уходят событиями по порядку seq через очередь api.js ===== */
+const gameId = () => 'g' + Array.from({ length: 14 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]).join('');
+// тело PUT /api/matches/:id для текущей игры
+function startBody() {
+  const c = G.ctx, ex = G.kind === 'ex' ? G.ex : Object.assign(Games.x01(G.mode, G.dbl), { lim: G.lim || 0 });
+  if (c && c.q) return { tournamentId: c.tid, qual: { playerId: c.q.id, try: c.q.k } };
+  if (c) return { tournamentId: c.tid, r: c.r, i: c.i, starter: G.mstart };
+  return { ex, ltw: G.legsToWin, starter: G.mstart, players: G.players.map(p => p.id ? { id: p.id } : { name: p.name }) };
+}
+// запись G.log → событие API
+function logEvent(e) {
+  if (e.tb) return { type: 'bull', leg: e.leg, p: e.p };
+  if (G.kind === 'ex') return { type: 'visit', leg: e.leg, p: e.p, v: e.v, d: e.d || null };
+  return { type: 'visit', leg: e.leg, p: e.p, s: e.s, pts: e.pts, n: e.n, b: e.b, d: e.d || null };
+}
+// итог матча для события finish — как строки commitMatch()
+function finishEvent() {
+  if (G.kind === 'ex') {
+    const st = exSt();
+    return { type: 'finish', w: st.winner, pl: G.players.map((p, i) => ({ id: p.id, legs: st.legs[i], pts: st.pts[i], darts: st.darts[i], f9: null })) };
+  }
+  return { type: 'finish', w: G.winner, pl: G.players.map(p => ({ id: p.id, legs: p.legs, pts: p.points, darts: p.darts, f9: p.f9d ? +(p.f9p / p.f9d * 3).toFixed(1) : null, hi: p.highest, hco: p.hco, c180: p.c180, c140: p.c140, c100: p.c100, coh: p.legs, coa: Math.max(p.legs, p.coa), bl: p.bl })) };
+}
+// после каждого изменения игры: сравнить с уже поставленным в очередь и добавить события (подходы, отмены, завершение)
+function syncGame() {
+  if (!SRV || !G || !G.srv) return;
+  let it = Api.ob.get(G.id);
+  // новый матч: старт уходит сразу — другие телефоны видят, что игра идёт
+  if (!it) { it = Api.ob.open(G.id, startBody()); Api.ob.kick(G.id); }
+  const cur = G.log.map(logEvent).map(e => JSON.stringify(e)), view = it.view || [];
+  let k = 0;
+  while (k < view.length && k < cur.length && view[k] === cur[k]) k++;
+  const evs = [];
+  if (it.fin && G.over !== 'match') { evs.push({ type: 'reopen' }); it.fin = false; }
+  for (let j = view.length; j > k; j--) evs.push({ type: 'undo' });
+  cur.slice(k).forEach(e => evs.push(JSON.parse(e)));
+  if (G.over === 'match' && !it.fin) { evs.push(finishEvent()); it.fin = true; }
+  it.view = cur;
+  if (evs.length) Api.ob.push(G.id, evs); else Api.ob.save();
+}
+// бросить матч на сервере (освободить игру сетки)
+function dropServerGame() {
+  if (!SRV || !G || !G.srv) return;
+  const id = G.id, it = Api.ob.get(id);
+  Api.ob.drop(id);
+  if (it && !it.start) Api.del('/api/matches/' + id).catch(() => {});
+}
+// очередь изменилась: в счётчике — обновить полосу отправки
+function obChanged() { const el = $('ob-bar'); if (el) el.outerHTML = obBar(); }
+function obBar() {
+  if (!SRV || !G || !G.srv) return '<div id="ob-bar" hidden></div>';
+  const it = Api.ob.get(G.id), n = Api.ob.pending(G.id), st = it && it.stop;
+  if (st) {
+    const btn = st.code === 'locked' || st.code === 'bad_event' || st.code === 'game_taken'
+      ? '<button class="mini go" data-act="takeover" data-v="' + esc(st.code === 'game_taken' && st.matchId ? st.matchId : G.id) + '">' + (st.code === 'bad_event' ? 'Восстановить по серверу' : 'Забрать ведение счёта') + '</button>' + (st.code === 'game_taken' && st.matchId ? '<button class="mini" data-act="mview" data-v="' + esc(st.matchId) + '">Смотреть</button>' : '')
+      : st.status === 401 ? '<button class="mini go" data-act="login">Войти</button>' : '<button class="mini" data-act="ob-resume">Повторить</button>';
+    const msg = st.code === 'locked' ? 'Счёт этого матча ведёт другое устройство' + (st.by ? ' (' + st.by + ')' : '') + '. Ваши подходы не отправлены.'
+      : st.code === 'bad_event' ? 'Счёт не принят сервером: ' + st.message
+      : st.code === 'game_taken' ? 'Этот матч уже ведёт другой телефон.' : st.message;
+    return '<div id="ob-bar" class="note-box warn" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>' + esc(msg) + '</b>' + btn + '</div>';
+  }
+  if (!n) return '<div id="ob-bar" hidden></div>';
+  return '<div id="ob-bar" class="meta" style="text-align:center">' + (navigator.onLine === false ? 'Нет сети · ' : '') + 'не отправлено: ' + n + ' — дошлём сами</div>';
+}
+// забрать ведение счёта: все события с сервера, счётчик восстанавливается по ним
+async function takeover(mid) {
+  if (!SRV || !ME) return svLogin();
+  try {
+    const r = await Api.post('/api/matches/' + mid + '/takeover');
+    if (G && G.srv && G.id !== mid) Api.ob.drop(G.id);
+    restoreGame(r.match, r.events);
+    toast('Вы ведёте счёт этого матча.');
+    S.inGame = true; go('play');
+  } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message); render(); }
+}
+// счётчик из матча сервера и его событий
+function restoreGame(m, events) {
+  const vis = [];
+  events.forEach(e => { if (e.type === 'visit') vis.push(e); else if (e.type === 'bull') vis.push({ leg: e.leg, p: e.p, tb: 1 }); else if (e.type === 'undo') vis.pop(); });
+  const ex = m.ex ? Games.norm(m.ex) : Games.x01(m.mode, m.dbl);
+  const ctx = m.q ? { tid: m.tid, q: { id: m.q.id, k: m.q.k } } : m.tid ? { tid: m.tid, r: m.r, i: m.i } : null;
+  newGame(m.players.map(p => ({ id: p.id, name: p.name })), { legsToWin: m.ltw, ex }, ctx, m.starter);
+  G.id = m.id; G.srv = true;
+  if (G.kind === 'ex') {
+    G.log = vis.map(v => v.tb ? { leg: v.leg, p: v.p, tb: 1 } : { leg: v.leg, p: v.p, v: v.v, d: v.d || null });
+    const st = exSt();
+    G.legNo = st.leg;
+    if (st.winner != null) { G.over = 'match'; G.winner = st.winner; G.res = { msg: '' }; }
+  } else replayX01(vis);
+  undo = [];
+  Api.ob.reset(G.id, null, m.lastSeq);
+  const it = Api.ob.get(G.id);
+  it.view = G.log.map(logEvent).map(e => JSON.stringify(e));
+  it.fin = m.status === 'done';
+  Api.ob.save();
+  saveGame();
+}
+// x01: прогнать подходы через счётчик, чтобы восстановить статистику
+function replayX01(vis) {
+  for (const v of vis) {
+    if (G.over === 'leg') { G.players.forEach(p => { p.score = G.mode; p.last = ''; p.legDarts = 0; p.legVisits = 0; }); G.starter = (G.starter + 1) % G.players.length; G.cur = G.starter; G.over = null; G.winner = null; G.legNo++; G.prev = null; G.tb = null; }
+    if (G.over) break;
+    if (v.tb) { G.log.push({ p: v.p, leg: G.legNo, tb: 1 }); G.tb = null; G.cur = v.p; legWonQuiet(); continue; }
+    G.cur = v.p;
+    const win = !v.b && G.players[v.p].score - v.pts === 0;
+    G.visit = [{ val: v.pts, m: win ? 2 : 1, l: String(v.pts) }];
+    G.entry = v.d && v.d.length ? 'darts' : 'total';
+    endVisitQuiet(!!v.b, win, v.n, v.d);
+  }
+  G.entry = lsGet('oche2.entry') === 'darts' ? 'darts' : 'total';
+}
+// как endVisit/legWon, но без звука и без записи матча (он уже на сервере)
+function endVisitQuiet(bust, win, n, d) {
+  const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; };
+  try { endVisit(bust, win, n); if (d && G.log.length) G.log[G.log.length - 1].d = d; }
+  finally { commitMatch = c; }
+}
+function legWonQuiet() { const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; }; try { legWon(); } finally { commitMatch = c; } }
+
+/* Просмотр матча (зритель): счёт с сервера, без ведения; можно забрать ведение счёта */
+function matchView(mid) {
+  const e = lz('mlive:' + mid, async cur => {
+    const r = await Api.get('/api/matches/' + mid + (cur ? '?since=' + cur.match.version : ''));
+    if (!r) return cur;
+    if (r.match.card) svMatch(r.match.card);
+    return r;
+  }, 1500);
+  let h = '<button class="back" data-act="back-tour">' + I.back + 'Назад</button>';
+  const st = svState(e, 'матча');
+  if (st) return h + st;
+  const m = e.data.match, ex = m.ex ? Games.norm(m.ex) : Games.x01(m.mode, m.dbl), s = m.state || {}, u = Games.unit(ex);
+  const t = m.tid ? TBY[m.tid] : null, N = Games.perLeg(ex), np = m.players.length;
+  h += '<div class="narrow"><div class="thead"><div class="row">' + (m.status === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : '<span class="pill">Сыгран</span>') + (t ? ' <button class="lnk meta" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + '</button>' : '') + '</div>';
+  h += '<div class="meta">' + esc(Games.label(ex)) + (np > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (m.q ? ' · квалификация, попытка ' + (m.q.k + 1) : '') + (t && m.r != null && boardOf(t, m.r, m.i) ? ' · мишень ' + boardOf(t, m.r, m.i) : '') + '</div></div>';
+  h += '<div class="players' + (np === 2 ? ' two' : '') + '">' + m.players.map((p, i) => {
+    const act = m.status === 'live' && s.cur === i, vis = s.vis ? s.vis[i] : null;
+    return '<div class="pl' + (act ? ' act' : '') + '"><div class="nm"><span class="n">' + esc(p.name) + '</span>' + (np > 1 || m.ltw > 1 ? '<span class="legs">' + m.legs[i] + '</span>' : '') + '</div><div class="num big">' + (s.scores ? s.scores[i] : '—') + '</div><div class="sub"><span>' + u.tot + '</span><span>' + (N && vis != null ? 'подход ' + Math.min(N, vis) + '/' + N : '') + '</span></div>' + (N && vis != null ? '<div class="prog"><i style="width:' + Math.round(Math.min(N, vis) / N * 100) + '%"></i></div>' : '') + '</div>';
+  }).join('') + '</div>';
+  const L = s.last;
+  if (L) h += '<div class="prev">Последний подход (' + esc(m.players[L.p] ? m.players[L.p].name : '') + '): <b>' + (L.tb ? 'бросок в булл' : L.b ? 'перебор' : (L.d && L.d.length ? esc(L.d.join(' · ')) + ' = ' : '') + L.pts) + '</b></div>';
+  if (s.tie) h += '<div class="note-box">Ничья в леге — разыгрывают булл.</div>';
+  if (m.status === 'live') {
+    h += '<p class="meta">Счёт ведёт: ' + esc(m.lock && m.lock.by || '—') + (m.lock && m.lock.mine ? ' (это устройство)' : '') + '. Обновляется сам.</p>';
+    if (ME && !(m.lock && m.lock.mine)) h += S.confirmTake === mid
+      ? '<div class="row2"><button class="btn" data-act="takeover" data-v="' + mid + '">Да, вести счёт здесь</button><button class="btn alt" data-act="take-no">Отмена</button></div><p class="meta">Другой телефон перестанет отправлять подходы.</p>'
+      : '<button class="btn alt" data-act="take-ask" data-v="' + mid + '">Забрать ведение счёта</button>';
+  } else if (m.card) h += matchCard(svMatch(m.card));
+  return h + '</div>';
+}
 /* ===== Счётчик упражнений (Набор очков, Большой раунд, Сектор, Крикет) — счёт ведёт движок Games ===== */
 const exCfg = () => ({ ex: G.ex, np: G.players.length, ltw: G.legsToWin, starter: G.mstart });
 const exSt = () => Games.state(exCfg(), G.log);
@@ -2842,6 +2996,7 @@ function exGameView() {
     : '<b>' + esc(Games.label(ex)) + (n > 1 ? ' · ' + ltwTxt(g.legsToWin) + ' · Лег ' + st.leg : '') + '</b>';
   let h = '<div class="game"><div class="ghead g-head-area"><div class="gh-t">' + title + '</div>';
   h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
+  h += obBar();
   const canSwap = !g.over && st.leg === 1 && !g.log.length && !g.visit.length && n > 1;
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
   g.players.forEach((q, i) => {
@@ -3147,6 +3302,7 @@ function render() {
     : R === 'play' ? playView()
     : R === 'rating' ? ratingView()
     : R.startsWith('p.') ? profileView(R.slice(2))
+    : R.startsWith('m.') && SRV ? matchView(R.slice(2))
     : feedView();
   if (fid) { const el = $(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
   drawChart();
@@ -3246,7 +3402,13 @@ document.addEventListener('click', e => {
     case 'tour-del': deleteTour(v); break;
     case 'copy-res': if (TBY[v]) copyText(resultsText(TBY[v]), 'Итоги скопированы — можно вставить в чат.'); break;
     case 'swap-start':
-      if (G && !G.over && G.legNo === 1 && !G.log.length && !G.visit.length) { G.cur = G.starter = G.mstart = ((G.kind === 'ex' ? G.mstart : G.cur) + 1) % G.players.length; saveGame(); render(); }
+      if (G && !G.over && G.legNo === 1 && !G.log.length && !G.visit.length) {
+        G.cur = G.starter = G.mstart = ((G.kind === 'ex' ? G.mstart : G.cur) + 1) % G.players.length;
+        // на сервере повтор старта до первого подхода меняет начинающего
+        const it = G.srv && Api.ob.get(G.id);
+        if (it) { it.start = startBody(); Api.ob.save(); Api.ob.kick(G.id); }
+        saveGame(); render();
+      }
       break;
     case 'feedf': S.feedF = v; S.feedN = 15; render(); break;
     case 'sv-retry': svNow(v); render(); break;
@@ -3328,7 +3490,13 @@ document.addEventListener('click', e => {
     case 'cont': if (!G) break; S.inGame = true; if (R !== 'play') go('play'); else render(); break;
     case 'drop': S.confirmDrop = true; render(); break;
     case 'drop-no': S.confirmDrop = false; render(); break;
-    case 'drop-yes': G = null; undo = []; S.confirmDrop = false; saveGame(); render(); break;
+    case 'drop-yes': dropServerGame(); G = null; undo = []; S.confirmDrop = false; saveGame(); render(); break;
+    case 'ob-resume': if (G) { Api.ob.resume(G.id); render(); } break;
+    case 'takeover': takeover(v || (G && G.id)); break;
+    case 'mview': closeModals(); go('m.' + v); break;
+    case 'take-ask': S.confirmTake = v; render(); break;
+    case 'take-no': S.confirmTake = null; render(); break;
+    case 'back-tour': { const m = SVC['mlive:' + R.slice(2)]; history.length > 1 ? history.back() : go(m && m.data && m.data.match.tid ? 't.' + m.data.match.tid : 'feed'); break; }
     case 'menu': S.inGame = false; S.buf = ''; if (G && G.over === 'match') { G = null; undo = []; } saveGame(); render(); toTop(); break;
     case 'leave': leaveMatch(v); break;
     case 'entry':

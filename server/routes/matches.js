@@ -142,9 +142,18 @@ module.exports = async function (app) {
     const me = needPlayer(req), id = req.params.id, b = req.body || {};
     if (!ID_RE.test(id)) throw E.bad('id матча: «g» и 10–30 латинских букв или цифр', 'id');
     const res = await tx(async c => {
-      const ex = await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]);
+      const ex = await one(c, MATCH_SQL + ' WHERE m.id = $1 FOR UPDATE OF m', [id]);
       if (ex) {
-        if (ex.created_by === me.id && ex.lock_device === req.device) return { code: 200, m: ex };
+        if (ex.created_by === me.id && ex.lock_device === req.device) {
+          // до первого подхода повтор старта может сменить того, кто начинает («Начинает другой»)
+          const st = b.starter == null ? ex.starter : V.int(b.starter, 'starter', 0, ex.players.length - 1);
+          if (ex.status === 'live' && ex.last_seq === 0 && st !== ex.starter) {
+            await c.query('UPDATE matches SET starter = $2, state = $3, version = version + 1 WHERE id = $1', [id, st, JSON.stringify(liveState(Object.assign({}, ex, { starter: st }), []))]);
+            forget('m', id);
+            return { code: 200, m: await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]) };
+          }
+          return { code: 200, m: ex };
+        }
         throw E.conflict('conflict', 'Матч с таким id уже есть');
       }
       if (b.tournamentId != null && b.qual != null) await startQualMatch(c, req, me, b, id);
