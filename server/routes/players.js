@@ -73,19 +73,19 @@ module.exports = async function (app) {
     const avg = 'CASE WHEN s.darts > 0 THEN s.pts::float8 / s.darts * 3 ELSE 0 END';
     const from = ` FROM players p LEFT JOIN player_stats s ON s.player_id = p.id AND s.scope = 'tour' WHERE ${where.join(' AND ')}`;
     const total = (await one(pool, 'SELECT count(*) AS n' + from, args)).n;
-    const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.rating, p.rated, ${avg} AS avg` + from +
+    const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.photo, p.rating, p.rated, ${avg} AS avg` + from +
       ` ORDER BY ${sort === 'avg' ? avg + ' DESC, p.rating DESC' : 'p.rating DESC'}, p.id LIMIT ${limit} OFFSET ${offset}`, args);
     const cities = (await all(pool, `SELECT DISTINCT city FROM players WHERE rated > 0 AND city <> '' ORDER BY city`)).map(x => x.city);
     return {
       total, cities,
-      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, club: x.club, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
+      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, club: x.club, photo: x.photo || null, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
     };
   });
 
   app.get('/api/feed', async req => {
     const q = req.query, scope = q.scope == null ? 'all' : V.oneOf(q.scope, 'scope', ['all', 'my']);
     const me = scope === 'my' ? needPlayer(req) : null, bef = before(q.before), limit = lim(q.limit, 30, 50);
-    const ms = await all(pool, `SELECT m.* FROM matches m WHERE m.status = 'done' AND m.finished < $1
+    const ms = await all(pool, `SELECT m.* FROM matches m WHERE m.status = 'done' AND m.q_player IS NULL AND m.finished < $1
       ${me ? 'AND EXISTS (SELECT 1 FROM match_lines l WHERE l.match_id = m.id AND l.player_id = $2)' : ''}
       ORDER BY m.finished DESC, m.id LIMIT ${limit}`, me ? [bef, me.id] : [bef]);
     // турнир в ленте — сразу после последнего матча, как на странице

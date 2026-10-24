@@ -25,6 +25,13 @@ const SEED_PLAYERS = [
   ['p16', 'Юлия Ершова', 'ershova_nsk', 'OCH-1016', 'Новосибирск', '«Сибирский дубль»', 46, 0],
   ['p17', 'Тестовый Игрок', 'player_me', 'OCH-7749', 'Москва', '«Оче-бар»', 58, 0]
 ];
+// игроки лиги NDL для демо-турниров с квалификацией (как NDL_PLAYERS на странице)
+const NDL_PLAYERS = [
+  ['p18', 'Дмитрий Горбунов', 'gorbunov_d', 'OCH-1018', 'Новоуральск', '«Новоуральская Дартс Лига»', 77, 1],
+  ['p19', 'Алексей Козеев', 'kozeev_a', 'OCH-1019', 'Новоуральск', '«Новоуральская Дартс Лига»', 82, 0],
+  ['p20', 'Ирина Сыханова', 'syhanova_i', 'OCH-1020', 'Новоуральск', '«Новоуральская Дартс Лига»', 63, 0]
+];
+const ALL_PLAYERS = SEED_PLAYERS.concat(NDL_PLAYERS);
 const ME = 'p17';
 const CHECKOUTS = [16, 20, 24, 32, 36, 40, 32, 40, 50, 56, 60, 64, 68, 72, 76, 80, 81, 84, 87, 90, 96, 100, 104, 107, 110, 116, 121, 124, 130, 141, 150, 161, 167, 170];
 const MIN = 6e4, HOUR = 36e5, DAY = 864e5;
@@ -35,7 +42,7 @@ function makeData() {
   const R = rng(20261014), NOW = Date.now();
   const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   const pick = a => a[Math.floor(R() * a.length)];
-  const byId = Object.fromEntries(SEED_PLAYERS.map(([id, name, , , , , base]) => [id, { id, name, base }]));
+  const byId = Object.fromEntries(ALL_PLAYERS.map(([id, name, , , , , base]) => [id, { id, name, base }]));
   const matches = [], tours = [];
 
   const line = (p, won, legs, isW, mode) => {
@@ -110,37 +117,75 @@ function makeData() {
     while (b === a) b = pick(ALL16);
     addMatch(a, b, NOW - (2 * HOUR + R() * 20 * DAY), { ltw: pick([1, 2, 2, 3]), mode: pick([501, 501, 501, 301]) });
   }
+
+  // NDL: квалификация «Набор очков» (лучшая из двух попыток), затем сетки по 8 мест; матчи — «Набор очков» до 2 побед
+  const SCORE = { k: 'score', lim: 10 }, NDL_ORG = { official: true, orgName: 'Новоуральская Дартс Лига', orgVer: true, owner: ME };
+  const NDL20 = ALL16.concat([ME, 'p18', 'p19', 'p20']);
+  const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
+  const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [total(byId[id]), total(byId[id])] : [total(byId[id])]]));
+  const scoreMatch = (t, g, time) => {
+    const [a, b] = B.gamePlayersIn(t, g), legs = [0, 0], sc = [[], []];
+    while (legs[0] < t.ltw && legs[1] < t.ltw) {
+      let x = total(byId[a]), y = total(byId[b]);
+      if (x === y) x++;
+      sc[0].push(x); sc[1].push(y); legs[x > y ? 0 : 1]++;
+    }
+    const n = sc[0].length, mk = (id, k) => ({ player_id: id, name: byId[id].name, legs: legs[k], pts: sc[k].reduce((s, v) => s + v, 0), darts: 30 * n, f9: null, hi: 0, hco: 0, c180: 0, c140: 0, c100: 0, coh: legs[k], coa: legs[k], bl: 0, sc: sc[k] });
+    const m = { id: 'm' + (matches.length + 1), finished: Math.round(time), tid: t.id, r: g.r, i: g.i, mode: 501, ltw: t.ltw, ex: SCORE, w: legs[0] > legs[1] ? 0 : 1, lines: [mk(a, 0), mk(b, 1)] };
+    matches.push(m);
+    g.res = { la: legs[0], lb: legs[1], w: m.w === 0 ? a : b, mid: m.id };
+  };
+  const ndl = T(Object.assign({ name: 'Лига NDL · этап 2', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 4 * HOUR, ltw: 2, cap: 20, ex: SCORE, split: 8, boards: { n: 6, at: {} } }, NDL_ORG));
+  ndl.qual = { ex: SCORE, tries: 2, res: qualOf(NDL20) };
+  const best = id => Math.max(...ndl.qual.res[id]);
+  const order = NDL20.slice().sort((x, y) => best(y) - best(x));
+  B.setBracket(ndl, 'pl', order, 8);
+  ndl.nums = Object.fromEntries(order.map((id, k) => [id, k + 1]));
+  let k = 0;
+  ndl.games.forEach(g => { if (k < 17 && B.gameState(ndl, g).st === 'ready') { scoreMatch(ndl, g, ndl.start + 70 * MIN + k * 6 * MIN); k++; } });
+  B.assignBoards(ndl);
+  // следующий этап: идёт квалификация, часть игроков уже сдала
+  const nq = T(Object.assign({ name: 'Лига NDL · этап 3', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, stage: 'qual', format: 'pl' }, NDL_ORG));
+  nq.players = NDL20.filter(id => id !== ME).concat([ME]);
+  nq.qual = { ex: SCORE, tries: 2, res: qualOf(nq.players.slice(0, 12)) };
   return { tours, matches };
 }
 
 async function seed(c) {
   const now = Date.now(), { tours, matches } = makeData();
-  for (const [id, name, handle, code, city, club, , ver] of SEED_PLAYERS) {
-    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, admin, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)', [id, name, handle, code, city, club, !!ver, now]);
+  for (const [id, name, handle, code, city, club, , ver] of ALL_PLAYERS) {
+    // тестовый игрок — администратор, чтобы проверять создание аккаунтов
+    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, admin, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [id, name, handle, code, city, club, !!ver, id === ME, now]);
   }
-  await c.query(`SELECT setval('player_seq', $1)`, [SEED_PLAYERS.length]);
+  await c.query(`SELECT setval('player_seq', $1)`, [ALL_PLAYERS.length]);
+  const js = v => v == null ? null : JSON.stringify(v);
   for (const t of tours) {
-    await c.query(`INSERT INTO tournaments (id, name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, ltw, cap, slots, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-    [t.id, t.name, t.official, t.owner, t.orgName, t.orgVer, t.city, t.venue, t.start, t.regUntil || null, t.status, t.format, t.mode, t.ltw, t.cap, t.slots ? JSON.stringify(t.slots) : null, now]);
+    await c.query(`INSERT INTO tournaments (id, name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, ltw, cap, slots,
+      ex, qual, split, block, stage, boards, nums, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+    [t.id, t.name, t.official, t.owner, t.orgName, t.orgVer, t.city, t.venue, t.start, t.regUntil || null, t.status, t.format, t.mode, t.ltw, t.cap, js(t.slots),
+      js(t.ex), t.qual ? js({ ex: t.qual.ex, tries: t.qual.tries }) : null, t.split || null, t.block || null, t.stage || null, js(t.boards), js(t.nums), now]);
     await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, t.players]);
+    if (t.qual) for (const [pid, vs] of Object.entries(t.qual.res)) for (const [k, v] of vs.entries()) {
+      await c.query('INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)', [t.id, pid, k, v, t.start + 5 * MIN]);
+    }
   }
   await c.query(`SELECT setval('tour_seq', $1)`, [tours.length]);
   for (const m of matches) {
     const pl = m.lines.map(l => ({ id: l.player_id, name: l.name }));
-    await c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, players, legs, w, created_by, started, finished)
-      VALUES ($1, $2, $3, $4, 'done', $5, $6, true, $7, $8, $9, $10, $11, $12)`,
-    [m.id, m.tid, m.r, m.i, m.mode, m.ltw, JSON.stringify(pl), JSON.stringify(m.lines.map(l => l.legs)), m.w, pl[0].id, m.finished - 20 * MIN, m.finished]);
+    await c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, ex, players, legs, w, created_by, started, finished)
+      VALUES ($1, $2, $3, $4, 'done', $5, $6, true, $7, $8, $9, $10, $11, $12, $13)`,
+    [m.id, m.tid, m.r, m.i, m.mode, m.ltw, js(m.ex), JSON.stringify(pl), JSON.stringify(m.lines.map(l => l.legs)), m.w, pl[0].id, m.finished - 20 * MIN, m.finished]);
     for (const [k, l] of m.lines.entries()) {
-      await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9, hi, hco, c180, c140, c100, coh, coa, bl)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-      [m.id, k, l.player_id, l.name, l.legs, l.pts, l.darts, l.f9, l.hi, l.hco, l.c180, l.c140, l.c100, l.coh, l.coa, l.bl]);
+      await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9, hi, hco, c180, c140, c100, coh, coa, bl, sc)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+      [m.id, k, l.player_id, l.name, l.legs, l.pts, l.darts, l.f9, l.hi, l.hco, l.c180, l.c140, l.c100, l.coh, l.coa, l.bl, js(l.sc)]);
     }
   }
   for (const t of await loadTours(c, (await c.query(TOUR_SQL + ` WHERE t.status <> 'reg'`)).rows)) await refreshTour(c, t);
   await eloAll(c);
-  await refreshStats(c, SEED_PLAYERS.map(p => p[0]));
-  return { players: SEED_PLAYERS.length, tours: tours.length, matches: matches.length };
+  await refreshStats(c, ALL_PLAYERS.map(p => p[0]));
+  return { players: ALL_PLAYERS.length, tours: tours.length, matches: matches.length };
 }
 
 async function main() {

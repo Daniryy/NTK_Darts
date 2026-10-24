@@ -6,11 +6,12 @@ const { pool, one, all } = require('../db');
 const { E, ApiError } = require('../errors');
 
 const MAX_CLIENTS = 3000, PING_MS = 15000;
-const LIVE_SQL = `SELECT m.id, m.tournament_id, m.r, m.i, m.status, m.mode, m.ltw, m.players, m.legs, m.w, m.state, m.version, m.last_seq,
+const LIVE_SQL = `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.ex, m.status, m.mode, m.ltw, m.players, m.legs, m.w, m.state, m.version, m.last_seq,
   m.lock_until, lp.name AS lock_name FROM matches m LEFT JOIN players lp ON lp.id = m.lock_player`;
 
 const liveJSON = m => ({
-  id: m.id, r: m.r, i: m.i, status: m.status, mode: m.mode, ltw: m.ltw, players: m.players, legs: m.legs, w: m.w,
+  id: m.id, r: m.r, i: m.i, q: m.q_player ? { id: m.q_player, k: m.q_try } : null, ex: m.ex || null,
+  status: m.status, mode: m.mode, ltw: m.ltw, players: m.players, legs: m.legs, w: m.w,
   state: m.state, version: m.version, lastSeq: m.last_seq, by: m.lock_name || null
 });
 

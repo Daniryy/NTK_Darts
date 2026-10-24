@@ -22,7 +22,12 @@ function build(opts = {}) {
   app.register(require('@fastify/cookie'), { secret: config.cookieSecret });
   app.register(require('@fastify/rate-limit'), {
     max: config.rateMax, timeWindow: 2000,
-    keyGenerator: req => req.headers['x-device-id'] || req.ip,
+    // устройство из заголовка; поток табло (EventSource не шлёт заголовки) — из ?d=; иначе IP.
+    // По IP нельзя: в зале все телефоны в одном Wi-Fi выходят с одного адреса.
+    keyGenerator: req => {
+      const d = req.headers['x-device-id'] || (req.query && req.query.d);
+      return typeof d === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(d) ? d : req.ip;
+    },
     errorResponseBuilder: (req, ctx) => new ApiError(429, 'too_many', 'Слишком много запросов, повторите через ' + Math.ceil(ctx.ttl / 1000) + ' с')
   });
 
@@ -44,6 +49,8 @@ function build(opts = {}) {
     api.register(require('./routes/tournaments'));
     api.register(require('./routes/matches'));
     api.register(require('./routes/live'));
+    api.register(require('./routes/photos'));
+    api.register(require('./routes/admin'));
   });
 
   if (config.serveStatic) {
@@ -52,6 +59,13 @@ function build(opts = {}) {
     app.get('/', (req, reply) => reply.sendFile('index.html'));
     app.get('/index.html', (req, reply) => reply.sendFile('index.html'));
     app.get('/shared/bracket.js', (req, reply) => reply.sendFile('shared/bracket.js'));
+    app.get('/shared/games.js', (req, reply) => reply.sendFile('shared/games.js'));
+    app.get('/api.js', (req, reply) => reply.sendFile('api.js'));
+    app.get('/vendor/qrcode.js', (req, reply) => reply.sendFile('vendor/qrcode.js'));
+    app.get('/sw.js', (req, reply) => reply.sendFile('sw.js'));
+    app.get('/manifest.webmanifest', (req, reply) => reply.type('application/manifest+json').sendFile('manifest.webmanifest'));
+    app.get('/icons/:f', (req, reply) => /^[\w-]+\.png$/.test(req.params.f) ? reply.sendFile('icons/' + req.params.f) : reply.code(404).send());
+    app.register(require('@fastify/static'), { root: config.uploadDir, prefix: '/uploads/', decorateReply: false });
   }
   return app;
 }

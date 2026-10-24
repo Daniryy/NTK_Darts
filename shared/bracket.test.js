@@ -11,9 +11,9 @@ const ids = n => range(1, n).map(i => 'p' + i);
 
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-function make(fmt, n) {
+function make(fmt, n, block) {
   const t = { id: 't', players: [], games: [] };
-  B.setBracket(t, fmt, ids(n));
+  B.setBracket(t, fmt, ids(n), block);
   return t;
 }
 // играет все готовые матчи по одному; pick(a, b, g) -> id победителя. Возвращает число сыгранных.
@@ -163,6 +163,61 @@ test('seedOrder: перестановка 1..S, первые два посева
     if (s > 2) assert.ok(o.indexOf(1) < s / 2 && o.indexOf(2) >= s / 2);
     for (let i = 0; i < s; i += 2) assert.equal(o[i] + o[i + 1], s + 1, 'в первом круге сильный играет со слабым');
   }
+});
+
+test('pl частями по 8 (NDL): 3–64 игроков, места 1..N, каждая часть играет за свои места', () => {
+  for (const n of SIZES) {
+    for (const [name, pick] of [['по посеву', seedWins], ['случайно', randomWins(3 * n)], ['наоборот', (a, b) => seedWins(b, a)]]) {
+      const t = make('pl', n, 8);
+      assert.equal(B.bSize(t), Math.min(8, B.bracketSize(n)), `n=${n}`);
+      assert.equal(B.bParts(t), Math.ceil(n / B.bSize(t)), `n=${n}`);
+      const played = playAll(t, pick);
+      assert.equal(played, B.tProgress(t).total, `n=${n} ${name}`);
+      const pls = B.places(t);
+      pls.forEach(p => assert.equal(p.lo, p.hi, `n=${n} ${name}: место ${p.id} не определено (${p.lo}–${p.hi})`));
+      assert.deepEqual(pls.map(p => p.lo), range(1, n), `n=${n} ${name}: места повторяются или пропущены`);
+      // игрок с посевом s остаётся в своей части: места части k — от 8k+1 до 8k+8
+      pls.forEach(p => { const s = Number(p.id.slice(1)); assert.equal(Math.floor((p.lo - 1) / 8), Math.floor((s - 1) / 8), `n=${n} ${name}: ${p.id} вне своей части (${p.lo})`); });
+      if (name === 'по посеву') pls.forEach(p => assert.equal(p.lo, Number(p.id.slice(1)), `n=${n}: ${p.id} занял ${p.lo}`));
+    }
+  }
+});
+
+test('pl частями: пары как на бумажной сетке NDL (1–8, 4–5, 2–7, 3–6), номера игр сквозные', () => {
+  const t = make('pl', 24, 8), rv = B.resolver(t);
+  const first = range(0, 11).map(i => rv.players(0, i).map(x => +x.slice(1)).sort((a, b) => a - b).join('-'));
+  assert.deepEqual(first, ['1-8', '4-5', '2-7', '3-6', '9-16', '12-13', '10-15', '11-14', '17-24', '20-21', '18-23', '19-22']);
+  const nums = B.gameNums(t, rv);
+  assert.deepEqual(range(0, 11).map(i => nums.get('0:' + i)), range(1, 12), 'круг 1 нумеруется подряд по частям');
+  assert.equal(nums.size, 36);
+  // последний круг: финал каждой части — последним номером в своей части
+  assert.ok(nums.get('2:0') > nums.get('2:3') && nums.get('2:4') > nums.get('2:7') && nums.get('2:4') > nums.get('2:0'));
+  assert.deepEqual(B.plGroup(t, 2, 4), { grp: 4, per: 1, lo: 9, part: 1, lg: 0 });
+  assert.deepEqual(B.roundProgress(t, rv).map(x => [x.r, x.done, x.total]), [[0, 0, 12], [1, 0, 12], [2, 0, 12]]);
+});
+
+test('pl частями: игроков не больше части — обычная сетка без частей', () => {
+  const t = make('pl', 7, 8);
+  assert.equal(t.block, undefined);
+  assert.equal(B.bSize(t), 8);
+  const u = make('pl', 5, 4);
+  assert.equal(u.block, 4);
+  assert.equal(B.bParts(u), 2);
+});
+
+test('мишени: готовые игры получают свободные мишени, сыгранные освобождают', () => {
+  const t = make('pl', 8);
+  t.boards = { n: 3, at: {} };
+  assert.equal(B.assignBoards(t), true);
+  assert.deepEqual(t.boards.at, { '0:0': 1, '0:1': 2, '0:2': 3 });
+  assert.equal(B.assignBoards(t), false, 'повторно ничего не меняется');
+  const g = B.gameAt(t, 0, 1), s = B.gameState(t, g);
+  g.res = { w: s.a, la: 3, lb: 0 };
+  B.assignBoards(t);
+  assert.deepEqual(t.boards.at, { '0:0': 1, '0:2': 3, '0:3': 2 }, 'мишень 2 перешла к следующей игре');
+  t.boards.at['0:3'] = 7;
+  B.assignBoards(t);
+  assert.equal(t.boards.at['0:3'], 2, 'неверный номер мишени заменяется свободным');
 });
 
 test('модуль грузится в браузере как глобальный Bracket', () => {

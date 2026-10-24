@@ -11,28 +11,55 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating, p.photo, p.title
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
-  const ms = await all(c, `SELECT id, tournament_id, r, i, status, players, legs, w, finished FROM matches WHERE tournament_id = ANY($1)`, [ids]);
-  return rows.map(row => build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id)));
+  // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
+  const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished,
+    (SELECT json_agg(json_build_array(l.pts, l.darts) ORDER BY l.idx) FROM match_lines l WHERE l.match_id = m.id) AS ln
+    FROM matches m WHERE m.tournament_id = ANY($1)`, [ids]);
+  const ph = await all(c, `SELECT id, file, tournament_id, w, h FROM photos WHERE tournament_id = ANY($1) ORDER BY created_at`, [ids]);
+  const qs = rows.some(r => r.qual) ? await all(c, 'SELECT * FROM qual_results WHERE tournament_id = ANY($1) ORDER BY try', [ids]) : [];
+  return rows.map(row => {
+    const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
+    t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
+    t.links = row.links || [];
+    t.streams = row.streams || [];
+    return t;
+  });
 }
 
-function build(row, ents, ms) {
+const avgOf = l => l && l[1] ? Math.round(l[0] / l[1] * 30) / 10 : null;
+
+function build(row, ents, ms, qs) {
   const t = {
     id: row.id, name: row.name, official: row.official, city: row.city, venue: row.venue, start: row.start, regUntil: row.reg_until,
     status: row.status, format: row.format, mode: row.mode, ltw: row.ltw, dbl: row.dbl, cap: row.cap,
     players: ents.map(e => e.player_id), games: [], live: {}, version: row.version
   };
+  if (row.ex) t.ex = row.ex;
+  if (row.split) t.split = row.split;
+  if (row.stage) t.stage = row.stage;
+  if (row.boards) t.boards = row.boards;
+  if (row.nums) t.nums = row.nums;
+  if (row.qual) {
+    t.qual = { ex: row.qual.ex, tries: row.qual.tries, res: {} };
+    qs.forEach(q => { (t.qual.res[q.player_id] = t.qual.res[q.player_id] || [])[q.try] = { v: q.v, mid: q.match_id, t: q.t }; });
+  }
   Object.defineProperty(t, '_row', { value: row });
   Object.defineProperty(t, '_ents', { value: ents });
   if (row.status === 'reg') return t;
-  if (B.isBracket(t)) { t.slots = row.slots; t.games = B.bracketGames(t.format, t.slots.length); }
-  else t.games = B.rrGames(t.players);
+  ms.forEach(m => { if (m.q_player != null && m.status === 'live') t.live['q:' + m.q_player + ':' + m.q_try] = m.id; });
+  if (t.stage === 'qual') return t;
+  if (B.isBracket(t)) {
+    t.slots = row.slots;
+    if (row.block) t.block = row.block;
+    t.games = B.bracketGames(t.format, t.slots.length, t.block);
+  } else t.games = B.rrGames(t.players);
   ms.forEach(m => {
-    const g = B.gameAt(t, m.r, m.i);
+    const g = m.r == null ? null : B.gameAt(t, m.r, m.i);
     if (!g) return;
     if (m.status === 'live') t.live[m.r + ':' + m.i] = m.id;
-    else g.res = { la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id };
+    else g.res = { la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id, avg: m.ln ? [avgOf(m.ln[0]), avgOf(m.ln[1])] : [null, null] };
   });
   return t;
 }
@@ -62,7 +89,7 @@ function champion(t) {
 
 // места всех участников: { id: [lo, hi] }
 function placesOf(t) {
-  if (t.status === 'reg') return {};
+  if (t.status === 'reg' || t.stage === 'qual') return {};
   const out = {};
   if (B.isBracket(t)) B.places(t).forEach(x => { out[x.id] = [x.lo, x.hi]; });
   else standings(t).forEach((x, k) => { out[x.id] = [k + 1, k + 1]; });
@@ -74,7 +101,10 @@ async function refreshTour(c, t) {
   const st = tStatus(t);
   let doneAt = null;
   if (st === 'done') doneAt = (await all(c, 'SELECT max(finished) AS f FROM matches WHERE tournament_id = $1', [t.id]))[0].f;
-  await c.query('UPDATE tournaments SET status = $2, done_at = $3, version = version + 1 WHERE id = $1', [t.id, st, doneAt]);
+  // мишени держатся за готовыми играми: сыгранная игра освобождает свою
+  const moved = t.boards && B.assignBoards(t);
+  await c.query('UPDATE tournaments SET status = $2, done_at = $3, version = version + 1' + (moved ? ', boards = $4' : '') + ' WHERE id = $1',
+    moved ? [t.id, st, doneAt, JSON.stringify(t.boards)] : [t.id, st, doneAt]);
   const pl = placesOf(t), ids = Object.keys(pl);
   await c.query(`UPDATE entries e SET place_lo = x.lo, place_hi = x.hi
     FROM unnest($2::text[], $3::int[], $4::int[]) AS x(id, lo, hi) WHERE e.tournament_id = $1 AND e.player_id = x.id`,
@@ -96,7 +126,7 @@ function gameLabel(t, g, rv) {
   rv = rv || B.resolver(t);
   const { grp, lo } = B.plGroup(t, g.r, g.i), c = B.groupReal(t, rv, g.r, grp);
   if (g.r === B.bRounds(t) - 1) return lo === 1 ? 'финал' : 'матч за ' + lo + '-е место';
-  if (g.r === 0) return 'круг 1';
+  if (g.r === 0 && !t.block) return 'круг 1';
   return 'круг ' + (g.r + 1) + ' · за ' + placesTxt(lo, lo + c - 1);
 }
 
@@ -119,15 +149,25 @@ function canClear(t, g, liveMatches) {
   }));
 }
 
+// сколько игроков сдали квалификацию
+const qualDone = t => t.qual ? t.players.filter(id => (t.qual.res[id] || []).some(Boolean)).length : 0;
+// порядок по квалификации: лучший результат, затем вторая попытка, затем рейтинг (как на странице)
+function qualOrder(t) {
+  const r = Object.fromEntries(t._ents.map(e => [e.player_id, e.rating]));
+  const key = id => { const v = (t.qual.res[id] || []).filter(Boolean).map(x => x.v).sort((a, b) => b - a); return [v.length ? v[0] : -1, v.length > 1 ? v[1] : -1]; };
+  return t.players.slice().sort((a, b) => { const ka = key(a), kb = key(b); return kb[0] - ka[0] || kb[1] - ka[1] || r[b] - r[a] || (a < b ? -1 : 1); });
+}
+
 const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver });
 
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me);
   const roster = {};
-  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating) }; });
+  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '' }; });
   const out = Object.assign({}, t, {
     org: orgOf(row), roster,
     can: {
+      org: owner,
       edit: owner && t.status === 'reg',
       delete: owner,
       launch: owner && t.status === 'reg',
@@ -144,12 +184,13 @@ function tourCard(t, me) {
   return {
     id: t.id, name: t.name, official: t.official, org: orgOf(row), city: t.city, venue: t.venue, start: t.start, regUntil: t.regUntil,
     status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, cap: t.cap, count: t.players.length,
-    progress: t.status === 'reg' ? { done: 0, total: 0 } : B.tProgress(t),
+    ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null,
+    progress: t.status === 'reg' ? { done: 0, total: 0 } : t.stage === 'qual' ? { done: qualDone(t), total: t.players.length } : B.tProgress(t),
     champion: e ? { id: ch, name: e.name } : null, joined: !!me && t.players.includes(me.id), version: t.version
   };
 }
 
 module.exports = {
   RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour,
-  roundLabel, gameLabel, isOwner, readyPair, canScoreGame, canClear, tourJSON, tourCard
+  roundLabel, gameLabel, isOwner, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
 };

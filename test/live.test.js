@@ -69,7 +69,7 @@ test('табло получает подходы и результат сраз�
   const id = 'gtablo' + Date.now().toString(36);
   assert.equal((await call('PUT', '/api/matches/' + id, { tournamentId: t.id, r: g.r, i: g.i })).s, 201);
   const started = await s.next(e => e.type === 'match' && e.data.id === id);
-  assert.deepEqual(started.data.state, { leg: 1, cur: 0, scores: [501, 501], last: null });
+  assert.deepEqual(started.data.state, { leg: 1, cur: 0, scores: [501, 501], avg: [null, null], last: null });
   await s.next(e => e.type === 'tour');
 
   const live = (await call('GET', `/api/tournaments/${t.id}/live`)).b;
@@ -82,7 +82,7 @@ test('табло получает подходы и результат сраз�
   assert.equal(sent.s, 200);
   const v = await s.next(e => e.type === 'match' && e.data.version === sent.b.version);
   assert.ok(v.at - okAt < 300, 'задержка ' + (v.at - okAt) + ' мс');
-  assert.deepEqual(v.data.state, { leg: 1, cur: 1, scores: [321, 501], last: { p: 0, pts: 180, n: 3, b: 0, d: ['T20', 'T20', 'T20'] } });
+  assert.deepEqual(v.data.state, { leg: 1, cur: 1, scores: [321, 501], avg: [180, null], last: { p: 0, pts: 180, n: 3, b: 0, d: ['T20', 'T20', 'T20'] } });
 
   // отмена тоже видна
   await call('POST', `/api/matches/${id}/events`, { events: [{ seq: 2, type: 'undo' }] });

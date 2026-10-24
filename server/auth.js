@@ -44,6 +44,8 @@ function hooks(app) {
   });
 }
 
+// сессии хранят игрока: после смены имени, фото или владельца аккаунта кэш сбрасывается
+const clearCache = () => cache.clear();
 const needPlayer = req => { if (!req.player) throw E.auth(); return req.player; };
 const safeReturn = r => typeof r === 'string' && /^\/(?!\/)[^\\\s]*$/.test(r) ? r : '/';
 
@@ -57,15 +59,42 @@ async function vkPost(path, query, body) {
 
 function routes(app) {
   app.get('/api/me', async req => ({ player: meJSON(req.player), admin: !!(req.player && req.player.admin) }));
+  // что умеет сервер: вход через VK, вход для разработки
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, dev: config.devLogin }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
     if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
     if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
     if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
+    if (b.title !== undefined) set.title = V.optStr(b.title, 'title', 40);
     const keys = Object.keys(set);
     if (!keys.length) throw E.bad('Нечего менять');
     const p = await one(pool, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [me.id, ...keys.map(k => set[k])]);
+    cache.clear();
+    return { player: meJSON(p), admin: p.admin };
+  });
+
+  // привязать аккаунт, созданный администратором: { code }. Свой новый аккаунт (без матчей и турниров) растворяется в нём.
+  app.post('/api/me/claim', async req => {
+    const me = needPlayer(req), code = V.str((req.body || {}).code, 'code', 4, 16).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const p = await tx(async c => {
+      const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
+      if (!t) throw E.notFound('Код не найден — проверьте у организатора');
+      if (t.id === me.id) throw E.conflict('conflict', 'Этот аккаунт уже ваш');
+      if (t.vk_id != null) throw E.conflict('conflict', 'Аккаунт уже привязан к VK');
+      const used = await one(c, `SELECT (SELECT count(*) FROM match_lines WHERE player_id = $1) + (SELECT count(*) FROM entries WHERE player_id = $1)
+        + (SELECT count(*) FROM tournaments WHERE owner_id = $1) AS n`, [me.id]);
+      if (used.n > 0) throw E.conflict('conflict', 'У вашего аккаунта уже есть матчи или турниры — объединить может только администратор');
+      const vk = (await one(c, 'SELECT vk_id FROM players WHERE id = $1 FOR UPDATE', [me.id])).vk_id;
+      await c.query('UPDATE players SET vk_id = NULL WHERE id = $1', [me.id]);
+      await c.query('UPDATE sessions SET player_id = $2 WHERE player_id = $1', [me.id, t.id]);
+      await c.query('UPDATE photos SET owner_id = $2 WHERE owner_id = $1', [me.id, t.id]);
+      await c.query('UPDATE players SET owner_id = $2 WHERE owner_id = $1', [me.id, t.id]);
+      const out = await one(c, 'UPDATE players SET vk_id = $2, claim = NULL WHERE id = $1 RETURNING *', [t.id, vk]);
+      await c.query('DELETE FROM players WHERE id = $1', [me.id]);
+      return out;
+    });
     cache.clear();
     return { player: meJSON(p), admin: p.admin };
   });
@@ -130,4 +159,4 @@ function routes(app) {
   });
 }
 
-module.exports = { hooks, routes, needPlayer, startSession };
+module.exports = { hooks, routes, needPlayer, startSession, clearCache };

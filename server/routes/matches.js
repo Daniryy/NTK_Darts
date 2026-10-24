@@ -2,7 +2,8 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { stateOf, liveState, checkVisit, checkFinish, lineOf } = require('../darts');
+const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf } = require('../darts');
+const Games = require('../../shared/games.js');
 const { TOUR_SQL, loadTours, readyPair, canScoreGame, isOwner, canClear, refreshTour } = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards, lineJSON } = require('../cards');
@@ -15,15 +16,16 @@ const MATCH_SQL = 'SELECT m.*, lp.name AS lock_name FROM matches m LEFT JOIN pla
 
 const matchJSON = (m, req, card) => ({
   id: m.id, status: m.status, tid: m.tournament_id, r: m.r, i: m.i, mode: m.mode, ltw: m.ltw, dbl: m.dbl, starter: m.starter,
+  ex: m.ex || null, q: m.q_player ? { id: m.q_player, k: m.q_try } : null,
   players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished,
   lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || null, until: m.lock_until }, card: card || null
 });
 const eventJSON = e => Object.assign({ seq: e.seq, type: e.type }, e.data, { t: e.t });
 
-// подходы, которые остались после отмен
+// подходы, которые остались после отмен; бросок в булл при ничьей — тоже подход
 function activeVisits(rows) {
   const v = [];
-  rows.forEach(e => { if (e.type === 'visit') v.push(e.data); else if (e.type === 'undo') v.pop(); });
+  rows.forEach(e => { if (e.type === 'visit') v.push(e.data); else if (e.type === 'bull') v.push(Object.assign({ tb: 1 }, e.data)); else if (e.type === 'undo') v.pop(); });
   return v;
 }
 
@@ -46,8 +48,9 @@ async function afterResult(c, tid, ids, fullElo) {
   }
   await refreshStats(c, ids);
 }
-// снять результат можно, только если от него ничего не зависит
+// снять результат можно, только если от него ничего не зависит; попытку квалификации — пока квалификация идёт
 async function checkClear(c, t, m) {
+  if (m.q_player) { if (t.stage !== 'qual') throw E.conflict('result_locked', 'Нельзя отменить: квалификация уже закрыта'); return; }
   const live = await all(c, `SELECT r, i, players FROM matches WHERE tournament_id = $1 AND status = 'live' AND id <> $2`, [t.id, m.id]);
   if (!canClear(t, B.gameAt(t, m.r, m.i), live)) throw E.conflict('result_locked', 'Нельзя отменить: следующие матчи сетки уже сыграны или идут');
 }
@@ -62,14 +65,40 @@ async function startTourMatch(c, req, me, b, id) {
   if (!canScoreGame(t, me, x.a, x.b)) throw E.forbidden('Вести счёт может организатор или игрок этой пары');
   const nm = pid => t._ents.find(e => e.player_id === pid).name;
   const starter = b.starter == null ? 0 : V.int(b.starter, 'starter', 0, 1);
-  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+  await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [tid]);
+  forget('t', tid);
+}
+
+// попытка квалификации: один игрок, один лег упражнения квалификации; сдаёт сам игрок или организатор
+async function startQualMatch(c, req, me, b, id) {
+  const tid = V.id(b.tournamentId, 'tournamentId'), q = b.qual || {};
+  const t = await tourOf(c, tid, true);
+  if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация закрыта');
+  const pid = V.id(q.playerId, 'qual.playerId'), k = V.int(q.try, 'qual.try', 0, t.qual.tries - 1);
+  if (!t.players.includes(pid)) throw E.bad('Игрок не участвует в турнире', 'qual.playerId');
+  if (pid !== me.id && !isOwner(t, me)) throw E.forbidden('Попытку сдаёт сам игрок или организатор');
+  const busy = await one(c, 'SELECT id FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try = $3', [tid, pid, k]);
+  if (busy) throw E.conflict('game_taken', 'Эта попытка уже идёт или сыграна', { matchId: busy.id });
+  if ((t.qual.res[pid] || [])[k]) throw E.conflict('game_taken', 'Результат этой попытки уже внесён', { matchId: null });
+  if (k > 0 && !(t.qual.res[pid] || [])[k - 1]) throw E.conflict('bad_state', 'Сначала нужна попытка ' + k);
+  const name = t._ents.find(e => e.player_id === pid).name;
+  await insertMatch(c, req, me, { id, tid, r: null, i: null, q_player: pid, q_try: k, mode: 501, ltw: 1, dbl: true, ex: Games.norm(t.qual.ex), starter: 0, players: [{ id: pid, name }] });
   await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [tid]);
   forget('t', tid);
 }
 
 async function startFriendly(c, req, me, b, id) {
-  const mode = V.oneOf(b.mode, 'mode', [301, 501, 701]), ltw = V.int(b.ltw, 'ltw', 1, 5);
-  const dbl = b.dbl == null ? true : V.bool(b.dbl, 'dbl');
+  let ex = null, mode, dbl;
+  if (b.ex != null) {
+    ex = Games.norm(b.ex);
+    if (!ex) throw E.bad('ex: неизвестное упражнение', 'ex');
+    if (ex.k === 'x01') { mode = ex.mode; dbl = ex.dbl; if (!ex.lim) ex = null; } else { mode = 501; dbl = true; }
+  } else {
+    mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
+    dbl = b.dbl == null ? true : V.bool(b.dbl, 'dbl');
+  }
+  const ltw = V.int(b.ltw, 'ltw', 1, 5);
   if (!Array.isArray(b.players) || b.players.length < 1 || b.players.length > 4) throw E.bad('Игроков от 1 до 4', 'players');
   const ids = b.players.map(x => x && x.id != null ? V.id(x.id, 'players') : null).filter(Boolean);
   if (!ids.length) throw E.bad('Нужен хотя бы один игрок из базы', 'players');
@@ -78,25 +107,30 @@ async function startFriendly(c, req, me, b, id) {
   if (found.length !== ids.length) throw E.bad('Игрок не найден', 'players');
   const players = b.players.map(x => x && x.id != null ? { id: x.id, name: found.find(p => p.id === x.id).name } : { id: null, name: V.str(x && x.name, 'players', 1, 32) });
   const starter = b.starter == null ? 0 : V.int(b.starter, 'starter', 0, players.length - 1);
-  await insertMatch(c, req, me, { id, tid: null, r: null, i: null, mode, ltw, dbl, starter, players });
+  await insertMatch(c, req, me, { id, tid: null, r: null, i: null, mode, ltw, dbl, ex, starter, players });
 }
 
 function insertMatch(c, req, me, m) {
   const now = Date.now();
-  return c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, starter, players, legs, state, lock_device, lock_player, lock_until, created_by, started)
-    VALUES ($1, $2, $3, $4, 'live', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $13, $15)`,
-  [m.id, m.tid, m.r, m.i, m.mode, m.ltw, m.dbl, m.starter, JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)),
-    JSON.stringify(liveState(m, [])), req.device, me.id, now + LOCK_MS, now]);
+  return c.query(`INSERT INTO matches (id, tournament_id, r, i, q_player, q_try, status, mode, ltw, dbl, ex, starter, players, legs, state, lock_device, lock_player, lock_until, created_by, started)
+    VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $16, $18)`,
+  [m.id, m.tid, m.r, m.i, m.q_player || null, m.q_player ? m.q_try : null, m.mode, m.ltw, m.dbl, m.ex ? JSON.stringify(m.ex) : null, m.starter,
+    JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)), JSON.stringify(liveState(m, [])), req.device, me.id, now + LOCK_MS, now]);
 }
 
 async function finishMatch(c, m, st, lines, now) {
   await c.query(`UPDATE matches SET status = 'done', w = $2, finished = $3 WHERE id = $1`, [m.id, st.winner, now]);
   for (const l of lines) {
-    await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9, hi, hco, c180, c140, c100, coh, coa, bl)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-    [m.id, l.idx, l.player_id, l.name, l.legs, l.pts, l.darts, l.f9, l.hi, l.hco, l.c180, l.c140, l.c100, l.coh, l.coa, l.bl]);
+    await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9, hi, hco, c180, c140, c100, coh, coa, bl, sc)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+    [m.id, l.idx, l.player_id, l.name, l.legs, l.pts, l.darts, l.f9, l.hi, l.hco, l.c180, l.c140, l.c100, l.coh, l.coa, l.bl, l.sc ? JSON.stringify(l.sc) : null]);
   }
-  if (m.tournament_id) {
+  if (m.q_player) {
+    // результат попытки — итог лега; если квалификацию уже закрыли или результат внесли вручную, матч остаётся тренировкой
+    const t = await tourOf(c, m.tournament_id, true);
+    if (t.stage === 'qual') await c.query(`INSERT INTO qual_results (tournament_id, player_id, try, v, match_id, t) VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (tournament_id, player_id, try) DO NOTHING`, [m.tournament_id, m.q_player, m.q_try, st.legsLog[0].tot[0], m.id, now]);
+  } else if (m.tournament_id) {
     await tourOf(c, m.tournament_id, true);
     await eloAdd(c, m.players[0].id, m.players[1].id, st.winner === 0);
   }
@@ -108,12 +142,22 @@ module.exports = async function (app) {
     const me = needPlayer(req), id = req.params.id, b = req.body || {};
     if (!ID_RE.test(id)) throw E.bad('id матча: «g» и 10–30 латинских букв или цифр', 'id');
     const res = await tx(async c => {
-      const ex = await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]);
+      const ex = await one(c, MATCH_SQL + ' WHERE m.id = $1 FOR UPDATE OF m', [id]);
       if (ex) {
-        if (ex.created_by === me.id && ex.lock_device === req.device) return { code: 200, m: ex };
+        if (ex.created_by === me.id && ex.lock_device === req.device) {
+          // до первого подхода повтор старта может сменить того, кто начинает («Начинает другой»)
+          const st = b.starter == null ? ex.starter : V.int(b.starter, 'starter', 0, ex.players.length - 1);
+          if (ex.status === 'live' && ex.last_seq === 0 && st !== ex.starter) {
+            await c.query('UPDATE matches SET starter = $2, state = $3, version = version + 1 WHERE id = $1', [id, st, JSON.stringify(liveState(Object.assign({}, ex, { starter: st }), []))]);
+            forget('m', id);
+            return { code: 200, m: await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]) };
+          }
+          return { code: 200, m: ex };
+        }
         throw E.conflict('conflict', 'Матч с таким id уже есть');
       }
-      if (b.tournamentId != null) await startTourMatch(c, req, me, b, id);
+      if (b.tournamentId != null && b.qual != null) await startQualMatch(c, req, me, b, id);
+      else if (b.tournamentId != null) await startTourMatch(c, req, me, b, id);
       else await startFriendly(c, req, me, b, id);
       return { code: 201, m: await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]) };
     });
@@ -135,21 +179,21 @@ module.exports = async function (app) {
         if (ev.seq <= seq) continue; // уже принято: повтор безопасен
         if (ev.seq !== seq + 1) throw E.conflict('seq_gap', 'Ожидается событие №' + (seq + 1), { expectSeq: seq + 1 });
         if (done) throw E.conflict('bad_state', 'Матч завершён');
-        const st = stateOf(m, visits);
         let data;
-        if (ev.type === 'visit') {
-          data = { leg: ev.leg, p: ev.p, s: ev.s, pts: ev.pts, n: ev.n, b: ev.b, d: ev.d == null ? null : ev.d };
-          const err = checkVisit(m, st, data);
+        if (ev.type === 'visit' || ev.type === 'bull') {
+          const v = visitOf(m, ev);
+          const err = checkVisit(m, visits, v);
           if (err) throw E.badEvent(err, ev.seq);
-          visits.push(data);
+          visits.push(v);
+          data = ev.type === 'bull' ? { leg: v.leg, p: v.p } : v;
         } else if (ev.type === 'undo') {
           if (!visits.length) throw E.badEvent('Нечего отменять', ev.seq);
           visits.pop();
           data = {};
         } else if (ev.type === 'finish') {
-          const err = checkFinish(m, st, ev);
+          const st = stateOf(m, visits), err = checkFinish(m, st, ev);
           if (err) throw E.badEvent(err, ev.seq);
-          const lines = ev.pl.map((l, k) => lineOf(m, l, k));
+          const lines = ev.pl.map((l, k) => lineOf(m, l, k, st));
           fin = { st, lines };
           data = { w: ev.w, pl: lines.map(lineJSON) };
           done = true;
@@ -194,6 +238,7 @@ module.exports = async function (app) {
       if (m.tournament_id) await checkClear(c, await tourOf(c, m.tournament_id, true), m);
       const now = Date.now();
       await c.query('DELETE FROM match_lines WHERE match_id = $1', [m.id]);
+      if (m.q_player) await c.query('DELETE FROM qual_results WHERE match_id = $1', [m.id]);
       await c.query(`UPDATE matches SET status = 'live', w = NULL, finished = NULL, last_seq = last_seq + 1, version = version + 1, lock_until = $2 WHERE id = $1`, [m.id, now + LOCK_MS]);
       await c.query(`INSERT INTO match_events (match_id, seq, ver, type, data, t) VALUES ($1, $2, $3, 'reopen', '{}', $4)`, [m.id, m.last_seq + 1, m.version + 1, now]);
       await afterResult(c, m.tournament_id, m.players.map(p => p.id), true);
@@ -235,7 +280,11 @@ module.exports = async function (app) {
     if (!m) throw E.notFound('Матч не найден');
     const evs = await all(pool, 'SELECT * FROM match_events WHERE match_id = $1 AND ver > $2 ORDER BY seq', [id, since || 0]);
     const card = m.status === 'done' ? (await matchCards(pool, [m]))[0] : null;
-    return { match: matchJSON(m, req, card), events: evs.map(eventJSON), version: m.version };
+    // фото игроков — для просмотра матча
+    const ids = m.players.map(p => p.id).filter(Boolean), ph = ids.length ? await all(pool, 'SELECT id, photo FROM players WHERE id = ANY($1)', [ids]) : [];
+    const out = matchJSON(m, req, card);
+    out.players = m.players.map(p => Object.assign({}, p, { photo: (ph.find(x => x.id === p.id) || {}).photo || null }));
+    return { match: out, events: evs.map(eventJSON), version: m.version };
   });
 };
 

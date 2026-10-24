@@ -35,7 +35,7 @@ async function createPlayer(c, p) {
   [p.name, handle, code, p.city || '', p.club || '', p.vk_id || null, p.owner_id || null, Date.now()]);
 }
 
-const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated });
-const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver } : null;
+const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '' });
+const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '' } : null;
 
 module.exports = { createPlayer, playerShort, meJSON };

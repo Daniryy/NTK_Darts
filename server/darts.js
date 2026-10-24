@@ -1,63 +1,45 @@
-// Проверка подходов счётчика. Состояние матча всегда пересчитывается из принятых подходов.
-const IMPOSSIBLE = new Set([163, 166, 169, 172, 173, 175, 176, 178, 179]);
+// Проверка подходов счётчика. Состояние матча всегда пересчитывается из принятых подходов
+// общим движком упражнений shared/games.js (тот же считает страница).
+const Games = require('../shared/games.js');
 
-const DART = [0, 25, 50];
-for (let k = 1; k <= 20; k++) DART.push(k, 2 * k, 3 * k);
-const DOUBLE = [50];
-for (let k = 1; k <= 20; k++) DOUBLE.push(2 * k);
+const IMPOSSIBLE = Games.IMPOSSIBLE;
 
-// SUM[n] — суммы n дротиков; FIN[n] — закрытия n дротиками с последним в дубль
-const SUM = [new Set([0])], FIN = [new Set()];
-for (let n = 1; n <= 3; n++) {
-  const s = new Set(), f = new Set();
-  SUM[n - 1].forEach(a => { DART.forEach(d => s.add(a + d)); DOUBLE.forEach(d => f.add(a + d)); });
-  SUM.push(s); FIN.push(f);
-}
+// упражнение матча: у старых матчей x01 по mode и dbl
+const exOf = m => m.ex || Games.x01(m.mode, m.dbl);
+const cfgOf = m => ({ ex: exOf(m), np: m.players.length, ltw: m.ltw, starter: m.starter });
 
-// visits — принятые подходы [{ leg, p, s, pts, n, b }]
-function stateOf(m, visits) {
-  const np = m.players.length;
-  const st = { leg: 1, cur: m.starter % np, scores: Array(np).fill(m.mode), legs: Array(np).fill(0), pts: Array(np).fill(0), darts: Array(np).fill(0), winner: null };
-  for (const v of visits) {
-    st.pts[v.p] += v.pts; st.darts[v.p] += v.n;
-    st.scores[v.p] -= v.pts;
-    if (!v.b && st.scores[v.p] === 0) {
-      st.legs[v.p]++;
-      if (st.legs[v.p] >= m.ltw) { st.winner = v.p; break; }
-      st.leg++;
-      st.cur = (m.starter + st.leg - 1) % np;
-      st.scores.fill(m.mode);
-    } else st.cur = (v.p + 1) % np;
-  }
-  return st;
-}
+// visits — принятые подходы (у x01 { leg, p, s, pts, n, b, d }, у упражнений { leg, p, v, d }, булл при ничьей { leg, p, tb })
+const stateOf = (m, visits) => Games.state(cfgOf(m), visits);
 
-// живое состояние для табло: лег, кто бросает, остатки, последний подход
+// живое состояние для табло: лег, кто бросает, счёт лега (остатки x01 или очки упражнения), последний подход;
+// у упражнений ещё подходы в леге, метки крикета и ничья (нужен бросок в булл)
 function liveState(m, visits) {
-  const st = stateOf(m, visits), v = visits[visits.length - 1];
-  return { leg: st.leg, cur: st.winner == null ? st.cur : null, scores: st.scores, last: v ? { p: v.p, pts: v.pts, n: v.n, b: v.b, d: v.d } : null };
+  const st = stateOf(m, visits), v = st.last;
+  const out = {
+    leg: st.leg, cur: st.winner == null ? st.cur : null, scores: st.tot,
+    // средний за подход (3 дротика) по всему матчу — для табло
+    avg: st.pts.map((p, i) => st.darts[i] ? Math.round(p / st.darts[i] * 30) / 10 : null),
+    last: v ? (v.tb ? { p: v.p, tb: 1 } : { p: v.p, pts: v.pts != null ? v.pts : v.v, n: v.n != null ? v.n : v.d ? v.d.length : 3, b: v.b || 0, d: v.d || null }) : null
+  };
+  if (m.ex) {
+    out.vis = st.vis;
+    if (st.marks) out.marks = st.marks;
+    if (st.need) out.tie = st.tie;
+  }
+  return out;
 }
 
-const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+// подход из события: только известные поля
+function visitOf(m, ev) {
+  if (ev.type === 'bull') return { leg: ev.leg, p: ev.p, tb: 1 };
+  if (exOf(m).k === 'x01') return { leg: ev.leg, p: ev.p, s: ev.s, pts: ev.pts, n: ev.n, b: ev.b, d: ev.d == null ? null : ev.d };
+  return { leg: ev.leg, p: ev.p, v: ev.v, d: ev.d == null ? null : ev.d };
+}
 
 // ошибка — текст; иначе null. Подход должен совпасть с тем, что считает сервер.
-function checkVisit(m, st, v) {
-  if (st.winner != null) return 'Матч уже выигран, ожидается завершение';
-  if (v.leg !== st.leg) return 'Ожидается лег ' + st.leg;
-  if (v.p !== st.cur) return 'Сейчас бросает игрок ' + (st.cur + 1);
-  if (v.s !== st.scores[v.p]) return 'Остаток игрока ' + st.scores[v.p] + ', а не ' + v.s;
-  if (!isInt(v.n, 1, 3)) return 'Дротиков должно быть 1–3';
-  if (v.b !== 0 && v.b !== 1) return 'Поле b: 0 или 1';
-  if (!isInt(v.pts, 0, 180)) return 'Очки должны быть от 0 до 180';
-  if (v.d != null && !(Array.isArray(v.d) && v.d.length <= 3 && v.d.every(x => typeof x === 'string' && x.length <= 4))) return 'Неверные метки дротиков';
-  if (v.b) return v.pts === 0 ? null : 'При переборе очки 0';
-  if (IMPOSSIBLE.has(v.pts) || !SUM[v.n].has(v.pts)) return v.pts + ' нельзя набрать ' + v.n + ' дротиками';
-  const rem = v.s - v.pts;
-  if (rem < 0 || (m.dbl && rem === 1)) return 'Это перебор';
-  if (rem === 0) return (m.dbl ? FIN[v.n] : SUM[v.n]).has(v.pts) ? null : v.pts + ' нельзя закрыть ' + v.n + ' дротиками';
-  return v.n === 3 ? null : 'Меньше 3 дротиков только при закрытии или переборе';
-}
+const checkVisit = (m, visits, v) => Games.check(cfgOf(m), visits, v);
 
+const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const LINE_INT = ['hi', 'hco', 'c180', 'c140', 'c100', 'coh', 'coa', 'bl'];
 // итог матча из finish: леги, очки и дротики должны совпасть с подходами
 function checkFinish(m, st, ev) {
@@ -77,11 +59,12 @@ function checkFinish(m, st, ev) {
   return null;
 }
 
-// строка для match_lines из finish (имя берём из матча)
-const lineOf = (m, l, k) => ({
+// строка для match_lines из finish (имя берём из матча, итоги легов — из подходов)
+const lineOf = (m, l, k, st) => ({
   idx: k, player_id: m.players[k].id || null, name: m.players[k].name, legs: l.legs, pts: l.pts, darts: l.darts,
   f9: l.f9 == null ? null : Math.round(l.f9 * 10) / 10, hi: l.hi || 0, hco: l.hco || 0, c180: l.c180 || 0, c140: l.c140 || 0,
-  c100: l.c100 || 0, coh: l.coh != null ? l.coh : l.legs, coa: Math.max(l.coa || 0, l.legs), bl: l.bl || 0
+  c100: l.c100 || 0, coh: l.coh != null ? l.coh : l.legs, coa: Math.max(l.coa || 0, l.legs), bl: l.bl || 0,
+  sc: m.ex && st ? st.legsLog.map(L => L.tot[k]) : null
 });
 
-module.exports = { IMPOSSIBLE, stateOf, liveState, checkVisit, checkFinish, lineOf };
+module.exports = { IMPOSSIBLE, exOf, stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf };
