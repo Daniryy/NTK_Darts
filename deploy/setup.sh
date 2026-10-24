@@ -19,7 +19,7 @@ fi
 
 echo "== пользователь и код"
 id oche >/dev/null 2>&1 || useradd --system --home /srv/oche --shell /usr/sbin/nologin oche
-mkdir -p /srv/oche /var/backups/oche
+mkdir -p /srv/oche /srv/oche/uploads /var/backups/oche
 if [[ ! -d $APP/.git ]]; then git clone --branch "$BRANCH" "$REPO" "$APP"; fi
 chown -R oche:oche /srv/oche /var/backups/oche
 

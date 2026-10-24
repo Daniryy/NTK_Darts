@@ -11,14 +11,20 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating, p.photo, p.title
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
   const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished,
     (SELECT json_agg(json_build_array(l.pts, l.darts) ORDER BY l.idx) FROM match_lines l WHERE l.match_id = m.id) AS ln
     FROM matches m WHERE m.tournament_id = ANY($1)`, [ids]);
+  const ph = await all(c, `SELECT id, file, tournament_id, w, h FROM photos WHERE tournament_id = ANY($1) ORDER BY created_at`, [ids]);
   const qs = rows.some(r => r.qual) ? await all(c, 'SELECT * FROM qual_results WHERE tournament_id = ANY($1) ORDER BY try', [ids]) : [];
-  return rows.map(row => build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id)));
+  return rows.map(row => {
+    const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
+    t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
+    t.links = row.links || [];
+    return t;
+  });
 }
 
 const avgOf = l => l && l[1] ? Math.round(l[0] / l[1] * 30) / 10 : null;
@@ -156,7 +162,7 @@ const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name |
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me);
   const roster = {};
-  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating) }; });
+  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '' }; });
   const out = Object.assign({}, t, {
     org: orgOf(row), roster,
     can: {

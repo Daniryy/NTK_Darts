@@ -7,7 +7,10 @@ DIR=/var/backups/oche
 FILE="$DIR/oche-$(date +%Y%m%d-%H%M).dump"
 
 if pg_dump -Fc -f "$FILE" "$DATABASE_URL"; then
-  find "$DIR" -name 'oche-*.dump' -mtime +14 -delete
+  # фото — рядом с копией базы
+  UP=${UPLOAD_DIR:-/srv/oche/uploads}
+  if [[ -d $UP ]]; then tar -czf "$DIR/uploads-$(date +%Y%m%d-%H%M).tgz" -C "$(dirname "$UP")" "$(basename "$UP")"; fi
+  find "$DIR" \( -name 'oche-*.dump' -o -name 'uploads-*.tgz' \) -mtime +14 -delete
   echo "$(date '+%F %T') ok $FILE $(du -h "$FILE" | cut -f1)"
 else
   rm -f "$FILE"

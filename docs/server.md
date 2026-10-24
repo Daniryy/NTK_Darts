@@ -38,6 +38,7 @@ deploy/            установка и обслуживание VPS
 | `VK_APP_ID` | ID приложения VK ID |
 | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT` | оповещения о сбоях |
 | `RATE_MAX` | запросов за 2 с с одного устройства (20) |
+| `UPLOAD_DIR` | куда класть фото (на VPS `/srv/oche/uploads`, локально `uploads/` в репозитории) |
 
 ## Вход через VK ID
 
@@ -83,17 +84,19 @@ bash /srv/oche/app/deploy/deploy.sh
 location = /shared/games.js { add_header Cache-Control "no-cache"; }
 location = /api.js { add_header Cache-Control "no-cache"; }
 ```
+Для фото (с третьего этапа) скопируйте из `deploy/nginx.conf` блоки `location /uploads/`, `location = /api/photos` и `location = /vendor/qrcode.js`, создайте папку: `mkdir -p /srv/oche/uploads && chown oche:oche /srv/oche/uploads`.
 и выполните `nginx -t && systemctl reload nginx`.
 
 ### Обслуживание
 - **Журнал:** `journalctl -u oche -f`.
 - **Состояние:** `systemctl status oche`, `curl localhost:3000/api/health`.
-- **Копии базы:** `/var/backups/oche/`, каждую ночь в 3:30, хранятся 14 дней. Отчёт в `/var/log/oche-backup.log`.
+- **Копии базы и фото:** `/var/backups/oche/`, каждую ночь в 3:30, хранятся 14 дней. Отчёт в `/var/log/oche-backup.log`.
 - **Восстановление:**
   ```
   set -a; . /etc/oche.env; set +a
   systemctl stop oche
   pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/oche/oche-ДАТА.dump
+  tar -xzf /var/backups/oche/uploads-ДАТА.tgz -C /srv/oche   # фото
   systemctl start oche
   ```
   Проверьте восстановление хотя бы раз до первого турнира.

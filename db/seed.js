@@ -154,7 +154,8 @@ function makeData() {
 async function seed(c) {
   const now = Date.now(), { tours, matches } = makeData();
   for (const [id, name, handle, code, city, club, , ver] of ALL_PLAYERS) {
-    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, admin, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)', [id, name, handle, code, city, club, !!ver, now]);
+    // тестовый игрок — администратор, чтобы проверять создание аккаунтов
+    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, admin, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [id, name, handle, code, city, club, !!ver, id === ME, now]);
   }
   await c.query(`SELECT setval('player_seq', $1)`, [ALL_PLAYERS.length]);
   const js = v => v == null ? null : JSON.stringify(v);

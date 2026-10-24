@@ -280,7 +280,11 @@ module.exports = async function (app) {
     if (!m) throw E.notFound('Матч не найден');
     const evs = await all(pool, 'SELECT * FROM match_events WHERE match_id = $1 AND ver > $2 ORDER BY seq', [id, since || 0]);
     const card = m.status === 'done' ? (await matchCards(pool, [m]))[0] : null;
-    return { match: matchJSON(m, req, card), events: evs.map(eventJSON), version: m.version };
+    // фото игроков — для просмотра матча
+    const ids = m.players.map(p => p.id).filter(Boolean), ph = ids.length ? await all(pool, 'SELECT id, photo FROM players WHERE id = ANY($1)', [ids]) : [];
+    const out = matchJSON(m, req, card);
+    out.players = m.players.map(p => Object.assign({}, p, { photo: (ph.find(x => x.id === p.id) || {}).photo || null }));
+    return { match: out, events: evs.map(eventJSON), version: m.version };
   });
 };
 

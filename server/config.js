@@ -14,6 +14,8 @@ module.exports = {
   // в разработке сервер сам отдаёт index.html и shared/; на VPS это делает nginx
   serveStatic: env.SERVE_STATIC ? env.SERVE_STATIC === '1' : !prod,
   devLogin: !prod && env.DEV_LOGIN !== '0',
+  // загруженные фото; на VPS — /srv/oche/uploads (nginx отдаёт их по /uploads/)
+  uploadDir: env.UPLOAD_DIR || (prod ? '/srv/oche/uploads' : require('node:path').join(__dirname, '..', 'uploads')),
   vk: { appId: env.VK_APP_ID || '', domain: env.VK_DOMAIN || 'id.vk.ru' },
   rateMax: +env.RATE_MAX || 20, // запросов за 2 с с одного устройства
   logLevel: env.LOG_LEVEL || (prod ? 'info' : 'warn')

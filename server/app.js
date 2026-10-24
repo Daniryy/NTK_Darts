@@ -44,6 +44,8 @@ function build(opts = {}) {
     api.register(require('./routes/tournaments'));
     api.register(require('./routes/matches'));
     api.register(require('./routes/live'));
+    api.register(require('./routes/photos'));
+    api.register(require('./routes/admin'));
   });
 
   if (config.serveStatic) {
@@ -54,6 +56,8 @@ function build(opts = {}) {
     app.get('/shared/bracket.js', (req, reply) => reply.sendFile('shared/bracket.js'));
     app.get('/shared/games.js', (req, reply) => reply.sendFile('shared/games.js'));
     app.get('/api.js', (req, reply) => reply.sendFile('api.js'));
+    app.get('/vendor/qrcode.js', (req, reply) => reply.sendFile('vendor/qrcode.js'));
+    app.register(require('@fastify/static'), { root: config.uploadDir, prefix: '/uploads/', decorateReply: false });
   }
   return app;
 }

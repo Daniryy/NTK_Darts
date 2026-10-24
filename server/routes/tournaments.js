@@ -172,18 +172,40 @@ module.exports = async function (app) {
   });
 
   app.delete('/api/tournaments/:id', async req => {
-    const me = needPlayer(req);
+    const me = needPlayer(req), files = [];
     await tx(async c => {
       // сначала матчи, потом турнир — тот же порядок блокировок, что у счётчика
       await c.query('SELECT id FROM matches WHERE tournament_id = $1 ORDER BY id FOR UPDATE', [req.params.id]);
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
       const ids = (await all(c, 'SELECT DISTINCT l.player_id FROM match_lines l JOIN matches m ON m.id = l.match_id WHERE m.tournament_id = $1', [t.id])).map(x => x.player_id);
+      (await all(c, 'SELECT file FROM photos WHERE tournament_id = $1', [t.id])).forEach(x => files.push(x.file));
       await c.query('DELETE FROM tournaments WHERE id = $1', [t.id]);
       if (ids.length) { await eloAll(c); await refreshStats(c, ids); }
       forget('t', t.id);
     });
+    require('./photos').unlink(files);
     return { ok: true };
+  });
+
+  // ссылки к итогам (организатор, в любой момент): { links: [{ title, url }] } — до 20, только http(s)
+  app.patch('/api/tournaments/:id/links', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    if (!Array.isArray(b.links) || b.links.length > 20) throw E.bad('links: до 20 ссылок', 'links');
+    const links = b.links.map((l, k) => {
+      const url = V.str(l && l.url, 'links', 8, 500);
+      let u;
+      try { u = new URL(url); } catch (e) { throw E.bad('Ссылка №' + (k + 1) + ' не похожа на адрес', 'links'); }
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') throw E.bad('Ссылка №' + (k + 1) + ': только http или https', 'links');
+      return { title: l.title == null || l.title === '' ? u.hostname : V.str(l.title, 'links', 1, 60), url: u.href };
+    });
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      await c.query('UPDATE tournaments SET links = $2 WHERE id = $1', [t.id, JSON.stringify(links)]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
   });
 
   app.post('/api/tournaments/:id/entries', async req => {

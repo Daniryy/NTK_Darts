@@ -73,12 +73,12 @@ module.exports = async function (app) {
     const avg = 'CASE WHEN s.darts > 0 THEN s.pts::float8 / s.darts * 3 ELSE 0 END';
     const from = ` FROM players p LEFT JOIN player_stats s ON s.player_id = p.id AND s.scope = 'tour' WHERE ${where.join(' AND ')}`;
     const total = (await one(pool, 'SELECT count(*) AS n' + from, args)).n;
-    const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.rating, p.rated, ${avg} AS avg` + from +
+    const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.photo, p.rating, p.rated, ${avg} AS avg` + from +
       ` ORDER BY ${sort === 'avg' ? avg + ' DESC, p.rating DESC' : 'p.rating DESC'}, p.id LIMIT ${limit} OFFSET ${offset}`, args);
     const cities = (await all(pool, `SELECT DISTINCT city FROM players WHERE rated > 0 AND city <> '' ORDER BY city`)).map(x => x.city);
     return {
       total, cities,
-      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, club: x.club, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
+      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, club: x.club, photo: x.photo || null, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
     };
   });
 
