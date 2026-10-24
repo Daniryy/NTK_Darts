@@ -68,6 +68,12 @@ test('аватар: загрузка, замена удаляет старый �
   ok(await call(X, 'DELETE', '/api/photos/' + r3.photo.id));
   assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.photo, null);
   assert.ok(!fs.existsSync(fileOf(r3.photo.url)));
+  // убрать аватар по игроку
+  const r4 = ok(await call(X, 'POST', '/api/photos?kind=avatar&w=400&h=400', jpeg(), 'image/jpeg'), 201);
+  err(await call(X, 'DELETE', '/api/players/p1/photo'), 403);
+  ok(await call(X, 'DELETE', '/api/players/p9/photo'));
+  assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.photo, null);
+  assert.ok(!fs.existsSync(fileOf(r4.photo.url)));
   // в разработке файлы отдаёт сам сервер
   const got = await app.inject({ method: 'GET', url: r2.photo.url });
   assert.equal(got.statusCode, 200);

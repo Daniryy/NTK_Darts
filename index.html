@@ -678,6 +678,14 @@ body.deskw .wrap { max-width: none; }
 .dpan-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dpan-h b { font-family: var(--display); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
 .dpan .tvt { box-shadow: none; }
+.tvopt { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-bright); }
+.tvqr { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.qrbox { background: #fff; border-radius: 12px; padding: 10px; width: min(320px, 80vw); aspect-ratio: 1; }
+.qrbox svg { width: 100%; height: 100%; display: block; }
+.tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
+.adm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.adm-row:last-child { border-bottom: 0; }
+.code { font-family: var(--display); font-size: 18px; letter-spacing: .12em; padding: 2px 8px; border-radius: 6px; background: var(--surface2); border: 1px dashed var(--line-bright); user-select: all; }
 .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .players { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; } }
 .players.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -686,6 +694,28 @@ body.deskw .wrap { max-width: none; }
 @media (min-width: 820px) { .pl { padding: 14px 16px; gap: 4px; border-radius: 14px; } }
 .pl.act { border-color: var(--green); box-shadow: inset 4px 0 0 var(--green); }
 .pl .nm { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+/* фото игрока: аватар в списках, маленькое фото над именем в счётчике */
+img.av { object-fit: cover; padding: 0; }
+.pl .ph { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line-bright); margin-bottom: 2px; }
+.pl.act .ph { border-color: var(--green); }
+@media (min-width: 820px) { .pl .ph { width: 56px; height: 56px; } }
+@media (max-height: 520px) { .pl .ph { display: none; } }
+.tvp .tph { width: clamp(34px, 3vw, 72px); height: clamp(34px, 3vw, 72px); border-radius: 50%; object-fit: cover; margin-right: .6vw; border: 2px solid var(--line-bright); flex: none; }
+.tvp.act .tph { border-color: var(--green); }
+/* обрезка фото */
+.crop { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; touch-action: none; cursor: grab; }
+.crop canvas { display: block; width: 100%; height: 100%; }
+.crop.round::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(0, 0, 0, .45); pointer-events: none; }
+.crop-zoom { width: 100%; accent-color: var(--green); }
+/* фото и ссылки к итогам */
+.gal { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.gal figure { position: relative; margin: 0; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: var(--surface2); }
+.gal img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+.gal .x { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.lbox { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .9); display: grid; place-items: center; padding: 16px; cursor: zoom-out; }
+.lbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.links { display: grid; gap: 6px; }
+.links .trow a { color: var(--fg); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl .nm .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl .nm .st { font-size: 8px; color: var(--fg); flex: none; }
 .pl .legs { color: var(--fg); background: var(--surface2); font-family: var(--display); font-size: 22px; line-height: 1.2; padding: 0 8px; border-radius: 7px; flex: none; }
@@ -1417,11 +1447,12 @@ const S = {
   theme: lsGet('oche2.theme') === 'light' ? 'light' : 'dark',
   palette: PALETTES.some(x => x.id === lsGet('oche2.palette')) ? lsGet('oche2.palette') : 'amber',
   sfx: lsGet('oche2.sfx') !== false,
+  photos: lsGet('oche2.photos') !== false, crop: null, lbox: null, linkErr: '',
   modalMatch: null, quickModal: null, qualModal: null, settings: false, clearRes: false, gf: 'all', confirmQual: null, hp: null,
   buf: '' // ввод суммы в счётчике, не часть G
 };
-const closeModals = () => { S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -1471,7 +1502,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin'].includes(h)) return true;
   // на сервере турнир, игрок или матч загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk)\.[\w-]+$/.test(h);
   if (/^(tv|desk)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -1489,7 +1520,11 @@ function pname(l) {
   return '<button class="pn" data-act="go" data-v="p.' + p.id + '">' + esc(n) + '</button>';
 }
 const pid = id => pname({ id });
-const avatar = (id, cls) => '<span class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(initials(P[id] ? P[id].name : '?')) + '</span>';
+// аватар: фото игрока или инициалы
+const photoOf = id => (P[id] && P[id].photo) || null;
+const avatar = (id, cls) => photoOf(id)
+  ? '<img class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" src="' + esc(photoOf(id)) + '" alt="" loading="lazy">'
+  : '<span class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(initials(P[id] ? P[id].name : '?')) + '</span>';
 const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая' };
 const venueOf = t => t.venue && t.venue !== 'место уточняется' ? t.venue : '';
 const fmtName = t => t.qual ? 'Квалификация + сетки по ' + (t.split || 8) : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
@@ -1612,12 +1647,19 @@ function renderModals() {
     h += '</div></div>';
     return h;
   }
+  if (S.crop && cropImg) return cropModal();
+  if (S.qr) {
+    const t = TBY[S.qr], url = tourUrl(S.qr);
+    return '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
+  }
+  if (S.lbox) return '<div class="lbox" data-act="lbox-close" role="dialog" aria-modal="true" aria-label="Фото"><img src="' + esc(S.lbox) + '" alt=""></div>';
   if (S.settings) {
     let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Настройки"><div class="ocard">';
     h += '<div class="ohead"><h2>Настройки</h2>' + closeBtn + '</div>';
     h += '<div class="seg2 full">' + [['dark', I.moon + ' Тёмная'], ['light', I.sun + ' Светлая']].map(([v, l]) => '<button class="' + (S.theme === v ? 'on' : '') + '" data-act="set-theme" data-v="' + v + '" aria-pressed="' + (S.theme === v) + '">' + l + '</button>').join('') + '</div>';
     h += '<div class="sws">' + PALETTES.map(p => '<button class="sw' + (S.palette === p.id ? ' on' : '') + '" data-act="set-palette" data-v="' + p.id + '" aria-pressed="' + (S.palette === p.id) + '"><i style="background:' + p.acc[S.theme === 'light' ? 1 : 0] + '"></i>' + p.name + '</button>').join('') + '</div>';
     h += '<button class="set-row" data-act="sfx" aria-pressed="' + S.sfx + '"><b>Звук и вибрация</b><span class="switch' + (S.sfx ? ' on' : '') + '" aria-hidden="true"></span></button>';
+    h += '<button class="set-row" data-act="photos-tg" aria-pressed="' + S.photos + '"><b>Фото игроков в счётчике</b><span class="switch' + (S.photos ? ' on' : '') + '" aria-hidden="true"></span></button>';
     h += accountBox();
     if (!SRV) h += S.confirmReset
       ? '<div class="set-foot"><span class="meta">Ваши матчи и турниры будут удалены.</span><div class="row2"><button class="ghost dng" data-act="reset-yes">Да, сбросить</button><button class="ghost" data-act="reset-no">Отмена</button></div></div>'
@@ -1894,7 +1936,7 @@ function tourView(id) {
   const tabs = st === 'reg' ? [['people', 'Участники']]
     : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']]
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']] : [['table', 'Таблица'], ['games', 'Матчи']])
-      .concat(t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']]);
+      .concat(t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : []);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -1906,7 +1948,7 @@ function tourView(id) {
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
   h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), t.org.name].filter(Boolean).map(esc).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
-  if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
+  if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
   h += '<div class="card tstat">';
   if (st === 'reg') {
@@ -1938,6 +1980,7 @@ function tourView(id) {
     h += tourDelLink(t);
   } else if (tab === 'games') h += gamesList(t);
   else if (tab === 'places') h += placesView(t) + tourDelLink(t);
+  else if (tab === 'media') h += mediaView(t);
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
   else if (st !== 'reg') h += numsView(t);
   else {
@@ -2284,16 +2327,17 @@ function profileView(id) {
 }
 // p — игрок, s — статистика выбранных матчей (с ms — матчами), all — по всем, tours — [{ id, name, start, badge }]
 function profileHTML(p, s, all, tours) {
-  const id = p.id, isMe = id === ME;
-  let h = '<div class="phero">' + avatar(id, 'lg') + '<div style="min-width:0">';
+  const id = p.id, isMe = id === ME, canPhoto = canEditPlayer(p);
+  let h = '<div class="phero"><div style="display:grid;gap:6px;justify-items:center">' + avatar(id, 'lg') + (canPhoto ? '<button class="ghost sm" data-act="photo-pick" data-v="avatar|' + id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button>' + (p.photo ? '<button class="ghost sm dng" data-act="photo-del-av" data-v="' + id + '">Убрать</button>' : '') : '') + '</div><div style="min-width:0">';
   if (isMe && S.editName) {
-    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div><div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
+    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div><input class="inp" id="me-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Разряд или звание (КМС, МС, 1 разряд…)" aria-label="Разряд"><div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
   } else {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
-  if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
+  if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + (p.title ? ' · ' + esc(p.title) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
   if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id] && RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
+  if (isMe && SRV && !all.n) h += claimBox();
   h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   if (!s.n) {
     h += '<div class="note-box">' + (S.pf === 'off' ? 'Турнирных матчей пока нет.' : 'Матчей пока нет.') + '</div>';
@@ -2768,7 +2812,7 @@ function gameView() {
   g.players.forEach((q, i) => {
     const act = i === g.cur, rem = act ? q.score - vs : q.score;
     const r = routeFor(rem, act && darts ? 3 - g.visit.length : 3, g.dbl);
-    h += '<div class="pl' + (act ? ' act' : '') + '"><div class="nm">' + (i === g.starter ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span><span class="legs" title="Выиграно легов">' + q.legs + '</span></div>' +
+    h += '<div class="pl' + (act ? ' act' : '') + '">' + plPhoto(q.id) + '<div class="nm">' + (i === g.starter ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span><span class="legs" title="Выиграно легов">' + q.legs + '</span></div>' +
       '<div class="num big">' + rem + '</div><div class="co-chip">' + (r ? routeText(r) : '') + '</div>' +
       '<div class="sub"><span>ср. ' + avg3(q.points, q.darts) + '</span><span>' + (g.lim ? 'подход ' + Math.min(g.lim, g.log.filter(e => e.leg === g.legNo && e.p === i && !e.tb).length + (act ? 1 : 0)) + '/' + g.lim : q.last ? 'посл. ' + q.last : q.legDarts + ' др.') + '</span></div></div>';
   });
@@ -2959,6 +3003,177 @@ function endVisitQuiet(bust, win, n, d) {
 }
 function legWonQuiet() { const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; }; try { legWon(); } finally { commitMatch = c; } }
 
+/* ===== Фото: выбор файла, обрезка в рамку, сжатие; на сервере — загрузка, в демо — в браузере ===== */
+// маленькое фото над именем в счётчике
+const plPhoto = id => S.photos && photoOf(id) ? '<img class="ph" src="' + esc(photoOf(id)) + '" alt="">' : '';
+// менять фото игрока: себе; в демо — и своим гостям; на сервере — гостям, которых создал я, и всем — администратору
+function canEditPlayer(p) {
+  if (!p || !p.id) return false;
+  if (p.id === ME) return true;
+  return SRV ? !!Api.admin : /^x/.test(p.id);
+}
+// виды обрезки: аватар — квадрат, итоги — 4:3
+const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 } };
+let cropImg = null;
+function photoPick(kind, target) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    if (f.size > 25 * 1024 * 1024) { toast('Файл больше 25 МБ.'); return; }
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = () => { cropImg = img; closeModals(); S.crop = { kind, target, zoom: 1, ox: null, oy: null, busy: false }; render(); };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('Не получилось открыть картинку.'); };
+    img.src = url;
+  };
+  inp.click();
+}
+// рамка на экране и положение картинки в ней: картинка всегда закрывает рамку целиком
+function cropGeom(fw, fh) {
+  const c = S.crop, W = cropImg.naturalWidth, H = cropImg.naturalHeight, s = Math.max(fw / W, fh / H) * c.zoom;
+  const w = W * s, h = H * s;
+  if (c.ox == null) { c.ox = (fw - w) / 2; c.oy = (fh - h) / 2; }
+  c.ox = Math.min(0, Math.max(fw - w, c.ox)); c.oy = Math.min(0, Math.max(fh - h, c.oy));
+  return { s, w, h };
+}
+function cropDraw() {
+  const box = $('crop-box');
+  if (!box || !S.crop || !cropImg) return;
+  const cv = box.querySelector('canvas'), fw = box.clientWidth, fh = box.clientHeight, dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(fw * dpr); cv.height = Math.round(fh * dpr);
+  const g = cropGeom(fw, fh), x = cv.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(cropImg, S.crop.ox, S.crop.oy, g.w, g.h);
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    let drag = null;
+    box.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ox: S.crop.ox, oy: S.crop.oy }; box.setPointerCapture(e.pointerId); });
+    box.addEventListener('pointermove', e => { if (!drag || !S.crop) return; S.crop.ox = drag.ox + e.clientX - drag.x; S.crop.oy = drag.oy + e.clientY - drag.y; cropDraw(); });
+    box.addEventListener('pointerup', () => { drag = null; });
+    box.addEventListener('wheel', e => { e.preventDefault(); cropZoom(S.crop.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+  }
+}
+// приближение относительно центра рамки
+function cropZoom(z) {
+  const box = $('crop-box');
+  if (!box || !S.crop) return;
+  const fw = box.clientWidth, fh = box.clientHeight, before = cropGeom(fw, fh), c = S.crop;
+  const cx = (fw / 2 - c.ox) / before.w, cy = (fh / 2 - c.oy) / before.h;
+  c.zoom = Math.max(1, Math.min(5, z));
+  const after = cropGeom(fw, fh);
+  c.ox = fw / 2 - cx * after.w; c.oy = fh / 2 - cy * after.h;
+  cropGeom(fw, fh);
+  const r = $('crop-z'); if (r) r.value = c.zoom;
+  cropDraw();
+}
+function cropModal() {
+  const c = S.crop, k = CROP[c.kind];
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Обрезка фото"><div class="ocard"><div class="ohead"><span class="label">' + (c.kind === 'avatar' ? 'Фото игрока' : 'Фото к итогам') + '</span><button class="icon-btn" data-act="crop-no" aria-label="Закрыть">✕</button></div>' +
+    '<div class="crop' + (c.kind === 'avatar' ? ' round' : '') + '" id="crop-box" style="aspect-ratio:' + k.a + '"><canvas></canvas></div>' +
+    '<input class="crop-zoom" id="crop-z" type="range" min="1" max="5" step="0.01" value="' + c.zoom + '" aria-label="Приближение">' +
+    '<span class="meta">Перетащите фото и приблизьте ползунком — сохранится то, что в рамке.</span>' +
+    '<button class="btn" data-act="crop-save"' + (c.busy ? ' disabled' : '') + '>' + (c.busy ? 'Сохраняем…' : 'Сохранить') + '</button></div></div>';
+}
+// вырезать рамку в нужном размере и сохранить
+async function cropSave() {
+  const c = S.crop, box = $('crop-box');
+  if (!c || !box || c.busy) return;
+  const k = CROP[c.kind], [OW, OH] = SRV ? k.out : k.demo, fw = box.clientWidth, g = cropGeom(fw, box.clientHeight), f = OW / fw;
+  const cv = document.createElement('canvas');
+  cv.width = OW; cv.height = OH;
+  const x = cv.getContext('2d');
+  x.imageSmoothingQuality = 'high';
+  x.fillStyle = '#000'; x.fillRect(0, 0, OW, OH);
+  x.drawImage(cropImg, c.ox * f, c.oy * f, g.w * f, g.h * f);
+  if (!SRV) {
+    const url = cv.toDataURL('image/jpeg', k.q - 0.08);
+    if (c.kind === 'avatar') { const p = P[c.target]; if (p) p.photo = url; }
+    else { const t = TBY[c.target]; if (t) (t.photos = t.photos || []).push({ id: 'f' + uid(), url, w: OW, h: OH }); }
+    S.crop = null; saveDb(); toast('Фото сохранено.'); return render();
+  }
+  c.busy = true; render();
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', k.q));
+  const q = c.kind === 'avatar' ? 'kind=avatar' + (c.target !== ME ? '&playerId=' + encodeURIComponent(c.target) : '') : 'kind=tour&tournamentId=' + encodeURIComponent(c.target);
+  try {
+    const r = await Api.upload('/api/photos?' + q + '&w=' + OW + '&h=' + OH, blob);
+    if (r.player) { svPlayer(r.player); if (r.player.id === ME) Api.me = Object.assign(Api.me || {}, { photo: r.player.photo }); svStale('player:'); }
+    else svNow('tour:' + c.target);
+    S.crop = null; toast('Фото сохранено.');
+  } catch (e) { c.busy = false; toast(e.net ? 'Нет связи с сервером — фото не загружено.' : e.message); }
+  render();
+}
+async function photoDelete(kind, target, id) {
+  if (!SRV) {
+    if (kind === 'avatar') { const p = P[target]; if (p) delete p.photo; }
+    else { const t = TBY[target]; if (t) t.photos = (t.photos || []).filter(x => x.id !== id); }
+    saveDb(); toast('Фото убрано.'); return render();
+  }
+  if (kind === 'avatar') return svDo(Api.del('/api/players/' + encodeURIComponent(target) + '/photo'), () => { if (P[target]) P[target].photo = null; svStale('player:'); toast('Фото убрано.'); });
+  svDo(Api.del('/api/photos/' + id), () => { svNow('tour:' + target); toast('Фото убрано.'); });
+}
+
+/* Итоги турнира: фото (4:3) и ссылки */
+function mediaView(t) {
+  const org = canDo(t, 'org'), ph = t.photos || [], ln = t.links || [];
+  let h = '<div class="tstat"><span class="label">Фото · ' + ph.length + '</span>' + (org ? '<button class="mini go" data-act="photo-pick" data-v="tour|' + t.id + '">+ Добавить фото</button>' : '') + '</div>';
+  h += ph.length ? '<div class="gal">' + ph.map(p => '<figure><img src="' + esc(p.url) + '" alt="Фото турнира" loading="lazy" data-act="lbox" data-v="' + esc(p.url) + '">' + (org ? '<button class="x" data-act="photo-del-t" data-v="' + esc(t.id + '|' + p.id) + '" aria-label="Убрать фото">✕</button>' : '') + '</figure>').join('') + '</div>' : '<div class="note-box">' + (org ? 'Добавьте фото с турнира — они обрежутся ровно, 4:3.' : 'Фото пока нет.') + '</div>';
+  h += '<div class="tstat"><span class="label">Ссылки · ' + ln.length + '</span></div><div class="links">';
+  h += ln.map((l, k) => '<div class="trow"><a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.title) + '</a>' + (org ? '<button class="ghost sm dng" data-act="link-del" data-v="' + esc(t.id + '|' + k) + '">Убрать</button>' : '<span class="meta">' + esc(hostOf(l.url)) + '</span>') + '</div>').join('');
+  if (!ln.length && !org) h += '<p class="meta">Ссылок пока нет.</p>';
+  h += '</div>';
+  if (org) h += '<div class="panel"><div class="field"><label class="label" for="ln-title">Новая ссылка</label><input class="inp" id="ln-title" maxlength="60" placeholder="Подпись: трансляция, протокол, фотоальбом"><input class="inp" id="ln-url" placeholder="https://…" inputmode="url"></div>' + (S.linkErr ? '<div class="err">' + esc(S.linkErr) + '</div>' : '') + '<button class="btn sm" data-act="link-add" data-v="' + t.id + '">Добавить ссылку</button></div>';
+  return h;
+}
+const hostOf = u => { try { return new URL(u).hostname; } catch (e) { return ''; } };
+function linksSave(t, links, msg) {
+  if (SRV) return svDo(Api.patch('/api/tournaments/' + t.id + '/links', { links }), r => { svTourSet(r); S.linkErr = ''; toast(msg); });
+  t.links = links; S.linkErr = ''; saveDb(); toast(msg); render();
+}
+
+/* QR-код: библиотека vendor/qrcode.js грузится при первом показе */
+const tourUrl = id => location.origin + location.pathname + '#t.' + id;
+let qrLoading = false;
+function loadQr() {
+  if (window.qrcode || qrLoading) return;
+  qrLoading = true;
+  const s = document.createElement('script');
+  s.src = 'vendor/qrcode.js';
+  s.onload = () => render();
+  s.onerror = () => { qrLoading = false; toast('Не удалось загрузить QR-код.'); };
+  document.head.appendChild(s);
+}
+function qrHTML(text) {
+  if (!window.qrcode) { loadQr(); return '<div class="qrbox"></div>'; }
+  const q = window.qrcode(0, 'M');
+  q.addData(text); q.make();
+  return '<div class="qrbox" role="img" aria-label="QR-код ссылки">' + q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }) + '</div>';
+}
+
+/* Аккаунты: администратор создаёт игроков и выдаёт код; игрок привязывает аккаунт кодом в профиле */
+function claimBox() {
+  return '<div class="card sec"><span class="label">Аккаунт от организатора</span><p class="meta">Организатор завёл вас заранее и дал код? Введите его — матчи и турниры того аккаунта станут вашими.</p><div class="nrow"><input class="inp" id="claim-code" maxlength="16" placeholder="Код, например K7MQ2XRA" autocomplete="off" style="text-transform:uppercase"><button class="mini go" data-act="claim">Привязать</button></div></div>';
+}
+function adminView() {
+  if (!SRV) return '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><div class="note-box">В демо-режиме аккаунтов нет: все игроки хранятся в этом браузере. Создание аккаунтов и коды привязки работают с сервером.</div></div>';
+  if (!Api.admin) return '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><div class="note-box">Раздел для администратора.</div></div>';
+  const q = (S.admQ || '').trim(), e = lz('admin:' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '')));
+  let h = '<div class="narrow"><h1 class="h1">Аккаунты игроков</h1><p class="meta">Создайте аккаунт и передайте игроку код. Он войдёт через VK и введёт код в профиле — аккаунт со всеми матчами станет его.</p>';
+  h += '<div class="panel"><span class="h2">Новый игрок</span><input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб"></div><input class="inp" id="adm-title" maxlength="40" placeholder="Разряд или звание"><button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
+  if (S.admNew) h += '<div class="note-box"><b>' + esc(S.admNew.name) + '</b> — код привязки: <span class="code">' + esc(S.admNew.claim) + '</span></div>';
+  h += '</div><input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти игрока" aria-label="Найти игрока">';
+  const st = svState(e, 'игроков');
+  if (st) return h + st + '</div>';
+  h += '<div class="card" style="padding:4px 14px">' + (e.data.players.length ? e.data.players.map(p => {
+    svPlayer(p);
+    return '<div class="adm-row">' + avatar(p.id) + '<div style="min-width:0;display:grid">' + pid(p.id) + '<span class="meta">' + esc([p.city, p.club, p.title].filter(Boolean).join(' · ')) + (p.vk ? ' · VK привязан' : '') + (p.admin ? ' · админ' : '') + '</span>' + (p.claim ? '<span class="meta">код: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><div class="gacts">' +
+      '<button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button>' + (p.vk ? '' : '<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код' : 'Выдать код') + '</button>') +
+      '<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '" title="Подтверждённый игрок">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button></div></div>';
+  }).join('') : '<p class="meta" style="padding:10px 0">Никого не нашли.</p>') + '</div>';
+  return h + '</div>';
+}
+
 /* ===== Табло для ТВ и экран организатора ===== */
 // идущие матчи турнира: на сервере — из потока, в демо — игра этого телефона (видна и в соседней вкладке)
 function liveOf(t) {
@@ -2966,11 +3181,11 @@ function liveOf(t) {
   if (!G || !G.ctx || G.ctx.tid !== t.id || G.over === 'match') return [];
   const ex = G.kind === 'ex' ? G.ex : Object.assign(Games.x01(G.mode, G.dbl), { lim: G.lim || 0 });
   let state, legs;
-  if (G.kind === 'ex') { const s = exSt(); legs = s.legs; state = { leg: s.leg, cur: s.cur, scores: s.tot, vis: s.vis, tie: s.tie, last: s.last && !s.last.tb ? { p: s.last.p, pts: s.last.v, d: s.last.d, n: 3, b: 0 } : null }; }
+  if (G.kind === 'ex') { const s = exSt(); legs = s.legs; state = { leg: s.leg, cur: s.cur, scores: s.tot, vis: s.vis, tie: s.tie, avg: s.pts.map((p, i) => Games.avg(p, s.darts[i])), last: s.last && !s.last.tb ? { p: s.last.p, pts: s.last.v, d: s.last.d, n: 3, b: 0 } : null }; }
   else {
     const e = G.log[G.log.length - 1];
     legs = G.players.map(p => p.legs);
-    state = { leg: G.legNo, cur: G.over ? null : G.cur, scores: G.players.map(p => p.score), last: e && !e.tb ? { p: e.p, pts: e.pts, n: e.n, b: e.b, d: e.d } : null, vis: G.lim ? G.players.map((_, i) => G.log.filter(x => x.leg === G.legNo && x.p === i && !x.tb).length) : undefined };
+    state = { leg: G.legNo, cur: G.over ? null : G.cur, scores: G.players.map(p => p.score), avg: G.players.map(p => Games.avg(p.points, p.darts)), last: e && !e.tb ? { p: e.p, pts: e.pts, n: e.n, b: e.b, d: e.d } : null, vis: G.lim ? G.players.map((_, i) => G.log.filter(x => x.leg === G.legNo && x.p === i && !x.tb).length) : undefined };
   }
   return [{ id: G.id, r: G.ctx.r == null ? null : G.ctx.r, i: G.ctx.i == null ? null : G.ctx.i, q: G.ctx.q ? { id: G.ctx.q.id, k: G.ctx.q.k } : null, ex, ltw: G.legsToWin, mode: G.mode, players: G.players.map(p => ({ id: p.id, name: p.name })), legs, state, by: meP().name }];
 }
@@ -2989,18 +3204,34 @@ function tvFx(m) {
   if (fx) TVFX[m.id] = Object.assign(fx, { at: Date.now() });
 }
 // плитка идущего матча
+/* Что показывать на табло и экране организатора — организатор включает и выключает, выбор хранится на устройстве */
+const TVO_LIST = [['photos', 'Фото игроков'], ['avg', 'Средний набор'], ['last', 'Последний подход'], ['progress', 'Подходы и лег'], ['boards', 'Мишени'], ['nums', 'Номера игроков'], ['fx', 'Вспышки 180 и закрытий'],
+  ['calls', 'К мишеням'], ['recent', 'Последние результаты'], ['stages', 'Ход турнира'], ['qr', 'QR-код турнира'], ['clock', 'Часы']];
+const TVO_OFF = ['qr'];
+function tvo() {
+  const o = lsGet('oche.tvopt') || {};
+  TVO_LIST.forEach(([k]) => { if (o[k] == null) o[k] = !TVO_OFF.includes(k); });
+  return o;
+}
+function tvoPanel() {
+  const o = tvo();
+  return '<div class="tvopt"><span class="label">Показывать</span>' + TVO_LIST.map(([k, l]) => '<button class="fchip' + (o[k] ? ' on' : '') + '" data-act="tvo" data-v="' + k + '" aria-pressed="' + !!o[k] + '">' + l + '</button>').join('') + '</div>';
+}
 function liveTile(t, m) {
   tvFx(m);
+  const O = tvo();
   const ex = m.ex ? Games.norm(m.ex) : Games.x01(m.mode || 501, true), s = m.state || {}, N = Games.perLeg(ex);
   const g = m.r != null ? gameAt(t, m.r, m.i) : null, n = g && isBracket(t) ? gameNums(t, resolver(t)).get(m.r + ':' + m.i) : 0;
   const lbl = m.q ? 'Квалификация · попытка ' + (m.q.k + 1) : (n ? '№' + n + ' · ' : '') + (g ? gameLabel(t, g) : '');
-  const b = m.r != null ? boardOf(t, m.r, m.i) : null, fx = TVFX[m.id] && Date.now() - TVFX[m.id].at < 2600 ? TVFX[m.id] : null;
+  const b = O.boards && m.r != null ? boardOf(t, m.r, m.i) : null, fx = O.fx && TVFX[m.id] && Date.now() - TVFX[m.id].at < 2600 ? TVFX[m.id] : null;
   let h = '<div class="tvt"' + (SRV ? ' role="button" tabindex="0" data-act="mview" data-v="' + m.id + '"' : '') + '><div class="tvt-h"><span>' + esc(lbl) + '</span>' + (b ? '<span class="bd">Мишень ' + b + '</span>' : '') + '</div>';
   m.players.forEach((p, i) => {
-    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + noBadge(t, p.id) + esc(p.name) + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
+    const ph = O.photos && photoOf(p.id) ? '<img class="tph" src="' + esc(photoOf(p.id)) + '" alt="">' : '';
+    const av = O.avg && s.avg && s.avg[i] != null ? '<span class="meta" style="margin-left:.6vw;font-size:.6em;font-weight:500">ср. ' + s.avg[i].toFixed(1) + '</span>' : '';
+    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + ph + (O.nums ? noBadge(t, p.id) : '') + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' + av + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
   });
   const L = s.last;
-  h += '<div class="sub"><span>' + esc(Games.name(ex)) + (m.players.length > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (N && s.vis ? ' · подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : '') + '</span><span>' + (s.tie ? 'ничья — булл' : L ? esc((m.players[L.p] || {}).name || '').split(' ').pop() + ': ' + (L.b ? 'перебор' : L.pts) : '') + '</span></div>';
+  h += '<div class="sub"><span>' + esc(Games.name(ex)) + (O.progress ? (m.players.length > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (N && s.vis ? ' · подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : '') : '') + '</span><span>' + (s.tie ? 'ничья — булл' : O.last && L ? esc((m.players[L.p] || {}).name || '').split(' ').pop() + ': ' + (L.b ? 'перебор' : L.pts) : '') + '</span></div>';
   // перерисовка не перезапускает анимацию: она продолжается с прошедшего момента
   if (fx) h += '<div class="tvfx on ' + fx.k + '" style="animation-delay:-' + (Date.now() - fx.at) + 'ms" aria-hidden="true">' + esc(fx.t) + '</div>';
   return h + '</div>';
@@ -3034,16 +3265,20 @@ let tvClock = 0;
 function tvView(id) {
   const { t, wait } = tvTour(id);
   if (!t) return wait || '<div class="note-box">Турнир не найден.</div>';
+  const O = tvo();
   if (!tvClock) tvClock = setInterval(() => { if (R.startsWith('tv.')) { const el = $('tv-clock'); if (el) el.textContent = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); } else { clearInterval(tvClock); tvClock = 0; } }, 10000);
   const live = liveOf(t).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
-  let h = '<div class="tvh"><div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div><div class="tvx"><span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
+  let h = '<div class="tvh"><div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div><div class="tvx">' + (O.clock ? '<span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<button class="mini" data-act="tvo-show">Настроить</button><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
+  if (S.tvoOpen) h += tvoPanel();
   h += live.length ? '<div class="tvg">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<div class="tvbox"><h2>Сейчас матчей нет</h2><p class="meta">Как только маркер начнёт матч, счёт появится здесь.' + (SRV ? '' : ' В демо табло показывает игру, которую ведут в соседней вкладке этого браузера.') + '</p></div>';
   h += '<div class="tvside">';
   if (t.stage === 'qual') {
     const order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, 10);
     h += '<div class="tvbox"><h2>Квалификация · лучшие</h2>' + (order.length ? order.map((x, k) => '<div class="tvrow"><span class="r">' + (k + 1) + '</span><span>' + noBadge(t, x) + esc(P[x] ? P[x].name : '—') + '</span><span class="r">' + qBest(t, x) + '</span></div>').join('') : '<p class="meta">Результатов пока нет.</p>') + '</div>';
-  } else h += '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div><div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>';
-  h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div></div>';
+  } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
+  if (O.stages) h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div>';
+  if (O.qr) h += '<div class="tvbox tvqr"><h2>Сетка и счёт на телефоне</h2>' + qrHTML(tourUrl(t.id)) + '<span class="meta">Наведите камеру телефона</span></div>';
+  h += '</div>';
   return h;
 }
 
@@ -3067,6 +3302,7 @@ function deskView(id) {
   if (!Array.isArray(on)) on = ['live', 'calls', 'stages'].concat(t.stage === 'qual' ? ['qual'] : []);
   on = on.filter(k => all.some(x => x[0] === k));
   let h = '<div class="thead"><button class="back" data-act="go" data-v="t.' + t.id + '">' + I.back + esc(t.name) + '</button><h1 class="h1">Экран организатора</h1><p class="meta">Выберите окна — набор запоминается на этом устройстве. Обновляется само.</p></div>';
+  h += tvoPanel();
   h += '<div class="desk-tools">' + all.map(([k, l]) => '<button class="fchip' + (on.includes(k) ? ' on' : '') + '" data-act="desk-toggle" data-v="' + esc(id + '|' + k) + '" aria-pressed="' + on.includes(k) + '">' + esc(l) + '</button>').join('') + '<button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button></div>';
   if (!on.length) return h + '<div class="note-box">Окна не выбраны.</div>';
   const cx = t.games && t.games.length ? bctx(t) : null, live = liveOf(t);
@@ -3103,7 +3339,8 @@ function matchView(mid) {
   h += '<div class="meta">' + esc(Games.label(ex)) + (np > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (m.q ? ' · квалификация, попытка ' + (m.q.k + 1) : '') + (t && m.r != null && boardOf(t, m.r, m.i) ? ' · мишень ' + boardOf(t, m.r, m.i) : '') + '</div></div>';
   h += '<div class="players' + (np === 2 ? ' two' : '') + '">' + m.players.map((p, i) => {
     const act = m.status === 'live' && s.cur === i, vis = s.vis ? s.vis[i] : null;
-    return '<div class="pl' + (act ? ' act' : '') + '"><div class="nm"><span class="n">' + esc(p.name) + '</span>' + (np > 1 || m.ltw > 1 ? '<span class="legs">' + m.legs[i] + '</span>' : '') + '</div><div class="num big">' + (s.scores ? s.scores[i] : '—') + '</div><div class="sub"><span>' + u.tot + '</span><span>' + (N && vis != null ? 'подход ' + Math.min(N, vis) + '/' + N : '') + '</span></div>' + (N && vis != null ? '<div class="prog"><i style="width:' + Math.round(Math.min(N, vis) / N * 100) + '%"></i></div>' : '') + '</div>';
+    if (p.photo && p.id) svPlayer({ id: p.id, name: p.name, photo: p.photo });
+    return '<div class="pl' + (act ? ' act' : '') + '">' + plPhoto(p.id) + '<div class="nm"><span class="n">' + esc(p.name) + '</span>' + (np > 1 || m.ltw > 1 ? '<span class="legs">' + m.legs[i] + '</span>' : '') + '</div><div class="num big">' + (s.scores ? s.scores[i] : '—') + '</div><div class="sub"><span>' + u.tot + '</span><span>' + (N && vis != null ? 'подход ' + Math.min(N, vis) + '/' + N : '') + '</span></div>' + (N && vis != null ? '<div class="prog"><i style="width:' + Math.round(Math.min(N, vis) / N * 100) + '%"></i></div>' : '') + '</div>';
   }).join('') + '</div>';
   const L = s.last;
   if (L) h += '<div class="prev">Последний подход (' + esc(m.players[L.p] ? m.players[L.p].name : '') + '): <b>' + (L.tb ? 'бросок в булл' : L.b ? 'перебор' : (L.d && L.d.length ? esc(L.d.join(' · ')) + ' = ' : '') + L.pts) + '</b></div>';
@@ -3171,7 +3408,7 @@ function exGameView() {
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
   g.players.forEach((q, i) => {
     const act = i === cur, done = Math.min(N, st.vis[i]), av = Games.avg(st.pts[i], st.darts[i]);
-    h += '<div class="pl' + (act ? ' act' : '') + '"><div class="nm">' + (i === (g.mstart + st.leg - 1) % n && n > 1 ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span>' + (n > 1 || g.legsToWin > 1 ? '<span class="legs" title="Выиграно легов">' + st.legs[i] + '</span>' : '') + '</div>' +
+    h += '<div class="pl' + (act ? ' act' : '') + '">' + plPhoto(q.id) + '<div class="nm">' + (i === (g.mstart + st.leg - 1) % n && n > 1 ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span>' + (n > 1 || g.legsToWin > 1 ? '<span class="legs" title="Выиграно легов">' + st.legs[i] + '</span>' : '') + '</div>' +
       '<div class="num big">' + st.tot[i] + '</div><div class="sub"><span>' + u.tot + '</span><span>' + (N ? 'подход ' + Math.min(N, done + (act ? 1 : 0)) + '/' + N : st.vis[i] + ' подх.') + '</span></div>' +
       '<div class="sub"><span>' + u.avg + '</span><span>' + (av == null ? '—' : av.toFixed(1)) + '</span></div>' + (N ? '<div class="prog"><i style="width:' + Math.round(done / N * 100) + '%"></i></div>' : '') + '</div>';
   });
@@ -3439,7 +3676,7 @@ function accountBox() {
   if (!SRV) h += '<span class="meta">Демо: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Сервер выключен вручную.' : ' Сервер не отвечает.') + '</span>';
   h += '</div>';
   if (!SRV) return h;
-  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.admin ? ' · администратор' : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>';
+  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.admin ? ' · администратор' : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (Api.admin ? '<button class="btn alt" data-act="go" data-v="admin">Аккаунты игроков</button>' : '');
   else {
     if (Api.config.vk) h += '<button class="btn" data-act="login">Войти через VK</button>';
     else h += '<span class="meta">Вход через VK на сервере не настроен.</span>';
@@ -3476,10 +3713,12 @@ function render() {
     : R.startsWith('p.') ? profileView(R.slice(2))
     : R.startsWith('m.') && SRV ? matchView(R.slice(2))
     : R.startsWith('tv.') ? tvView(R.slice(3))
+    : R === 'admin' ? adminView()
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : feedView();
   if (fid) { const el = $(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
   drawChart();
+  cropDraw();
 }
 // свежие данные на открытом экране: раз в 30 с, только в видимой вкладке
 setInterval(() => { if (SRV && document.visibilityState === 'visible' && !anyModal() && !(R === 'play' && S.inGame)) render(); }, 30000);
@@ -3636,15 +3875,16 @@ document.addEventListener('click', e => {
     case 'cancelname': S.editName = false; render(); break;
     case 'savename': {
       const val = k => { const el = $('me-' + k); return el ? el.value.trim() : null; };
-      const nv = val('name'), city = val('city'), club = val('club');
+      const nv = val('name'), city = val('city'), club = val('club'), title = val('title');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '' }), r => { Api.me = r.player; svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '', title: title || '' }), r => { Api.me = r.player; svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;
       if (city) meP().city = city;
       if (club != null) meP().club = club;
+      if (title != null) meP().title = title;
       if (su.names[0] === old) { su.names[0] = nv; saveSu(); }
       saveDb(); S.editName = false; toast('Профиль обновлён.'); render(); break;
     }
@@ -3669,6 +3909,40 @@ document.addEventListener('click', e => {
     case 'takeover': takeover(v || (G && G.id)); break;
     case 'mview': closeModals(); go('m.' + v); break;
     case 'take-ask': S.confirmTake = v; render(); break;
+    case 'photo-pick': { const [k, id] = v.split('|'); photoPick(k, id); break; }
+    case 'photo-del-av': photoDelete('avatar', v); break;
+    case 'photo-del-t': { const [tid, id] = v.split('|'); photoDelete('tour', tid, id); break; }
+    case 'crop-no': S.crop = null; render(); break;
+    case 'crop-save': cropSave(); break;
+    case 'lbox': S.lbox = v; render(); break;
+    case 'lbox-close': S.lbox = null; render(); break;
+    case 'photos-tg': S.photos = !S.photos; lsSet('oche2.photos', S.photos); render(); break;
+    case 'link-add': {
+      const t = TBY[v], ti = $('ln-title'), ur = $('ln-url');
+      if (!t || !ur) break;
+      const url = ur.value.trim(), title = ti.value.trim();
+      if (!/^https?:\/\/\S+\.\S+/.test(url)) { S.linkErr = 'Нужен адрес, который начинается с https://'; render(); break; }
+      linksSave(t, (t.links || []).concat([{ title: title || hostOf(url), url }]), 'Ссылка добавлена.'); break;
+    }
+    case 'link-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (t) linksSave(t, (t.links || []).filter((_, j) => j !== +k), 'Ссылка убрана.'); break; }
+    case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); render(); break; }
+    case 'tvo-show': S.tvoOpen = !S.tvoOpen; render(); break;
+    case 'qr-show': closeModals(); S.qr = v; loadQr(); render(); break;
+    case 'qr-copy': copyText(v, 'Ссылка скопирована.'); break;
+    case 'claim': {
+      const el = $('claim-code'), code = el ? el.value.trim() : '';
+      if (code.length < 4) { toast('Введите код от организатора.'); break; }
+      svDo(Api.post('/api/me/claim', { code }), r => { Api.me = r.player; Api.admin = r.admin; ME = r.player.id; svPlayer(r.player); Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); toast('Аккаунт привязан: ' + r.player.name + '.'); go('p.me'); });
+      break;
+    }
+    case 'adm-new': {
+      const val = k => { const el = $('adm-' + k); return el ? el.value.trim() : ''; };
+      if (val('name').length < 2) { toast('Введите имя игрока.'); break; }
+      svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title') }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); ['name', 'city', 'club', 'title'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку код.'); });
+      break;
+    }
+    case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); toast('Новый код готов.'); }); break;
+    case 'adm-ver': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { ver: on === '1' }), () => svStale('admin:')); break; }
     case 'tv-full': try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} break;
     case 'desk-toggle': {
       const [tid, k] = v.split('|'), key = 'oche.desk.' + tid, t = TBY[tid];
@@ -3734,7 +4008,9 @@ document.addEventListener('input', e => {
     if (Number.isInteger(n) && n >= 1 && n <= 999) setNum(tid, id, n);
   }
   if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); }
+  if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
+  if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
     S.rsearch = t.value;
     clearTimeout(S.rqT); S.rqT = setTimeout(() => { S.rq = S.rsearch; render(); }, 300);

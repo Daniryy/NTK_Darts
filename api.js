@@ -62,6 +62,17 @@
     put: (p, b) => Api.req('PUT', p, b === undefined ? {} : b),
     patch: (p, b) => Api.req('PATCH', p, b === undefined ? {} : b),
     del: p => Api.req('DELETE', p),
+    // файл (фото) телом запроса как есть
+    async upload(path, blob) {
+      let res;
+      try {
+        res = await W.fetch(Api.base + path, { method: 'POST', headers: { 'X-Device-Id': deviceId(), 'Content-Type': blob.type || 'image/jpeg' }, body: blob, credentials: 'same-origin' });
+      } catch (e) { throw new ApiError(0, 'net', NET_MSG); }
+      let data = null;
+      try { data = await res.json(); } catch (e) { data = null; }
+      if (!res.ok) { const er = data && data.error ? data.error : { code: 'server', message: 'Ошибка сервера (' + res.status + ')' }; throw new ApiError(res.status, er.code, er.message, er); }
+      return data;
+    },
 
     // режим работы: закреплённый выбор или «сервер, если отвечает»
     storedMode: () => ls.get('oche.mode'),

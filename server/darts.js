@@ -17,6 +17,8 @@ function liveState(m, visits) {
   const st = stateOf(m, visits), v = st.last;
   const out = {
     leg: st.leg, cur: st.winner == null ? st.cur : null, scores: st.tot,
+    // средний за подход (3 дротика) по всему матчу — для табло
+    avg: st.pts.map((p, i) => st.darts[i] ? Math.round(p / st.darts[i] * 30) / 10 : null),
     last: v ? (v.tb ? { p: v.p, tb: 1 } : { p: v.p, pts: v.pts != null ? v.pts : v.v, n: v.n != null ? v.n : v.d ? v.d.length : 3, b: v.b || 0, d: v.d || null }) : null
   };
   if (m.ex) {

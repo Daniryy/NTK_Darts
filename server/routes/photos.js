@@ -88,6 +88,19 @@ module.exports = async function (app) {
     }
   });
 
+  // DELETE /api/players/:id/photo — убрать аватар (те же права, что на загрузку)
+  app.delete('/api/players/:id/photo', async req => {
+    const me = needPlayer(req), files = [];
+    await tx(async c => {
+      const p = await avatarTarget(c, me, req.params.id);
+      (await all(c, 'DELETE FROM photos WHERE player_id = $1 RETURNING file', [p.id])).forEach(x => files.push(x.file));
+      await c.query('UPDATE players SET photo = NULL WHERE id = $1', [p.id]);
+    });
+    unlink(files);
+    clearCache();
+    return { ok: true };
+  });
+
   // DELETE /api/photos/:id — свой аватар, аватар гостя, фото турнира (организатор), администратор — любое
   app.delete('/api/photos/:id', async req => {
     const me = needPlayer(req);
