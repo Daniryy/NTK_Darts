@@ -1,6 +1,7 @@
 // Турниры: список, страница с версией, создание, регистрация, запуск, быстрый счёт.
 const crypto = require('node:crypto');
 const B = require('../../shared/bracket.js');
+const Games = require('../../shared/games.js');
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
@@ -32,17 +33,27 @@ async function seedOrder(c, ids, seed) {
   return ids.slice().sort((a, b) => r[b] - r[a] || (a < b ? -1 : 1));
 }
 
-// посев и сетка; турнир становится live
-async function launch(c, id, fmt, order) {
+// посев и сетка; турнир становится live. С квалификацией сетки ещё нет: сначала стадия qual.
+async function launch(c, id, fmt, order, row) {
   const t = { players: [], games: [] };
   let slots = null;
-  if (fmt === 'rr') t.players = order;
-  else { B.setBracket(t, fmt, order); slots = t.slots; }
+  if (row.qual) t.players = order;
+  else if (fmt === 'rr') t.players = order;
+  else { B.setBracket(t, fmt, order, row.split); slots = t.slots; }
   await c.query('DELETE FROM entries WHERE tournament_id = $1', [id]);
   await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [id, order]);
-  await c.query(`UPDATE tournaments SET status = 'live', slots = $2, start = $3 WHERE id = $1`, [id, slots && JSON.stringify(slots), Date.now()]);
+  await c.query(`UPDATE tournaments SET status = 'live', slots = $2, block = $3, stage = $4, start = $5 WHERE id = $1`,
+    [id, slots && JSON.stringify(slots), t.block || null, row.qual ? 'qual' : null, Date.now()]);
   await T.refreshTour(c, await getTour(c, id, false));
 }
+
+// упражнение: обычный x01 без лимита хранится как mode/dbl, остальное — в ex
+function exField(v, field) {
+  const ex = Games.norm(v);
+  if (!ex) throw E.bad('Поле ' + field + ': неизвестное упражнение', field);
+  return ex;
+}
+const QUAL_KINDS = ['score', 'round', 'sector'];
 
 // общие поля создания и правки; full — все обязательны
 function tourFields(b, full, me) {
@@ -51,8 +62,23 @@ function tourFields(b, full, me) {
   if (full || b.city !== undefined) o.city = V.optStr(b.city, 'city', 40);
   if (full || b.venue !== undefined) o.venue = V.optStr(b.venue, 'venue', 60);
   if (full || b.format !== undefined) o.format = V.oneOf(b.format, 'format', ['pl', 'ko', 'rr']);
-  if (full || b.mode !== undefined) o.mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
+  if ((full && b.ex == null) || b.mode !== undefined) o.mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
   if (full || b.ltw !== undefined) o.ltw = V.int(b.ltw, 'ltw', 1, 5);
+  if (b.ex != null) {
+    const ex = exField(b.ex, 'ex');
+    if (ex.k === 'x01') { o.mode = ex.mode; o.dbl = ex.dbl; o.ex = ex.lim ? ex : null; }
+    else o.ex = ex;
+  } else if (b.ex === null) o.ex = null;
+  if (b.qual != null) {
+    const q = b.qual;
+    if (typeof q !== 'object') throw E.bad('qual: { ex, tries }', 'qual');
+    const ex = exField(q.ex, 'qual.ex');
+    if (!QUAL_KINDS.includes(ex.k)) throw E.bad('Квалификация: Набор очков, Большой раунд или Сектор', 'qual.ex');
+    o.qual = { ex, tries: q.tries == null ? 2 : V.int(q.tries, 'qual.tries', 1, 2) };
+    if (b.split === undefined) o.split = 8;
+  } else if (b.qual === null) o.qual = null;
+  if (b.split != null) o.split = V.oneOf(b.split, 'split', [4, 8, 16, 32]);
+  else if (b.split === null) o.split = null;
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
@@ -98,6 +124,7 @@ module.exports = async function (app) {
     const f = tourFields(b, true, me);
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
+    if ((f.qual || f.split) && f.format !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
     const max = T.maxPlayers(f.format);
     const ids = b.players == null && reg ? [] : b.players;
     if (!Array.isArray(ids) || ids.some(x => typeof x !== 'string')) throw E.bad('players: список id', 'players');
@@ -112,11 +139,13 @@ module.exports = async function (app) {
     }
     const res = await tx(async c => {
       if (ids.length && (await all(c, 'SELECT id FROM players WHERE id = ANY($1)', [ids])).length !== ids.length) throw E.bad('Игрок не найден', 'players');
-      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, ltw, cap, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14) RETURNING id`,
-      [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode, f.ltw, cap, Date.now()]);
+      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+      [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
+        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, Date.now()]);
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
-      else await launch(c, row.id, f.format, f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed));
+      // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
+      else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
       return tourResp(c, row.id, me);
     });
     return reply.code(201).send(res);
@@ -129,6 +158,8 @@ module.exports = async function (app) {
       needOwner(t, me);
       if (t.status !== 'reg') throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const b = req.body || {}, f = tourFields(b, false, me);
+      if ((f.qual || f.split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
+      ['ex', 'qual'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
       if (b.cap !== undefined) f.cap = V.int(b.cap, 'cap', Math.max(3, t.players.length), T.maxPlayers(f.format || t.format));
       if (f.format && t.players.length > T.maxPlayers(f.format)) throw E.bad('Для этого формата слишком много участников', 'format');
       if (f.format && !f.cap && t.cap > T.maxPlayers(f.format)) f.cap = T.maxPlayers(f.format);
@@ -193,7 +224,7 @@ module.exports = async function (app) {
       const max = T.maxPlayers(t.format);
       if (t.players.length < 3) throw E.conflict('bad_state', 'Нужно минимум 3 участника');
       if (t.players.length > max) throw E.conflict('bad_state', 'Для этого формата максимум ' + max + ' участников');
-      await launch(c, t.id, t.format, await seedOrder(c, t.players, 'r'));
+      await launch(c, t.id, t.format, t._row.qual ? t.players : await seedOrder(c, t.players, 'r'), t._row);
       forget('t', t.id);
       return tourResp(c, t.id, me);
     });
@@ -214,9 +245,9 @@ module.exports = async function (app) {
       if (!((la === t.ltw && lb < t.ltw) || (lb === t.ltw && la < t.ltw))) throw E.bad('Победитель должен выиграть ' + t.ltw + ' лег(а)', 'la');
       const id = 'q' + crypto.randomBytes(8).toString('hex'), now = Date.now(), w = la > lb ? 0 : 1;
       const nm = pid => t._ents.find(e => e.player_id === pid).name;
-      await c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, players, legs, w, quick, created_by, started, finished)
-        VALUES ($1, $2, $3, $4, 'done', $5, $6, $7, $8, $9, $10, true, $11, $12, $12)`,
-      [id, t.id, r, i, t.mode, t.ltw, t.dbl, JSON.stringify([{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }]), JSON.stringify([la, lb]), w, me.id, now]);
+      await c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, ex, players, legs, w, quick, created_by, started, finished)
+        VALUES ($1, $2, $3, $4, 'done', $5, $6, $7, $8, $9, $10, $11, true, $12, $13, $13)`,
+      [id, t.id, r, i, t.mode, t.ltw, t.dbl, t.ex ? JSON.stringify(t.ex) : null, JSON.stringify([{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }]), JSON.stringify([la, lb]), w, me.id, now]);
       // без бросков: в средние не попадает (darts 0), как на странице
       for (const [k, pid, legs] of [[0, x.a, la], [1, x.b, lb]]) {
         await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9) VALUES ($1, $2, $3, $4, $5, 0, 0, NULL)`, [id, k, pid, nm(pid), legs]);
@@ -229,4 +260,122 @@ module.exports = async function (app) {
       return Object.assign(await tourResp(c, t.id, me), { match: (await matchCards(c, [m]))[0] });
     });
   });
+
+  // результат попытки квалификации вручную (организатор); тело { v }
+  app.put('/api/tournaments/:id/qual/:pid/:try', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      const { pid, k } = qualSlot(t, req.params);
+      const max = qualMax(t.qual.ex), v = V.int(b.v, 'v', 0, max);
+      const old = await one(c, 'SELECT match_id FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k]);
+      if (old && old.match_id) throw E.conflict('game_taken', 'Эта попытка сыграна в счётчике', { matchId: old.match_id });
+      const live = await one(c, `SELECT id FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try = $3`, [t.id, pid, k]);
+      if (live) throw E.conflict('game_taken', 'Эта попытка идёт в счётчике', { matchId: live.id });
+      if (k > 0 && !await one(c, 'SELECT 1 FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k - 1])) throw E.conflict('bad_state', 'Сначала нужна попытка ' + k);
+      await c.query(`INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (tournament_id, player_id, try) DO UPDATE SET v = EXCLUDED.v, t = EXCLUDED.t`, [t.id, pid, k, v, Date.now()]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // удалить результат попытки и следующих (организатор); сыгранные в счётчике попытки удаляются вместе с матчем
+  app.delete('/api/tournaments/:id/qual/:pid/:try', async req => {
+    const me = needPlayer(req);
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      const { pid, k } = qualSlot(t, req.params);
+      await c.query(`DELETE FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try >= $3`, [t.id, pid, k]);
+      await c.query('DELETE FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try >= $3', [t.id, pid, k]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // закончить квалификацию: посев по лучшему результату, сетки частями по split мест (организатор)
+  app.post('/api/tournaments/:id/qual/close', async req => {
+    const me = needPlayer(req);
+    return tx(async c => {
+      await c.query('SELECT id FROM matches WHERE tournament_id = $1 ORDER BY id FOR UPDATE', [req.params.id]);
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация уже закрыта');
+      if (T.qualDone(t) < 2) throw E.conflict('bad_state', 'Нужны результаты хотя бы двух игроков');
+      if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
+      const order = T.qualOrder(t), g = { players: [], games: [] };
+      B.setBracket(g, 'pl', order, t.split || 8);
+      await c.query('DELETE FROM entries WHERE tournament_id = $1', [t.id]);
+      await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, order]);
+      await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = $3, nums = $4 WHERE id = $1`,
+        [t.id, JSON.stringify(g.slots), g.block || null, JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])))]);
+      await T.refreshTour(c, await getTour(c, t.id, false));
+      forget('t', t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // мишени (организатор): { n } — сколько их, { r, i, board } — поставить игре мишень
+  app.patch('/api/tournaments/:id/boards', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени — после старта');
+      let bd = t.boards ? { n: t.boards.n, at: Object.assign({}, t.boards.at) } : { n: 0, at: {} };
+      if (b.n !== undefined) bd.n = V.int(b.n, 'n', 0, 64);
+      if (b.board !== undefined) {
+        const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63), no = V.int(b.board, 'board', 1, Math.max(1, bd.n));
+        const g = B.gameAt(t, r, i);
+        if (!g || B.gameState(t, g).st !== 'ready') throw E.conflict('bad_state', 'Мишень ставится только готовой к игре паре');
+        Object.keys(bd.at).forEach(k => { if (bd.at[k] === no) delete bd.at[k]; });
+        bd.at[r + ':' + i] = no;
+      }
+      t.boards = bd.n ? bd : null;
+      if (t.boards) B.assignBoards(t);
+      await c.query('UPDATE tournaments SET boards = $2 WHERE id = $1', [t.id, t.boards && JSON.stringify(t.boards)]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // номера игроков (организатор): { nums: { id: номер } } — только меняемые; null — номера по порядку
+  app.patch('/api/tournaments/:id/nums', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      let nums = null;
+      if (b.nums !== null) {
+        if (!b.nums || typeof b.nums !== 'object' || Array.isArray(b.nums)) throw E.bad('nums: { id: номер }', 'nums');
+        nums = Object.fromEntries(t.players.map((id, k) => [id, (t.nums && t.nums[id]) || k + 1]));
+        for (const [id, n] of Object.entries(b.nums)) {
+          if (!t.players.includes(id)) throw E.bad('Игрок ' + id + ' не участвует', 'nums');
+          nums[id] = V.int(n, 'nums', 1, 999);
+        }
+      }
+      await c.query('UPDATE tournaments SET nums = $2 WHERE id = $1', [t.id, nums && JSON.stringify(nums)]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
 };
+
+// игрок и номер попытки из адреса; турнир должен быть в квалификации
+function qualSlot(t, p) {
+  if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация закрыта');
+  const pid = p.pid, k = +p.try;
+  if (!t.players.includes(pid)) throw E.notFound('Игрок не участвует');
+  if (!Number.isInteger(k) || k < 0 || k >= t.qual.tries) throw E.bad('Попытка от 0 до ' + (t.qual.tries - 1), 'try');
+  return { pid, k };
+}
+// наибольший результат упражнения квалификации
+function qualMax(ex) {
+  ex = Games.norm(ex);
+  if (ex.k === 'score') return 180 * ex.lim;
+  if (ex.k === 'round') return 9 * 210 + 6 * 25;
+  return 9 * ex.lim;
+}
+module.exports.qualMax = qualMax;

@@ -222,6 +222,29 @@
     return null;
   }
 
+  // мишени: t.boards = { n, at: { 'r:i': номер } }. Мишень держится за готовой игрой, сыгранная её освобождает;
+  // свободные мишени получают готовые игры без мишени по порядку номеров. true — что-то поменялось.
+  function assignBoards(t, rv) {
+    const bd = t.boards;
+    if (!bd || !t.games || !t.games.length) return false;
+    rv = rv || resolver(t);
+    const at = bd.at || (bd.at = {}), before = JSON.stringify(at), used = new Set();
+    Object.keys(at).forEach(k => {
+      const [r, i] = k.split(':').map(Number), g = gameAt(t, r, i), b = at[k];
+      if (!g || gameState(t, g, rv).st !== 'ready' || !(Number.isInteger(b) && b >= 1 && b <= bd.n) || used.has(b)) delete at[k];
+      else used.add(b);
+    });
+    const nums = gameNums(t, rv), no = g => nums.get(g.r + ':' + g.i) || 0;
+    const wait = t.games.filter(g => !at[g.r + ':' + g.i] && gameState(t, g, rv).st === 'ready').sort((x, y) => no(x) - no(y));
+    let b = 1;
+    for (const g of wait) {
+      while (b <= bd.n && used.has(b)) b++;
+      if (b > bd.n) break;
+      at[g.r + ':' + g.i] = b; used.add(b);
+    }
+    return JSON.stringify(at) !== before;
+  }
+
   // все игроки с местами: [{ id, lo, hi }], по возрастанию места; для сервера и итоговой таблицы
   function places(t) {
     const rv = resolver(t), N = t.players.length;
@@ -232,6 +255,6 @@
   return {
     BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
     roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
-    srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places
+    srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards
   };
 });

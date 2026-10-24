@@ -205,6 +205,21 @@ test('pl частями: игроков не больше части — обы�
   assert.equal(B.bParts(u), 2);
 });
 
+test('мишени: готовые игры получают свободные мишени, сыгранные освобождают', () => {
+  const t = make('pl', 8);
+  t.boards = { n: 3, at: {} };
+  assert.equal(B.assignBoards(t), true);
+  assert.deepEqual(t.boards.at, { '0:0': 1, '0:1': 2, '0:2': 3 });
+  assert.equal(B.assignBoards(t), false, 'повторно ничего не меняется');
+  const g = B.gameAt(t, 0, 1), s = B.gameState(t, g);
+  g.res = { w: s.a, la: 3, lb: 0 };
+  B.assignBoards(t);
+  assert.deepEqual(t.boards.at, { '0:0': 1, '0:2': 3, '0:3': 2 }, 'мишень 2 перешла к следующей игре');
+  t.boards.at['0:3'] = 7;
+  B.assignBoards(t);
+  assert.equal(t.boards.at['0:3'], 2, 'неверный номер мишени заменяется свободным');
+});
+
 test('модуль грузится в браузере как глобальный Bracket', () => {
   const src = fs.readFileSync(path.join(__dirname, 'bracket.js'), 'utf8');
   const ctx = { self: {} };

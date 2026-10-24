@@ -85,7 +85,7 @@ module.exports = async function (app) {
   app.get('/api/feed', async req => {
     const q = req.query, scope = q.scope == null ? 'all' : V.oneOf(q.scope, 'scope', ['all', 'my']);
     const me = scope === 'my' ? needPlayer(req) : null, bef = before(q.before), limit = lim(q.limit, 30, 50);
-    const ms = await all(pool, `SELECT m.* FROM matches m WHERE m.status = 'done' AND m.finished < $1
+    const ms = await all(pool, `SELECT m.* FROM matches m WHERE m.status = 'done' AND m.q_player IS NULL AND m.finished < $1
       ${me ? 'AND EXISTS (SELECT 1 FROM match_lines l WHERE l.match_id = m.id AND l.player_id = $2)' : ''}
       ORDER BY m.finished DESC, m.id LIMIT ${limit}`, me ? [bef, me.id] : [bef]);
     // турнир в ленте — сразу после последнего матча, как на странице

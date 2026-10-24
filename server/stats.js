@@ -38,8 +38,9 @@ const FIELDS = ['n', 'w', 'pts', 'darts', 'f9s', 'f9n', 'coh', 'coa', 'hco', 'hi
 async function refreshStats(c, ids) {
   ids = [...new Set(ids.filter(Boolean))];
   if (!ids.length) return;
-  const rows = await all(c, `SELECT l.*, m.mode, m.w AS mw, m.tournament_id IS NOT NULL AS tour FROM match_lines l
-    JOIN matches m ON m.id = l.match_id WHERE l.player_id = ANY($1) AND m.status = 'done'`, [ids]);
+  // попытки квалификации — не матчи; упражнения считаются матчами, но в средние x01 не входят
+  const rows = await all(c, `SELECT l.*, m.mode, m.ex, m.w AS mw, m.tournament_id IS NOT NULL AS tour FROM match_lines l
+    JOIN matches m ON m.id = l.match_id WHERE l.player_id = ANY($1) AND m.status = 'done' AND m.q_player IS NULL`, [ids]);
   const acc = {};
   ids.forEach(id => { acc[id] = { all: blank(), tour: blank() }; });
   rows.forEach(l => {
@@ -59,6 +60,7 @@ const blank = () => Object.fromEntries(FIELDS.map(f => [f, 0]));
 function add(o, l) {
   o.n++;
   if (l.mw === l.idx) o.w++;
+  if (l.ex && l.ex.k !== 'x01') return;
   o.pts += l.pts; o.darts += l.darts;
   if (l.f9 != null) { o.f9s += l.f9; o.f9n++; }
   o.coh += l.coh; o.coa += l.coa;

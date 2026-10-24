@@ -3,7 +3,7 @@ const B = require('../shared/bracket.js');
 const { all } = require('./db');
 const { TOUR_SQL, loadTours, gameLabel } = require('./tour');
 
-const lineJSON = l => ({ id: l.player_id, n: l.name, legs: l.legs, pts: l.pts, darts: l.darts, f9: l.f9, hi: l.hi, hco: l.hco, c180: l.c180, c140: l.c140, c100: l.c100, coh: l.coh, coa: l.coa, bl: l.bl });
+const lineJSON = l => ({ id: l.player_id, n: l.name, legs: l.legs, pts: l.pts, darts: l.darts, f9: l.f9, hi: l.hi, hco: l.hco, c180: l.c180, c140: l.c140, c100: l.c100, coh: l.coh, coa: l.coa, bl: l.bl, sc: l.sc || null });
 
 // ms — строки matches со status = 'done'
 async function matchCards(c, ms) {
@@ -16,8 +16,8 @@ async function matchCards(c, ms) {
     const t = m.tournament_id && tours.find(x => x.id === m.tournament_id);
     return {
       id: m.id, t: m.finished, tid: m.tournament_id, tname: t ? t.name : null, r: m.r, i: m.i,
-      label: t ? gameLabel(t, B.gameAt(t, m.r, m.i), rv.get(t.id)) : null, off: !!(t && t.official),
-      mode: m.mode, ltw: m.ltw, dbl: m.dbl, w: m.w, quick: m.quick,
+      label: t ? (m.q_player ? 'квалификация · попытка ' + (m.q_try + 1) : gameLabel(t, B.gameAt(t, m.r, m.i), rv.get(t.id))) : null, off: !!(t && t.official),
+      mode: m.mode, ltw: m.ltw, dbl: m.dbl, ex: m.ex || null, q: m.q_player ? { id: m.q_player, k: m.q_try } : null, w: m.w, quick: m.quick,
       pl: lines.filter(l => l.match_id === m.id).map(lineJSON)
     };
   });
