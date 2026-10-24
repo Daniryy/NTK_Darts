@@ -637,6 +637,47 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .gh-t span { color: var(--muted); font-size: 12.5px; }
 body.ingame { padding-top: max(8px, env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 body.ingame .tabs, body.ingame .top-wrap { display: none; }
+/* табло для телевизора и экран организатора */
+body.tv { padding: 0 max(18px, 1.6vw) 18px; }
+body.tv .tabs, body.tv .top-wrap { display: none; }
+body.tv .wrap { max-width: none; gap: 1.4vw; }
+body.deskw .wrap { max-width: none; }
+.tvh { display: flex; align-items: center; justify-content: space-between; gap: 2vw; padding-top: 1.2vw; flex-wrap: wrap; }
+.tvh h1 { font-family: var(--display); font-size: clamp(26px, 3vw, 64px); text-transform: uppercase; letter-spacing: .03em; line-height: 1; }
+.tvh .clock { font-family: var(--display); font-size: clamp(24px, 2.6vw, 56px); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tvh .tvx { display: flex; gap: 8px; align-items: center; }
+.tvg { display: grid; gap: 1.2vw; grid-template-columns: repeat(auto-fill, minmax(min(100%, max(360px, 28vw)), 1fr)); }
+.tvt { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line-bright); border-radius: 18px; padding: 1vw 1.2vw; display: grid; gap: .5vw; box-shadow: var(--shadow); }
+.tvt-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: clamp(13px, 1vw, 22px); color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.tvt-h .bd { font-size: clamp(14px, 1.2vw, 26px); padding: 2px 10px; }
+.tvp { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1vw; align-items: center; padding: .3vw .2vw; border-radius: 10px; }
+.tvp.act { background: color-mix(in srgb, var(--green) 14%, transparent); box-shadow: inset 4px 0 0 var(--green); }
+.tvp .nm { font-size: clamp(18px, 1.6vw, 36px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+.tvp .lg { font-family: var(--display); font-size: clamp(22px, 2vw, 44px); color: var(--muted); min-width: 1.2em; text-align: center; background: var(--surface2); border-radius: 8px; padding: 0 .3em; }
+.tvp .sc { font-family: var(--display); font-size: clamp(40px, 4.4vw, 104px); line-height: 1; font-weight: 700; min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.tvp.act .sc { color: var(--green); }
+.tvt .sub { display: flex; justify-content: space-between; gap: 8px; font-size: clamp(12px, .95vw, 20px); color: var(--muted); }
+.tvfx { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: var(--display); font-weight: 700; font-size: clamp(48px, 6vw, 150px); letter-spacing: .04em; text-transform: uppercase; opacity: 0; }
+.tvfx.on { animation: tvfx 2.6s ease-out forwards; }
+.tvfx.f180 { color: #f2c94c; text-shadow: 0 0 30px rgba(242, 201, 76, .7); background: radial-gradient(circle, rgba(242, 201, 76, .22), transparent 70%); }
+.tvfx.bust { color: var(--red); background: radial-gradient(circle, var(--red-glow), transparent 70%); }
+.tvfx.co, .tvfx.leg { color: var(--green); background: radial-gradient(circle, var(--green-glow), transparent 70%); }
+@keyframes tvfx { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; transform: scale(1.08); } 22% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tvfx.on { animation: none; opacity: 1; } }
+.tvside { display: grid; gap: 1.2vw; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+.tvbox { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 1vw 1.2vw; display: grid; gap: .6vw; align-content: start; }
+.tvbox h2 { font-family: var(--display); font-size: clamp(16px, 1.3vw, 30px); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.tvrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1vw; align-items: center; font-size: clamp(15px, 1.25vw, 28px); padding: .25vw 0; border-bottom: 1px solid var(--line); }
+.tvrow:last-child { border-bottom: 0; }
+.tvrow .bd { font-size: clamp(14px, 1.2vw, 26px); padding: 2px 10px; }
+.tvrow .r { font-family: var(--display); font-weight: 600; }
+.desk-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.desk { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); align-items: start; }
+.dpan { background: var(--surface); border: 1px solid var(--line-bright); border-radius: 14px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; box-shadow: var(--shadow); }
+.dpan.wide { grid-column: 1 / -1; }
+.dpan-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.dpan-h b { font-family: var(--display); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+.dpan .tvt { box-shadow: none; }
 .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .players { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; } }
 .players.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1588,7 +1629,7 @@ function renderModals() {
 }
 
 const TABS = [['feed', 'Лента', 'feed'], ['tours', 'Турниры', 'trophy'], ['play', 'Играть', 'target'], ['rating', 'Рейтинг', 'podium'], ['p.me', 'Профиль', 'user']];
-function curTab() { if (R.startsWith('t.') || R === 'new') return 'tours'; if (R === 'p.me') return 'p.me'; if (R.startsWith('p.')) return 'rating'; return R; }
+function curTab() { if (R.startsWith('t.') || R.startsWith('desk.') || R === 'new') return 'tours'; if (R === 'p.me') return 'p.me'; if (R.startsWith('p.')) return 'rating'; return R; }
 const hasLiveGame = () => !!(G && G.over !== 'match');
 function topView() {
   const c = curTab();
@@ -1864,7 +1905,9 @@ function tourView(id) {
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
-  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), t.org.name].filter(Boolean).map(esc).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div></div>';
+  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), t.org.name].filter(Boolean).map(esc).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
+  if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
+  h += '</div>';
   h += '<div class="card tstat">';
   if (st === 'reg') {
     const inn = t.players.includes(ME), n = t.players.length, max = isBracket(t) ? BR_MAX : RR_MAX;
@@ -2916,6 +2959,133 @@ function endVisitQuiet(bust, win, n, d) {
 }
 function legWonQuiet() { const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; }; try { legWon(); } finally { commitMatch = c; } }
 
+/* ===== Табло для ТВ и экран организатора ===== */
+// идущие матчи турнира: на сервере — из потока, в демо — игра этого телефона (видна и в соседней вкладке)
+function liveOf(t) {
+  if (SRV) return Object.values(SV.live[t.id] || {});
+  if (!G || !G.ctx || G.ctx.tid !== t.id || G.over === 'match') return [];
+  const ex = G.kind === 'ex' ? G.ex : Object.assign(Games.x01(G.mode, G.dbl), { lim: G.lim || 0 });
+  let state, legs;
+  if (G.kind === 'ex') { const s = exSt(); legs = s.legs; state = { leg: s.leg, cur: s.cur, scores: s.tot, vis: s.vis, tie: s.tie, last: s.last && !s.last.tb ? { p: s.last.p, pts: s.last.v, d: s.last.d, n: 3, b: 0 } : null }; }
+  else {
+    const e = G.log[G.log.length - 1];
+    legs = G.players.map(p => p.legs);
+    state = { leg: G.legNo, cur: G.over ? null : G.cur, scores: G.players.map(p => p.score), last: e && !e.tb ? { p: e.p, pts: e.pts, n: e.n, b: e.b, d: e.d } : null, vis: G.lim ? G.players.map((_, i) => G.log.filter(x => x.leg === G.legNo && x.p === i && !x.tb).length) : undefined };
+  }
+  return [{ id: G.id, r: G.ctx.r == null ? null : G.ctx.r, i: G.ctx.i == null ? null : G.ctx.i, q: G.ctx.q ? { id: G.ctx.q.id, k: G.ctx.q.k } : null, ex, ltw: G.legsToWin, mode: G.mode, players: G.players.map(p => ({ id: p.id, name: p.name })), legs, state, by: meP().name }];
+}
+// эффект на табло: 180, перебор, закрытие, лег — по изменению последнего подхода
+const TVPREV = {}, TVFX = {};
+function tvFx(m) {
+  const s = m.state || {}, L = s.last, key = JSON.stringify([L, m.legs, s.leg]);
+  const prev = TVPREV[m.id];
+  TVPREV[m.id] = key;
+  if (prev === undefined || prev === key || !L) return;
+  const ex = m.ex ? Games.norm(m.ex) : Games.x01(m.mode, true), legUp = JSON.parse(prev)[1].join() !== m.legs.join();
+  let fx = null;
+  if (legUp) fx = { k: L.tb ? 'leg' : 'co', t: L.tb ? 'Лег · булл' : ex.k === 'x01' ? 'Закрытие ' + L.pts : 'Лег' };
+  else if (ex.k === 'x01' && L.b) fx = { k: 'bust', t: 'Перебор' };
+  else if ((ex.k === 'x01' || ex.k === 'score') && L.pts === 180) fx = { k: 'f180', t: '180' };
+  if (fx) TVFX[m.id] = Object.assign(fx, { at: Date.now() });
+}
+// плитка идущего матча
+function liveTile(t, m) {
+  tvFx(m);
+  const ex = m.ex ? Games.norm(m.ex) : Games.x01(m.mode || 501, true), s = m.state || {}, N = Games.perLeg(ex);
+  const g = m.r != null ? gameAt(t, m.r, m.i) : null, n = g && isBracket(t) ? gameNums(t, resolver(t)).get(m.r + ':' + m.i) : 0;
+  const lbl = m.q ? 'Квалификация · попытка ' + (m.q.k + 1) : (n ? '№' + n + ' · ' : '') + (g ? gameLabel(t, g) : '');
+  const b = m.r != null ? boardOf(t, m.r, m.i) : null, fx = TVFX[m.id] && Date.now() - TVFX[m.id].at < 2600 ? TVFX[m.id] : null;
+  let h = '<div class="tvt"' + (SRV ? ' role="button" tabindex="0" data-act="mview" data-v="' + m.id + '"' : '') + '><div class="tvt-h"><span>' + esc(lbl) + '</span>' + (b ? '<span class="bd">Мишень ' + b + '</span>' : '') + '</div>';
+  m.players.forEach((p, i) => {
+    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + noBadge(t, p.id) + esc(p.name) + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
+  });
+  const L = s.last;
+  h += '<div class="sub"><span>' + esc(Games.name(ex)) + (m.players.length > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (N && s.vis ? ' · подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : '') + '</span><span>' + (s.tie ? 'ничья — булл' : L ? esc((m.players[L.p] || {}).name || '').split(' ').pop() + ': ' + (L.b ? 'перебор' : L.pts) : '') + '</span></div>';
+  // перерисовка не перезапускает анимацию: она продолжается с прошедшего момента
+  if (fx) h += '<div class="tvfx on ' + fx.k + '" style="animation-delay:-' + (Date.now() - fx.at) + 'ms" aria-hidden="true">' + esc(fx.t) + '</div>';
+  return h + '</div>';
+}
+// вызов к мишеням: готовые игры с мишенью, которые ещё не начаты
+function callsOf(t) {
+  if (!t.games || !t.games.length || tStatus(t) !== 'live') return [];
+  const cx = bctx(t), live = new Set(liveOf(t).map(m => m.r + ':' + m.i));
+  return t.games.map(g => ({ g, s: gameState(t, g, cx.rv), n: cx.nums.get(g.r + ':' + g.i) })).filter(x => x.s.st === 'ready' && !live.has(x.g.r + ':' + x.g.i) && !otherLive(t, x.g))
+    .sort((a, b) => (boardOf(t, a.g.r, a.g.i) ? 0 : 1) - (boardOf(t, b.g.r, b.g.i) ? 0 : 1) || a.n - b.n);
+}
+function callsHTML(t, max) {
+  const cs = callsOf(t).slice(0, max || 12);
+  if (!cs.length) return '<p class="meta">Сейчас никого не вызываем.</p>';
+  return cs.map(x => '<div class="tvrow">' + (boardOf(t, x.g.r, x.g.i) ? '<span class="bd">М' + boardOf(t, x.g.r, x.g.i) + '</span>' : '<span class="meta">№' + x.n + '</span>') + '<span>' + noBadge(t, x.s.a) + esc(P[x.s.a] ? P[x.s.a].name : '—') + ' — ' + noBadge(t, x.s.b) + esc(P[x.s.b] ? P[x.s.b].name : '—') + '</span><span class="meta">' + esc(gameLabel(t, x.g)) + '</span></div>').join('');
+}
+function recentHTML(t, max) {
+  const done = (t.games || []).filter(g => g.res && gameState(t, g).st === 'done').map(g => ({ g, at: (MBY[g.res.mid] || {}).t || 0, s: gameState(t, g) }));
+  // свежие сверху: в демо — по времени матча, на сервере — по номеру круга и игры с конца
+  done.sort((a, b) => b.at - a.at || b.g.r - a.g.r || b.g.i - a.g.i);
+  if (!done.length) return '<p class="meta">Результатов пока нет.</p>';
+  return done.slice(0, max || 8).map(x => { const w = x.g.res.w === x.s.a; return '<div class="tvrow"><span class="r">' + x.g.res.la + ':' + x.g.res.lb + '</span><span><b' + (w ? '' : ' class="muted"') + '>' + esc(P[x.s.a] ? P[x.s.a].name : '—') + '</b> — <b' + (w ? ' class="muted"' : '') + '>' + esc(P[x.s.b] ? P[x.s.b].name : '—') + '</b></span><span class="meta">' + esc(gameLabel(t, x.g)) + '</span></div>'; }).join('');
+}
+// турнир для табло: на сервере — загрузка, в демо — из базы
+function tvTour(id) {
+  if (!SRV) return { t: TBY[id] || null, wait: '' };
+  const e = tourE(id);
+  return { t: e.data, wait: e.data ? '' : svState(e, 'турнира') };
+}
+let tvClock = 0;
+function tvView(id) {
+  const { t, wait } = tvTour(id);
+  if (!t) return wait || '<div class="note-box">Турнир не найден.</div>';
+  if (!tvClock) tvClock = setInterval(() => { if (R.startsWith('tv.')) { const el = $('tv-clock'); if (el) el.textContent = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); } else { clearInterval(tvClock); tvClock = 0; } }, 10000);
+  const live = liveOf(t).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
+  let h = '<div class="tvh"><div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div><div class="tvx"><span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
+  h += live.length ? '<div class="tvg">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<div class="tvbox"><h2>Сейчас матчей нет</h2><p class="meta">Как только маркер начнёт матч, счёт появится здесь.' + (SRV ? '' : ' В демо табло показывает игру, которую ведут в соседней вкладке этого браузера.') + '</p></div>';
+  h += '<div class="tvside">';
+  if (t.stage === 'qual') {
+    const order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, 10);
+    h += '<div class="tvbox"><h2>Квалификация · лучшие</h2>' + (order.length ? order.map((x, k) => '<div class="tvrow"><span class="r">' + (k + 1) + '</span><span>' + noBadge(t, x) + esc(P[x] ? P[x].name : '—') + '</span><span class="r">' + qBest(t, x) + '</span></div>').join('') : '<p class="meta">Результатов пока нет.</p>') + '</div>';
+  } else h += '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div><div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>';
+  h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div></div>';
+  return h;
+}
+
+/* Экран организатора: окна на выбор — идущие матчи, вызов к мишеням, сетки по частям, квалификация, итоги */
+function deskPanels(t) {
+  const out = [['live', 'Идущие матчи'], ['calls', 'К мишеням'], ['stages', 'Ход турнира']];
+  if (t.qual) out.push(['qual', 'Квалификация']);
+  if (t.games && t.games.length && isBracket(t)) {
+    if (t.block) for (let k = 0; k < bParts(t); k++) out.push(['part' + k, 'Сетка ' + (k * t.block + 1) + '–' + Math.min(t.players.length, (k + 1) * t.block)]);
+    else out.push(['grid', 'Сетка']);
+  }
+  if (t.games && t.games.length) out.push(['recent', 'Последние результаты']);
+  liveOf(t).forEach(m => out.push(['m:' + m.id, m.players.map(p => p.name.split(' ').pop()).join(' — ')]));
+  return out;
+}
+function deskView(id) {
+  const { t, wait } = tvTour(id);
+  if (!t) return wait || '<div class="note-box">Турнир не найден.</div>';
+  const key = 'oche.desk.' + id, all = deskPanels(t);
+  let on = lsGet(key);
+  if (!Array.isArray(on)) on = ['live', 'calls', 'stages'].concat(t.stage === 'qual' ? ['qual'] : []);
+  on = on.filter(k => all.some(x => x[0] === k));
+  let h = '<div class="thead"><button class="back" data-act="go" data-v="t.' + t.id + '">' + I.back + esc(t.name) + '</button><h1 class="h1">Экран организатора</h1><p class="meta">Выберите окна — набор запоминается на этом устройстве. Обновляется само.</p></div>';
+  h += '<div class="desk-tools">' + all.map(([k, l]) => '<button class="fchip' + (on.includes(k) ? ' on' : '') + '" data-act="desk-toggle" data-v="' + esc(id + '|' + k) + '" aria-pressed="' + on.includes(k) + '">' + esc(l) + '</button>').join('') + '<button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button></div>';
+  if (!on.length) return h + '<div class="note-box">Окна не выбраны.</div>';
+  const cx = t.games && t.games.length ? bctx(t) : null, live = liveOf(t);
+  h += '<div class="desk">' + on.map(k => {
+    const l = (all.find(x => x[0] === k) || [k, k])[1];
+    let body = '', wide = false;
+    if (k === 'live') body = live.length ? '<div class="tvg" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<p class="meta">Сейчас матчей нет.</p>';
+    else if (k === 'calls') body = callsHTML(t, 16) + (canDo(t, 'org') ? boardsCtl(t) : '');
+    else if (k === 'stages') body = stagesView(t, resolver(t)) || '<p class="meta">Турнир ещё не начался.</p>';
+    else if (k === 'qual') { body = qualView(t); wide = true; }
+    else if (k === 'grid') { body = bracketView(t); wide = true; }
+    else if (k.startsWith('part')) { body = plGridHTML(t, cx, +k.slice(4)); wide = true; }
+    else if (k === 'recent') body = recentHTML(t, 12);
+    else if (k.startsWith('m:')) { const m = live.find(x => x.id === k.slice(2)); body = m ? liveTile(t, m) : '<p class="meta">Матч закончился.</p>'; }
+    return '<section class="dpan' + (wide ? ' wide' : '') + '"><div class="dpan-h"><b>' + esc(l) + '</b><button class="ghost sm" data-act="desk-toggle" data-v="' + esc(id + '|' + k) + '" aria-label="Закрыть окно">✕</button></div>' + body + '</section>';
+  }).join('') + '</div>';
+  return h;
+}
+
 /* Просмотр матча (зритель): счёт с сервера, без ведения; можно забрать ведение счёта */
 function matchView(mid) {
   const e = lz('mlive:' + mid, async cur => {
@@ -3292,6 +3462,8 @@ function render() {
   CHART = null;
   const ingame = R === 'play' && S.inGame && !!G;
   document.body.classList.toggle('ingame', ingame);
+  document.body.classList.toggle('tv', R.startsWith('tv.'));
+  document.body.classList.toggle('deskw', R.startsWith('desk.'));
   if (ingame) wakeOn(); else wakeOff();
   // данные с сервера приходят фоном: поле ввода не теряет фокус и курсор
   const fa = document.activeElement, fid = fa && app.contains(fa) && fa.id, sel = fid && fa.selectionStart != null ? [fa.selectionStart, fa.selectionEnd] : null;
@@ -3303,6 +3475,8 @@ function render() {
     : R === 'rating' ? ratingView()
     : R.startsWith('p.') ? profileView(R.slice(2))
     : R.startsWith('m.') && SRV ? matchView(R.slice(2))
+    : R.startsWith('tv.') ? tvView(R.slice(3))
+    : R.startsWith('desk.') ? deskView(R.slice(5))
     : feedView();
   if (fid) { const el = $(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
   drawChart();
@@ -3495,6 +3669,14 @@ document.addEventListener('click', e => {
     case 'takeover': takeover(v || (G && G.id)); break;
     case 'mview': closeModals(); go('m.' + v); break;
     case 'take-ask': S.confirmTake = v; render(); break;
+    case 'tv-full': try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} break;
+    case 'desk-toggle': {
+      const [tid, k] = v.split('|'), key = 'oche.desk.' + tid, t = TBY[tid];
+      let on = lsGet(key);
+      if (!Array.isArray(on)) on = ['live', 'calls', 'stages'].concat(t && t.stage === 'qual' ? ['qual'] : []);
+      on = on.includes(k) ? on.filter(x => x !== k) : on.concat([k]);
+      lsSet(key, on); render(); break;
+    }
     case 'take-no': S.confirmTake = null; render(); break;
     case 'back-tour': { const m = SVC['mlive:' + R.slice(2)]; history.length > 1 ? history.back() : go(m && m.data && m.data.match.tid ? 't.' + m.data.match.tid : 'feed'); break; }
     case 'menu': S.inGame = false; S.buf = ''; if (G && G.over === 'match') { G = null; undo = []; } saveGame(); render(); toTop(); break;
