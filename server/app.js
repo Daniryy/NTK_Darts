@@ -22,7 +22,12 @@ function build(opts = {}) {
   app.register(require('@fastify/cookie'), { secret: config.cookieSecret });
   app.register(require('@fastify/rate-limit'), {
     max: config.rateMax, timeWindow: 2000,
-    keyGenerator: req => req.headers['x-device-id'] || req.ip,
+    // устройство из заголовка; поток табло (EventSource не шлёт заголовки) — из ?d=; иначе IP.
+    // По IP нельзя: в зале все телефоны в одном Wi-Fi выходят с одного адреса.
+    keyGenerator: req => {
+      const d = req.headers['x-device-id'] || (req.query && req.query.d);
+      return typeof d === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(d) ? d : req.ip;
+    },
     errorResponseBuilder: (req, ctx) => new ApiError(429, 'too_many', 'Слишком много запросов, повторите через ' + Math.ceil(ctx.ttl / 1000) + ' с')
   });
 

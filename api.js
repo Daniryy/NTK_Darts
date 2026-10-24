@@ -221,7 +221,8 @@
       let es = null, timer = null, closed = false, okAt = 0;
       const open = () => {
         if (closed || es || !visible() || !W.EventSource) return;
-        es = new W.EventSource(Api.base + '/api/tournaments/' + encodeURIComponent(tid) + '/stream');
+        // ?d= — устройство: лимит частоты считается по нему, а не по общему IP зала
+        es = new W.EventSource(Api.base + '/api/tournaments/' + encodeURIComponent(tid) + '/stream?d=' + deviceId());
         es.addEventListener('snapshot', e => { okAt = Date.now(); h.snapshot && h.snapshot(JSON.parse(e.data)); });
         es.addEventListener('match', e => { okAt = Date.now(); h.match && h.match(JSON.parse(e.data)); });
         es.addEventListener('tour', e => { okAt = Date.now(); h.tour && h.tour(JSON.parse(e.data)); });
