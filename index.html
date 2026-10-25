@@ -3422,14 +3422,14 @@ function loginModal() {
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
   if (!tabs.some(x => x[0] === L.tab)) L.tab = tabs[0][0];
   if (tabs.length > 1) h += '<div class="seg2 full" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (L.tab === v) + '" class="' + (L.tab === v ? 'on' : '') + '" data-act="login-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  const dis = L.busy ? ' disabled' : '';
+  const dis = L.busy ? ' disabled' : '', call = (L.method || c.phoneBy) !== 'sms', digits = L.digits || (call ? 4 : 6);
   if (L.tab === 'phone' && !L.sent) {
     h += '<div class="field"><label class="label" for="login-phone">Номер телефона</label><input class="inp big" id="login-phone" data-lf="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" value="' + esc(L.phone) + '"></div>';
-    h += '<button class="btn" data-act="login-send"' + dis + '>Получить код</button><span class="meta">Пришлём SMS с кодом из 6 цифр.' + (L.link ? '' : ' Номер новый — создадим аккаунт, имя укажете в профиле.') + '</span>';
+    h += '<button class="btn" data-act="login-send"' + dis + '>' + (call ? 'Позвоните мне' : 'Получить код') + '</button><span class="meta">' + (call ? 'Вам поступит звонок — брать трубку не нужно: код — последние 4 цифры номера, с которого звонят.' : 'Пришлём SMS с кодом из 6 цифр.') + (L.link ? '' : ' Номер новый — создадим аккаунт, имя укажете в профиле.') + '</span>';
   } else if (L.tab === 'phone') {
-    h += '<p class="meta">Код отправлен на <b>' + esc(L.phone) + '</b>.</p><div class="field"><label class="label" for="login-otp">Код из SMS</label><input class="inp big code-inp" id="login-otp" data-lf="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="' + esc(L.otp) + '"></div>';
-    if (L.dev) h += '<div class="note-box">Разработка: SMS не отправляются, код <b>' + esc(L.dev) + '</b>.</div>';
-    h += '<button class="btn" data-act="login-verify"' + dis + '>' + (L.link ? 'Привязать' : 'Войти') + '</button><div class="row2"><button class="ghost sm" data-act="login-back">Другой номер</button><button class="ghost sm" data-act="login-send"' + dis + '>Прислать код ещё раз</button></div>';
+    h += '<p class="meta">' + (call ? 'Сейчас на <b>' + esc(L.phone) + '</b> поступит звонок. Не отвечайте — введите <b>последние 4 цифры</b> номера, с которого звонят.' : 'Код отправлен на <b>' + esc(L.phone) + '</b>.') + '</p><div class="field"><label class="label" for="login-otp">' + (call ? 'Последние 4 цифры номера' : 'Код из SMS') + '</label><input class="inp big code-inp" id="login-otp" data-lf="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="' + digits + '" placeholder="' + '0'.repeat(digits) + '" value="' + esc(L.otp) + '"></div>';
+    if (L.dev) h += '<div class="note-box">Разработка: ' + (call ? 'звонки' : 'SMS') + ' не отправляются, код <b>' + esc(L.dev) + '</b>.</div>';
+    h += '<button class="btn" data-act="login-verify"' + dis + '>' + (L.link ? 'Привязать' : 'Войти') + '</button><div class="row2"><button class="ghost sm" data-act="login-back">Другой номер</button><button class="ghost sm" data-act="login-send"' + dis + '>' + (call ? 'Позвонить ещё раз' : 'Прислать код ещё раз') + '</button></div>';
   } else if (L.tab === 'vk') {
     h += '<button class="btn" data-act="login-vk">Войти через VK ID</button><span class="meta">Откроется VK: подтвердите вход и вернётесь обратно.</span>';
   } else {
@@ -3459,7 +3459,7 @@ function loginAct(a) {
   if (a === 'send') {
     if (!L.sent) L.phone = val('login-phone');
     if (!L.phone) { L.err = 'Введите номер телефона.'; return render(); }
-    return loginDo(Api.phoneStart(L.phone), r => { L.sent = true; L.otp = ''; L.dev = r.devCode || ''; setTimeout(() => { const el = $('login-otp'); if (el) el.focus(); }, 30); });
+    return loginDo(Api.phoneStart(L.phone), r => { L.sent = true; L.otp = ''; L.dev = r.devCode || ''; L.method = r.method; L.digits = r.digits; setTimeout(() => { const el = $('login-otp'); if (el) el.focus(); }, 30); });
   }
   if (a === 'verify') {
     L.otp = val('login-otp');

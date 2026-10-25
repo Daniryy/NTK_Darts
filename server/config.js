@@ -20,6 +20,7 @@ module.exports = {
   // вход по телефону: SMS_PROVIDER=smsru и SMS_RU_API_ID; в разработке по умолчанию log — код пишется в журнал
   sms: {
     provider: env.SMS_PROVIDER || (prod ? '' : 'log'),
+    method: env.SMS_METHOD === 'sms' ? 'sms' : 'call', // call — звонок-сброс (дешевле), sms — код в SMS
     smsruId: env.SMS_RU_API_ID || '',
     from: env.SMS_FROM || '',
     dayMax: +env.SMS_DAY_MAX || 300 // SMS за сутки на весь сервер: защита от счёта за рассылку
