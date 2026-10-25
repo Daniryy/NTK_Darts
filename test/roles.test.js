@@ -52,10 +52,12 @@ test('вход по телефону: код из SMS, новый игрок, л
   err(await call(u, 'POST', '/api/auth/phone', { phone: '123' }), 400);
   const s1 = ok(await call(u, 'POST', '/api/auth/phone', { phone: '8 (912) 345-67-89' }));
   assert.equal(s1.wait, 60);
-  assert.match(s1.devCode, /^\d{6}$/);
+  assert.match(s1.devCode, /^\d{4}$/);
+  assert.equal(s1.method, 'call');
+  assert.equal(s1.digits, 4);
   const again = err(await call(u, 'POST', '/api/auth/phone', { phone: '+79123456789' }), 429, 'too_many');
   assert.ok(again.retryAfter > 0);
-  const wrong = s1.devCode === '000000' ? '111111' : '000000';
+  const wrong = s1.devCode === '0000' ? '1111' : '0000';
   err(await call(u, 'POST', '/api/auth/phone/verify', { phone: '+79123456789', code: wrong }), 409, 'bad_code');
   const r = ok(await call(u, 'POST', '/api/auth/phone/verify', { phone: '89123456789', code: s1.devCode }));
   assert.equal(r.created, true);
@@ -65,17 +67,18 @@ test('вход по телефону: код из SMS, новый игрок, л
   // код одноразовый
   err(await call(anon(), 'POST', '/api/auth/phone/verify', { phone: '+79123456789', code: s1.devCode }), 409, 'code_expired');
   // повторный вход тем же номером — тот же игрок
-  await pool.query('UPDATE phone_codes SET sent_at = 0');
-  await pool.query('DELETE FROM phone_codes');
+  await pool.query('DELETE FROM sms_log');
   const v = anon(), s2 = ok(await call(v, 'POST', '/api/auth/phone', { phone: '+7 912 345 67 89' }));
   const r2 = ok(await call(v, 'POST', '/api/auth/phone/verify', { phone: '+79123456789', code: s2.devCode }));
   assert.equal(r2.created, false);
   assert.equal(r2.player.id, r.player.id);
   // пять неверных попыток — код сгорает
   const w = anon(), phone = '+79990000001', s3 = ok(await call(w, 'POST', '/api/auth/phone', { phone }));
-  const bad = s3.devCode === '123456' ? '654321' : '123456';
-  for (let k = 0; k < 5; k++) err(await call(w, 'POST', '/api/auth/phone/verify', { phone, code: bad }), 409, 'bad_code');
+  const bad = s3.devCode === '1234' ? '4321' : '1234';
+  // у кода звонка 3 попытки
+  for (let k = 0; k < 3; k++) err(await call(w, 'POST', '/api/auth/phone/verify', { phone, code: bad }), 409, 'bad_code');
   err(await call(w, 'POST', '/api/auth/phone/verify', { phone, code: s3.devCode }), 409, 'code_expired');
+  err(await call(w, 'POST', '/api/auth/phone/verify', { phone, code: '12' }), 400);
 });
 
 test('привязка телефона к своему аккаунту и отвязка', async () => {
@@ -86,7 +89,7 @@ test('привязка телефона к своему аккаунту и от
   assert.equal(r.player.phone, phone);
   // занятый номер к другому аккаунту не привязать
   const o = await login('p12');
-  await pool.query('DELETE FROM phone_codes');
+  await pool.query('DELETE FROM sms_log');
   const s2 = ok(await call(o, 'POST', '/api/auth/phone', { phone }));
   err(await call(o, 'POST', '/api/auth/phone/verify', { phone, code: s2.devCode, link: true }), 409, 'phone_taken');
   // единственный способ входа не отвязать

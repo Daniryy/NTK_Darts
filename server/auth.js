@@ -4,7 +4,7 @@ const config = require('./config');
 const { pool, tx, one } = require('./db');
 const { E, V, ApiError } = require('./errors');
 const { isAdmin } = require('./roles');
-const { sendSms } = require('./sms');
+const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
 
 const SID = 'oche_sid', VKC = 'oche_vk';
@@ -69,7 +69,8 @@ function normPhone(v) {
 const phoneOn = () => config.sms.provider === 'log' || (config.sms.provider === 'smsru' && !!config.sms.smsruId);
 const codeHash = (phone, code) => sha(phone + ':' + code);
 const tooMany = (sec, msg) => new ApiError(429, 'too_many', msg || 'Слишком часто, повторите через ' + sec + ' с', { retryAfter: sec });
-const SMS_GAP = 60e3, CODE_TTL = 10 * 6e4, CODE_TRIES = 5;
+// попыток ввода: у 4 цифр звонка меньше, чем у 6 цифр SMS
+const SMS_GAP = 60e3, CODE_TTL = 10 * 6e4, TRIES = { 4: 3, 6: 5 };
 // код от ведущего или администратора: буквы и цифры без похожих
 const normCode = v => V.str(v, 'code', 4, 16).toUpperCase().replace(/[^A-Z0-9]/g, '');
 const safeReturn = r => typeof r === 'string' && /^\/(?!\/)[^\\\s]*$/.test(r) ? r : '/';
@@ -85,7 +86,7 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), dev: config.devLogin }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, dev: config.devLogin }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
@@ -138,41 +139,41 @@ function routes(app) {
     return meResp(pool, p);
   });
 
-  // вход по телефону, шаг 1: { phone } → SMS с кодом. Не чаще раза в минуту и 5 раз в час на номер.
+  // вход по телефону, шаг 1: { phone } → звонок-сброс или SMS с кодом. Не чаще раза в минуту и 5 раз в час на номер.
   app.post('/api/auth/phone', async (req, reply) => {
     if (!phoneOn()) throw E.notFound('Вход по телефону не настроен');
-    const phone = normPhone((req.body || {}).phone), now = Date.now();
-    const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+    const phone = normPhone((req.body || {}).phone), now = Date.now(), method = config.sms.method;
+    // лимиты и запись в журнал — до отправки: ошибки провайдера тоже считаются
     await tx(async c => {
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [phone]);
-      const last = await one(c, 'SELECT sent_at FROM phone_codes WHERE phone = $1', [phone]);
-      if (last && now - last.sent_at < SMS_GAP) throw tooMany(Math.ceil((SMS_GAP - (now - last.sent_at)) / 1000), 'Код уже отправлен — новый можно запросить через ' + Math.ceil((SMS_GAP - (now - last.sent_at)) / 1000) + ' с');
+      const last = await one(c, 'SELECT max(t) AS t FROM sms_log WHERE phone = $1', [phone]);
+      if (last.t && now - last.t < SMS_GAP) { const sec = Math.ceil((SMS_GAP - (now - last.t)) / 1000); throw tooMany(sec, 'Код уже отправлен — новый можно запросить через ' + sec + ' с'); }
       const n = async (where, args) => (await one(c, 'SELECT count(*)::int AS n FROM sms_log WHERE ' + where, args)).n;
       if (await n('phone = $1 AND t > $2', [phone, now - 36e5]) >= 5) throw tooMany(600, 'На этот номер уже отправлено 5 кодов за час — попробуйте позже');
       if (req.device && await n('device_id = $1 AND t > $2', [req.device, now - 36e5]) >= 10) throw tooMany(600, 'С этого устройства запрошено слишком много кодов — попробуйте позже');
-      if (await n('t > $1', [now - 864e5]) >= config.sms.dayMax) throw new ApiError(503, 'sms_limit', 'Вход по SMS временно недоступен — войдите через VK');
-      await c.query(`INSERT INTO phone_codes (phone, code_hash, expires_at, tries, sent_at) VALUES ($1, $2, $3, 0, $4)
-        ON CONFLICT (phone) DO UPDATE SET code_hash = $2, expires_at = $3, tries = 0, sent_at = $4`, [phone, codeHash(phone, code), now + CODE_TTL, now]);
+      if (await n('t > $1', [now - 864e5]) >= config.sms.dayMax) throw new ApiError(503, 'sms_limit', 'Вход по телефону временно недоступен — войдите через VK');
       await c.query('INSERT INTO sms_log (phone, device_id, t) VALUES ($1, $2, $3)', [phone, req.device, now]);
     });
+    let code;
     try {
-      await sendSms(phone, 'Oche: код входа ' + code + '. Никому его не сообщайте.', req.log);
+      code = await sendCode(phone, req.ip, req.log);
     } catch (e) {
-      req.log.error({ err: e.message }, 'sms failed');
-      await pool.query('DELETE FROM phone_codes WHERE phone = $1', [phone]);
-      throw new ApiError(502, 'sms_failed', 'Не удалось отправить SMS — попробуйте ещё раз или войдите через VK');
+      req.log.error({ err: e.message }, 'phone code failed');
+      throw new ApiError(502, 'sms_failed', (method === 'call' ? 'Не удалось позвонить' : 'Не удалось отправить SMS') + ' — попробуйте ещё раз или войдите через VK');
     }
-    // в разработке SMS не уходят: код возвращается в ответе
-    return Object.assign({ ok: true, wait: SMS_GAP / 1000 }, config.sms.provider === 'log' && !config.prod ? { devCode: code } : {});
+    await pool.query(`INSERT INTO phone_codes (phone, code_hash, expires_at, tries, sent_at, digits) VALUES ($1, $2, $3, 0, $4, $5)
+      ON CONFLICT (phone) DO UPDATE SET code_hash = $2, expires_at = $3, tries = 0, sent_at = $4, digits = $5`, [phone, codeHash(phone, code), now + CODE_TTL, now, code.length]);
+    // в разработке ничего не уходит: код возвращается в ответе
+    return Object.assign({ ok: true, wait: SMS_GAP / 1000, method, digits: code.length }, config.sms.provider === 'log' && !config.prod ? { devCode: code } : {});
   });
 
   // шаг 2: { phone, code } → вход (новый номер — новый игрок); { link: true } — привязать номер к своему аккаунту
   app.post('/api/auth/phone/verify', async (req, reply) => {
     const b = req.body || {}, phone = normPhone(b.phone), code = String(b.code == null ? '' : b.code).replace(/\D/g, ''), now = Date.now();
-    if (code.length !== 6) throw E.bad('Код — 6 цифр из SMS', 'code');
+    if (code.length !== DIGITS.call && code.length !== DIGITS.sms) throw E.bad('Код — 4 последние цифры номера, с которого звонили, или 6 цифр из SMS', 'code');
     const link = b.link === true, me = link ? needPlayer(req) : null;
     // попытка считается сразу и вне транзакции: неверный код не откатывает счётчик
-    const row = await one(pool, 'UPDATE phone_codes SET tries = tries + 1 WHERE phone = $1 AND expires_at > $2 AND tries < $3 RETURNING code_hash', [phone, now, CODE_TRIES]);
+    const row = await one(pool, `UPDATE phone_codes SET tries = tries + 1 WHERE phone = $1 AND expires_at > $2 AND tries < CASE digits WHEN 4 THEN ${TRIES[4]} ELSE ${TRIES[6]} END RETURNING code_hash`, [phone, now]);
     if (!row) throw E.conflict('code_expired', 'Код устарел или кончились попытки — запросите новый');
     const want = Buffer.from(row.code_hash), got = Buffer.from(codeHash(phone, code));
     if (!crypto.timingSafeEqual(want, got)) throw E.conflict('bad_code', 'Неверный код');
