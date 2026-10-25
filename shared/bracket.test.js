@@ -227,3 +227,31 @@ test('модуль грузится в браузере как глобальн�
   assert.equal(typeof ctx.self.Bracket.setBracket, 'function');
   assert.equal(typeof ctx.self.Bracket.places, 'function');
 });
+
+test('порядок и подписи как на бумажном листе NDL: 20 игроков, сетки по 8', () => {
+  const t = { id: 't', players: [], games: [], layout: 'ndl', labels: 'ab' };
+  B.setBracket(t, 'pl', ids(20), 8);
+  const no = x => x ? +x.slice(1) : null;
+  // первый круг сверху вниз: 1–8, 5–4, 3–6, 7–2; во второй части 9–16, 13–12, 11–14, 15–10; в третьей 21–24 нет
+  assert.deepEqual(t.slots.map(no), [1, 8, 5, 4, 3, 6, 7, 2, 9, 16, 13, 12, 11, 14, 15, 10, 17, null, null, 20, 19, null, null, 18]);
+  const g = (r, i) => B.gameAt(t, r, i);
+  assert.deepEqual([0, 1, 2, 3, 4, 8].map(i => B.gameTag(t, g(0, i))), ['1–8', '5–4', '3–6', '7–2', '9–16', '17–24']);
+  assert.deepEqual([0, 1, 2, 3, 4].map(i => B.gameTag(t, g(1, i))), ['A1–A2', 'A3–A4', 'A5–A6', 'A7–A8', 'A9–A10']);
+  assert.deepEqual([0, 1, 2, 3, 8, 9].map(i => B.gameTag(t, g(2, i))), ['B1–B2', 'B3–B4', 'B5–B6', 'B7–B8', 'B17–B18', 'B19–B20']);
+  // «Победитель на A1, проигравший на A5» и дальше «Победитель на B1, проигравший на B3»
+  const tag = (r, [i, side]) => B.slotTag(r, i, side);
+  const dst = (r, i) => { const n = B.nextOf(t, r, i); return [n.w && tag(r + 1, n.w), n.l && tag(r + 1, n.l)]; };
+  assert.deepEqual([0, 1, 2, 3].map(i => dst(0, i)), [['A1', 'A5'], ['A2', 'A6'], ['A3', 'A7'], ['A4', 'A8']]);
+  assert.deepEqual([0, 1, 2, 3].map(i => dst(1, i)), [['B1', 'B3'], ['B2', 'B4'], ['B5', 'B7'], ['B6', 'B8']]);
+  assert.deepEqual(dst(2, 0), [null, null]);
+  // сильнейший выигрывает: дальше всё как на листе — 1–4 за 1–4 места, 17–20 и 18–19 в третьей части
+  playAll(t, (a, b) => no(a) < no(b) ? a : b);
+  const rv = B.resolver(t), pair = (r, i) => rv.players(r, i).map(x => B.isReal(x) ? no(x) : null);
+  assert.deepEqual([pair(1, 0), pair(1, 1), pair(1, 2), pair(1, 3)], [[1, 4], [3, 2], [8, 5], [6, 7]]);
+  assert.deepEqual([pair(1, 8), pair(1, 9)], [[17, 20], [19, 18]]);
+  assert.deepEqual([pair(2, 8), pair(2, 9)], [[17, 18], [20, 19]]);
+  // без layout — прежний порядок
+  const s = make('pl', 8);
+  assert.deepEqual(s.slots.map(no), [1, 8, 4, 5, 2, 7, 3, 6]);
+  assert.equal(B.gameTag(s, B.gameAt(s, 1, 0)), null);
+});

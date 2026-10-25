@@ -36,7 +36,7 @@ async function seedOrder(c, ids, seed) {
 
 // посев и сетка; турнир становится live. С квалификацией сетки ещё нет: сначала стадия qual.
 async function launch(c, id, fmt, order, row) {
-  const t = { players: [], games: [] };
+  const t = { players: [], games: [], layout: row.layout };
   let slots = null;
   if (row.qual) t.players = order;
   else if (fmt === 'rr') t.players = order;
@@ -80,6 +80,9 @@ function tourFields(b, full, me) {
   } else if (b.qual === null) o.qual = null;
   if (b.split != null) o.split = V.oneOf(b.split, 'split', [4, 8, 16, 32]);
   else if (b.split === null) o.split = null;
+  // вид сетки: порядок матчей как на листе NDL или классический, подписи A1/B1 или №1
+  if (b.layout != null) o.layout = V.oneOf(b.layout, 'layout', ['ndl', 'std']);
+  if (b.labels != null) o.labels = V.oneOf(b.labels, 'labels', ['ab', 'num']);
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
@@ -151,10 +154,12 @@ module.exports = async function (app) {
     const res = await tx(async c => {
       if (ids.length && (await all(c, 'SELECT id FROM players WHERE id = ANY($1)', [ids])).length !== ids.length) throw E.bad('Игрок не найден', 'players');
       if (b.clubId != null) Object.assign(f, await clubFields(c, b.clubId, me));
-      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
+      // по умолчанию: порядок как на листе NDL; подписи A/B — у турниров с квалификацией, остальным номера
+      const layout = f.layout || 'ndl', labels = f.labels || (f.qual ? 'ab' : 'num');
+      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, layout, labels, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
-        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, Date.now()]);
+        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now()]);
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
       // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
       else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
@@ -168,8 +173,10 @@ module.exports = async function (app) {
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
-      if (t.status !== 'reg') throw E.conflict('bad_state', 'Менять настройки можно только до старта');
-      const b = req.body || {}, f = tourFields(b, false, me);
+      const b = req.body || {};
+      // подписи матчей — только вид, их можно менять и после старта
+      if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => k === 'labels'))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
+      const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
       if ((f.qual || f.split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
       ['ex', 'qual'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
@@ -363,7 +370,7 @@ module.exports = async function (app) {
       if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация уже закрыта');
       if (T.qualDone(t) < 2) throw E.conflict('bad_state', 'Нужны результаты хотя бы двух игроков');
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
-      const order = T.qualOrder(t), g = { players: [], games: [] };
+      const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout };
       B.setBracket(g, 'pl', order, t.split || 8);
       await c.query('DELETE FROM entries WHERE tournament_id = $1', [t.id]);
       await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, order]);

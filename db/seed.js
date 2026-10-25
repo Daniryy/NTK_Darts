@@ -144,7 +144,7 @@ function makeData() {
   const qualOf = ids => Object.fromEntries(ids.map(id => [id, R() < 0.75 ? [total(byId[id]), total(byId[id])] : [total(byId[id])]]));
   // завершённый турнир по-новому: квалификация «Набор очков», места по квалификации, сетки по 8 мест, все матчи сыграны
   const qualTour = (o, ids, gap) => {
-    const t = T(Object.assign({ cap: ids.length, split: 8, format: 'pl' }, o));
+    const t = T(Object.assign({ cap: ids.length, split: 8, format: 'pl', layout: 'ndl', labels: 'ab' }, o));
     t.qual = { ex: SCORE, tries: 2, res: qualOf(ids) };
     const order = ids.slice().sort((x, y) => Math.max(...t.qual.res[y]) - Math.max(...t.qual.res[x]));
     B.setBracket(t, 'pl', order, 8);
@@ -195,7 +195,7 @@ function makeData() {
     matches.push(m);
     g.res = { la: legs[0], lb: legs[1], w: m.w === 0 ? a : b, mid: m.id };
   };
-  const ndl = T(Object.assign({ name: 'Лига NDL · этап 2', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 4 * HOUR, ltw: 2, cap: 20, ex: SCORE, split: 8, boards: { n: 6, at: {} } }, NDL_ORG));
+  const ndl = T(Object.assign({ name: 'Лига NDL · этап 2', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 4 * HOUR, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', boards: { n: 6, at: {} } }, NDL_ORG));
   ndl.qual = { ex: SCORE, tries: 2, res: qualOf(NDL20) };
   const best = id => Math.max(...ndl.qual.res[id]);
   const order = NDL20.slice().sort((x, y) => best(y) - best(x));
@@ -205,7 +205,7 @@ function makeData() {
   ndl.games.forEach(g => { if (k < 17 && B.gameState(ndl, g).st === 'ready') { scoreMatch(ndl, g, ndl.start + 70 * MIN + k * 6 * MIN); k++; } });
   B.assignBoards(ndl);
   // следующий этап: идёт квалификация, часть игроков уже сдала
-  const nq = T(Object.assign({ name: 'Лига NDL · этап 3', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, stage: 'qual', format: 'pl' }, NDL_ORG));
+  const nq = T(Object.assign({ name: 'Лига NDL · этап 3', city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', stage: 'qual', format: 'pl' }, NDL_ORG));
   nq.players = NDL20.filter(id => id !== ME).concat([ME]);
   nq.qual = { ex: SCORE, tries: 2, res: qualOf(nq.players.slice(0, 12)) };
   return { tours, matches };
@@ -239,10 +239,10 @@ async function seed(c) {
   const js = v => v == null ? null : JSON.stringify(v);
   for (const t of tours) {
     await c.query(`INSERT INTO tournaments (id, name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, ltw, cap, slots,
-      ex, qual, split, block, stage, boards, nums, club_id, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+      ex, qual, split, block, stage, boards, nums, club_id, layout, labels, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)`,
     [t.id, t.name, t.official, t.owner, t.orgName, t.orgVer, t.city, t.venue, t.start, t.regUntil || null, t.status, t.format, t.mode, t.ltw, t.cap, js(t.slots),
-      js(t.ex), t.qual ? js({ ex: t.qual.ex, tries: t.qual.tries }) : null, t.split || null, t.block || null, t.stage || null, js(t.boards), js(t.nums), t.club || null, now]);
+      js(t.ex), t.qual ? js({ ex: t.qual.ex, tries: t.qual.tries }) : null, t.split || null, t.block || null, t.stage || null, js(t.boards), js(t.nums), t.club || null, t.layout || null, t.labels || null, now]);
     await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, t.players]);
     if (t.qual) for (const [pid, vs] of Object.entries(t.qual.res)) for (const [k, v] of vs.entries()) {
       await c.query('INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)', [t.id, pid, k, v, t.start + 5 * MIN]);
