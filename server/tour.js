@@ -42,6 +42,8 @@ function build(row, ents, ms, qs) {
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
   if (row.nums) t.nums = row.nums;
+  if (row.layout) t.layout = row.layout;
+  if (row.labels) t.labels = row.labels;
   if (row.qual) {
     t.qual = { ex: row.qual.ex, tries: row.qual.tries, res: {} };
     qs.forEach(q => { (t.qual.res[q.player_id] = t.qual.res[q.player_id] || [])[q.try] = { v: q.v, mid: q.match_id, t: q.t }; });
@@ -186,7 +188,7 @@ function tourCard(t, me) {
   return {
     id: t.id, name: t.name, official: t.official, org: orgOf(row), city: t.city, venue: t.venue, start: t.start, regUntil: t.regUntil,
     status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, cap: t.cap, count: t.players.length,
-    ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null,
+    ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null, layout: t.layout || null, labels: t.labels || null,
     progress: t.status === 'reg' ? { done: 0, total: 0 } : t.stage === 'qual' ? { done: qualDone(t), total: t.players.length } : B.tProgress(t),
     champion: e ? { id: ch, name: e.name } : null, joined: !!me && t.players.includes(me.id), version: t.version
   };

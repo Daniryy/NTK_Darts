@@ -163,6 +163,17 @@ test('закрытие квалификации: посев по лучшему 
   const rv = B.resolver(t);
   assert.deepEqual(rv.players(0, 0), ['p3', 'p7'], 'первый против восьмого');
   assert.deepEqual(rv.players(0, 4), ['p4', B.BYE], 'девятый — в нижней части, соперника нет');
+  // по умолчанию — как на бумажном листе NDL: 1–8, 5–4, 3–6, 7–2 и подписи A1–A2
+  assert.equal(t.layout, 'ndl');
+  assert.equal(t.labels, 'ab');
+  // посев: p3 1, p1 2, ME 3, p2 4, p8 5, p5 6, p6 7, p7 8
+  assert.deepEqual([1, 2, 3].map(i => rv.players(0, i)), [['p8', 'p2'], [ME, 'p5'], ['p6', 'p1']]);
+  assert.equal(B.gameTag(t, B.gameAt(t, 1, 0)), 'A1–A2');
+  // подписи можно сменить и после старта, остальное — нет
+  assert.equal(ok(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'num' })).tournament.labels, 'num');
+  ok(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'ab' }));
+  err(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'ab', name: 'Новое' }), 409, 'bad_state');
+  err(await call(X, 'PATCH', '/api/tournaments/' + tid, { labels: 'num' }), 403);
   err(await call(A, 'POST', '/api/tournaments/' + tid + '/qual/close'), 409, 'bad_state');
   err(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p9/0', { v: 500 }), 409, 'bad_state');
   tour = t;

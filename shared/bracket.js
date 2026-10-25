@@ -34,6 +34,9 @@
   const bRounds = t => Math.round(Math.log2(bSize(t)));
 
   function seedOrder(n) { let o = [1, 2]; while (o.length < n) { const m = o.length * 2; o = o.flatMap(s => [s, m + 1 - s]); } return o; }
+  // порядок как на бумажном листе NDL: 1–8, 5–4, 3–6, 7–2 (пары и дальнейшие встречи те же, другой только порядок)
+  const NDL_ORDER = { 2: [1, 2], 4: [1, 4, 3, 2], 8: [1, 8, 5, 4, 3, 6, 7, 2] };
+  const orderOf = (t, n) => (t.layout === 'ndl' && NDL_ORDER[n]) || seedOrder(n);
   function bracketSize(n) { let s = 2; while (s < n) s *= 2; return s; }
   // size — мест во всей сетке, block — в одной части (pl)
   function bracketGames(fmt, size, block) {
@@ -46,9 +49,10 @@
   }
   // ids — игроки по посеву (сильнейший первым); заполняет t.format, players, slots, games.
   // block (только pl) — делить сетку на части по block мест: посев 1..block в первой части и т. д.
+  // t.layout = 'ndl' — порядок матчей как на листе NDL (части до 8 мест)
   function setBracket(t, fmt, ids, block) {
     const n = ids.length, B = fmt === 'pl' && block ? Math.min(block, bracketSize(n)) : bracketSize(n);
-    const parts = Math.ceil(n / B), order = seedOrder(B);
+    const parts = Math.ceil(n / B), order = orderOf(t, B);
     t.format = fmt;
     t.players = ids.slice();
     t.slots = [];
@@ -148,6 +152,23 @@
       fr--;
     }
     return '';
+  }
+
+  // подписи как на бумажном листе NDL (t.labels = 'ab'): места второго круга A1, A2…, третьего B1…, сквозные по частям
+  const slotTag = (r, i, side) => String.fromCharCode(64 + r) + (2 * i + side + 1);
+  // куда идут победитель и проигравший матча (r, i): { w: [i, сторона] | null, l: [i, сторона] | null } в круге r + 1
+  function nextOf(t, r, i) {
+    const out = { w: null, l: null };
+    if (!isBracket(t) || r + 1 >= bRounds(t)) return out;
+    for (let j = 0, n = roundGames(t, r + 1); j < n; j++) feeders(t, r + 1, j).forEach(([fi, take], side) => { if (fi === i) out[take] = [j, side]; });
+    return out;
+  }
+  // название матча при подписях NDL: «A1–A2», «B3–B4»; в первом круге — номера посева «1–8». null — подписи номерами
+  function gameTag(t, g) {
+    if (t.labels !== 'ab' || !isBracket(t)) return null;
+    if (g.r > 0) return slotTag(g.r, g.i, 0) + '–' + slotTag(g.r, g.i, 1);
+    const B = bSize(t), base = partOf(t, g.i) * B, o = orderOf(t, B), k = (2 * g.i) % B;
+    return (base + o[k]) + '–' + (base + o[k + 1]);
   }
 
   // сколько матчей сыграно из всех, где есть два игрока
@@ -255,6 +276,7 @@
   return {
     BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
     roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
-    srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards
+    srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards,
+    NDL_ORDER, slotTag, nextOf, gameTag
   };
 });
