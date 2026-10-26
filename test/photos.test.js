@@ -130,6 +130,6 @@ test('администратор создаёт аккаунт, игрок пр�
   assert.equal(ed.title, 'МС');
   assert.notEqual(ed.claim, p2.claim);
   err(await call(A, 'PATCH', '/api/admin/players/' + ME, { role: 'player' }), 409);
-  // разряд в своём профиле
-  assert.equal(ok(await call(X, 'PATCH', '/api/me', { title: '1 разряд' })).player.title, '1 разряд');
+  // своё звание вписать нельзя — только заявкой с документом
+  err(await call(X, 'PATCH', '/api/me', { title: '1 разряд' }), 400);
 });

@@ -43,6 +43,7 @@ deploy/            установка и обслуживание VPS
 | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT` | оповещения о сбоях |
 | `RATE_MAX` | запросов за 2 с с одного устройства (20) |
 | `UPLOAD_DIR` | куда класть фото (на VPS `/srv/oche/uploads`, локально `uploads/` в репозитории) |
+| `PRIVATE_DIR` | документы заявок на звания (на VPS `/srv/oche/private`, локально `uploads-private/`); nginx эту папку не отдаёт |
 
 ## Вход по телефону (звонок-сброс)
 
@@ -123,6 +124,7 @@ location = /shared/games.js { add_header Cache-Control "no-cache"; }
 location = /api.js { add_header Cache-Control "no-cache"; }
 ```
 Для фото (с третьего этапа) скопируйте из `deploy/nginx.conf` блоки `location /uploads/`, `location = /api/photos` и `location = /vendor/qrcode.js`, создайте папку: `mkdir -p /srv/oche/uploads && chown oche:oche /srv/oche/uploads`.
+Для заявок на звания: блок `location = /api/titles/docs` из `deploy/nginx.conf` (файлы до 8 МБ) и закрытая папка: `mkdir -p /srv/oche/private && chown oche:oche /srv/oche/private && chmod 700 /srv/oche/private`.
 и выполните `nginx -t && systemctl reload nginx`.
 
 ### Обслуживание

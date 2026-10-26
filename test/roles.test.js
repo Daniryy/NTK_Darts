@@ -112,7 +112,8 @@ test('ведущий заводит аккаунт: вход по коду, то
   // чужой аккаунт ведущему не править, роль не выдать
   err(await call(HOST, 'PATCH', '/api/admin/players/p6', { name: 'Взлом' }), 403);
   err(await call(HOST, 'PATCH', '/api/admin/players/' + p.id, { ver: true }), 403);
-  ok(await call(HOST, 'PATCH', '/api/admin/players/' + p.id, { title: '2 разряд' }));
+  ok(await call(HOST, 'PATCH', '/api/admin/players/' + p.id, { city: 'Подольск' }));
+  err(await call(HOST, 'PATCH', '/api/admin/players/' + p.id, { title: '2 разряд' }), 403, 'forbidden'); // звание — только по заявке
   // номер 12 в списке ведущего
   const nums = ok(await call(HOST, 'GET', '/api/host/nums')).nums;
   assert.deepEqual(nums.map(x => [x.n, x.player.id]), [[12, p.id]]);
