@@ -104,8 +104,8 @@
       return r;
     },
     async loadMe() { return Api.setMe(await Api.get('/api/me')); },
-    // роль не ниже: player < host < admin < tech
-    can: role => !!Api.me && ['player', 'host', 'admin', 'tech'].indexOf(Api.role) >= ['player', 'host', 'admin', 'tech'].indexOf(role),
+    // роль не ниже: player < host и свои роли (тарифы) < admin < tech
+    can: role => { const R = { player: 0, host: 1, admin: 2, tech: 3 }, rk = r => r in R ? R[r] : 1; return !!Api.me && rk(Api.role) >= rk(role); },
     // право из настроек ролей сервера (club_tour, streams, accounts, host_nums, players, block, give_host, clubs, …)
     perm: k => !!Api.me && (Api.role === 'tech' || Api.perms.includes(k)),
     // вход администратора по логину и паролю

@@ -115,6 +115,8 @@ module.exports = async function (app) {
       }
       if (b.claim === true) {
         if (cur.vk_id != null) throw E.conflict('conflict', 'Аккаунт привязан к VK — игрок входит сам');
+        // по коду войдёт любой, у кого он есть: аккаунту с телефоном новый код выдаёт только администратор
+        if (!full && (cur.phone != null || cur.login)) throw E.forbidden('Игрок входит по номеру телефона — новый код выдаёт администратор');
         set.claim = await newClaim(c);
       } else if (b.claim === false) set.claim = null;
       if (b.ver !== undefined) {
@@ -132,6 +134,8 @@ module.exports = async function (app) {
         if ((RANK[role] >= RANK.admin || RANK[cur.role] >= RANK.admin) && me.role !== 'tech') throw E.forbidden('Роль администратора выдаёт тех. администратор');
         if (!can(me, 'give_host') && me.role !== 'tech') throw E.forbidden('Роль ведущего выдаёт администратор');
         set.role = role;
+        // выданная вручную роль остаётся основой: к ней игрок вернётся, когда кончится тариф (plans.js)
+        set.base_role = RANK[role] < RANK.admin ? role : 'player';
         // ниже администратора вход по паролю не нужен
         if (RANK[role] < RANK.admin) { set.login = null; set.pass_hash = null; }
       }
@@ -139,7 +143,7 @@ module.exports = async function (app) {
       if (!keys.length) throw E.bad('Нечего менять');
       if (set.blocked || set.pass_hash === null) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
-      const log = Object.fromEntries(keys.filter(k => k !== 'claim' && k !== 'pass_hash' && k !== 'login').map(k => [k, set[k]]));
+      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
       if (b.claim === true) log.code = 'новый';
       await audit(c, me, set.role ? 'player.role' : set.blocked !== undefined ? 'player.block' : 'player.edit', out, log);

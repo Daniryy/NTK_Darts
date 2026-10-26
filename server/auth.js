@@ -126,7 +126,12 @@ function routes(app) {
       const used = await one(c, `SELECT (SELECT count(*) FROM match_lines WHERE player_id = $1) + (SELECT count(*) FROM entries WHERE player_id = $1)
         + (SELECT count(*) FROM tournaments WHERE owner_id = $1) AS n`, [me.id]);
       if (used.n > 0) throw E.conflict('conflict', 'У вашего аккаунта уже есть матчи или турниры — объединить может только администратор');
-      const cur = await one(c, 'SELECT vk_id, phone FROM players WHERE id = $1 FOR UPDATE', [me.id]);
+      const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
+      // свой аккаунт растворяется: роль, звание, вход по паролю, клуб, номера, тариф и заявки пропали бы вместе с ним
+      const own = await one(c, `SELECT (SELECT count(*) FROM club_hosts WHERE player_id = $1) + (SELECT count(*) FROM host_nums WHERE host_id = $1)
+        + (SELECT count(*) FROM player_plans WHERE player_id = $1 AND status IN ('active', 'requested')) + (SELECT count(*) FROM title_requests WHERE player_id = $1 AND status = 'review')
+        + (SELECT count(*) FROM clubs WHERE owner_id = $1 AND status IN ('pending', 'active')) AS n`, [me.id]);
+      if (cur.role !== 'player' || cur.title || cur.login || own.n > 0) throw E.conflict('conflict', 'У вашего аккаунта есть роль, звание, клуб или тариф — объединить может только администратор');
       await c.query('UPDATE players SET vk_id = NULL, phone = NULL WHERE id = $1', [me.id]);
       await c.query('UPDATE sessions SET player_id = $2 WHERE player_id = $1', [me.id, t.id]);
       await c.query('UPDATE photos SET owner_id = $2 WHERE owner_id = $1', [me.id, t.id]);

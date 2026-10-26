@@ -178,7 +178,9 @@ module.exports = async function (app) {
       if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => k === 'labels'))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
-      if ((f.qual || f.split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
+      // с учётом того, что уже стоит у турнира: смена формата не должна оставить квалификацию у ko или rr
+      const qual = 'qual' in f ? f.qual : t._row.qual, split = 'split' in f ? f.split : t._row.split;
+      if ((qual || split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
       ['ex', 'qual'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
       if (b.cap !== undefined) f.cap = V.int(b.cap, 'cap', Math.max(3, t.players.length), T.maxPlayers(f.format || t.format));
       if (f.format && t.players.length > T.maxPlayers(f.format)) throw E.bad('Для этого формата слишком много участников', 'format');

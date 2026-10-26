@@ -195,7 +195,7 @@ module.exports = async function (app) {
       const r = await one(c, 'SELECT * FROM roles WHERE key = $1 FOR UPDATE', [req.params.key]);
       if (!r) throw E.notFound('Роли нет');
       if (r.builtin) throw E.conflict('conflict', 'Встроенную роль удалить нельзя');
-      if (await one(c, 'SELECT 1 FROM players WHERE role = $1', [r.key])) throw E.conflict('conflict', 'У этой роли есть игроки — сначала смените им роль');
+      if (await one(c, 'SELECT 1 FROM players WHERE role = $1 OR base_role = $1', [r.key])) throw E.conflict('conflict', 'У этой роли есть игроки — сначала смените им роль');
       if (await one(c, 'SELECT 1 FROM plans WHERE role = $1', [r.key])) throw E.conflict('conflict', 'Роль даёт тариф — сначала поменяйте тариф');
       await c.query('DELETE FROM roles WHERE key = $1', [r.key]);
       await audit(c, me, 'role.delete', { id: r.key, name: r.name }, null);
