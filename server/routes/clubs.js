@@ -32,10 +32,8 @@ function fields(b, full) {
   return o;
 }
 // игрок — ведущий, пока у него есть открытый клуб; роли выше ведущего не трогаем
-async function syncHostRole(c, pid) {
-  const has = await one(c, `SELECT 1 FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 AND c.status = 'active'`, [pid]);
-  await c.query(`UPDATE players SET role = $2 WHERE id = $1 AND role = $3`, [pid, has ? 'host' : 'player', has ? 'player' : 'host']);
-}
+// с учётом тарифов: роль действующего тарифа, иначе ведущий при открытом клубе, иначе игрок (plans.js)
+const syncHostRole = (c, pid) => require('../plans').syncPlanRole(c, pid);
 const nameTaken = async (c, name, except) => !!await one(c, `SELECT 1 FROM clubs WHERE lower(name) = lower($1) AND status IN ('pending', 'active') AND id <> $2`, [name, except || '']);
 
 module.exports = async function (app) {

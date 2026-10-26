@@ -157,21 +157,22 @@
 | `host_nums` | ведущий | свои номера игроков |
 | `players` | администратор | править любых игроков, подтверждать, коды, завершать сеансы |
 | `block` | администратор | блокировать |
-| `give_host` | администратор | выдавать и снимать роль ведущего |
+| `give_host` | администратор | выдавать и снимать роли игроков: ведущий и свои роли (ранг 1) |
 | `clubs` | администратор | клубы и их ведущие |
 | `any_tour` | администратор | любые турниры и матчи |
 | `official` | администратор | официальный статус турниров |
+| `plans` | администратор | тарифы: подключать по заявке и вручную, продлевать, завершать |
 | `stats` | администратор | сводка |
 | `titles` | администратор | проверять, подтверждать и снимать звания |
 | `audit` | администратор | журнал |
 | `banners` | тех. администратор | баннеры |
 
 ### `GET /api/admin/audit?limit=50&before=время&target=id` — право `audit`
-Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `password.change`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `cli.*`.
+Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `password.change`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
 
 ## Звания
 
-Спортивное звание или разряд в профиле — только после проверки документа; самому вписать нельзя (`PATCH /api/me` с другим `title` — `400`). Стадии для игрока: **1 подача → 2 автоматическая проверка → 3 проверка администратором → 4 подтверждено ✅** (или отклонено с причиной). Подтверждённое звание — поле `title` игрока (`МС`, `КМС`, `1 разряд`…) во всех карточках.
+Спортивное звание или разряд в профиле — только после проверки документа; самому вписать нельзя (`PATCH /api/me` с другим `title` — `400`). Стадии для игрока: **1 подача → 2 автопроверка → 3 ручная проверка → 4 подтверждено ✅** (или отклонено с причиной). Подтверждённое звание — поле `title` игрока (`МС`, `КМС`, `1 разряд`…) во всех карточках.
 
 Звания (`k`): `zms` ЗМС, `msmk` МСМК, `ms` МС (присваивает Минспорт России), `kms` КМС, `r1` 1 разряд (орган власти субъекта РФ), `r2`, `r3`, `y1`–`y3` — разряды и юношеские разряды.
 
@@ -187,9 +188,9 @@
 ### `POST /api/titles` — заявка
 `{ fullName, title, orderNo, orderDate, issuer, comment?, docs: [id] }` (ФИО как в документе, 1–5 файлов). Сразу проходит автоматическая проверка, заявка получает `status: "review"`. Ответ `201 { request: TitleRequest }`; `409` — заявка уже на проверке.
 
-**TitleRequest:** `{ id, title, short, full, fullName, orderNo, orderDate, issuer, comment, status: review | approved | rejected | cancelled, auto: [{ k, st: ok | warn | info, text }], autoAt, note, created, decided, docs: [{ id, mime, url }] }`.
+**TitleRequest:** `{ id, title, short, full, fullName, orderNo, orderDate, issuer, comment, status: review | approved | rejected | cancelled, auto: [{ k, st: ok | warn | info, label, text }], autoAt, note, created, decided, docs: [{ id, mime, url }] }`.
 
-Автопроверка (`auto`): документ приложен; ФИО совпадает с именем в профиле; номер и дата приказа указаны и правдоподобны; кто присвоил (МС, МСМК, ЗМС — только Минспорт России); тот же приказ с тем же ФИО уже подтверждён у другого аккаунта; уже есть звание выше; для федеральных званий — ссылка на поиск приказа на сайте Минспорта (только администратору). `warn` — на что администратору обратить внимание; решение всегда за ним.
+Автопроверка (`auto`): документ приложен; ФИО совпадает с именем в профиле; номер и дата приказа указаны и правдоподобны; кто присвоил (МС, МСМК, ЗМС — только Минспорт России); тот же приказ с тем же ФИО уже подтверждён у другого аккаунта; уже есть звание выше; для федеральных званий — ссылка на поиск приказа на сайте Минспорта (только администратору). `label` — короткая подпись пункта («Документ», «ФИО», «Приказ», «Присвоил», «Повторы», «Сейчас», «Минспорт»), `text` — коротко итог («1 файл», «совпадает с профилем», «№ 45 нг от 10.03.2025»); у `minsport` в `text` ссылка поиска. `warn` — на что администратору обратить внимание; решение всегда за ним.
 
 ### `GET /api/titles/mine`, `DELETE /api/titles/:id`
 Мои заявки (новые сверху) и подтверждённое звание `title`; отозвать заявку, пока она на проверке.
@@ -202,6 +203,53 @@
 
 ### `DELETE /api/admin/players/:id/title` — право `titles`
 Снять подтверждённое звание: `{ note }` пишется в журнал. Администратор с правом `titles` может и сразу задать звание в карточке игрока (`PATCH /api/admin/players/:id` с `title`).
+
+## Роли и тарифы
+
+Роли хранятся в базе (`roles`): `player` (ранг 0), `host` и свои роли (ранг 1), `admin` (2), `tech` (3). Свои роли добавляет тех. администратор — например, для тарифа; что им доступно, настраивается в «Правах ролей» как у остальных (по умолчанию — ничего сверх игрока).
+
+Тариф даёт роль на срок. Онлайн-оплаты пока нет: игрок оставляет заявку, администратор подключает. Роль игрока — роль действующего тарифа (при двух — того, что кончается позже); ведущий клуба остаётся ведущим; администраторов тарифы не трогают. По окончании срока роль снимается сама (сервер проверяет раз в 10 минут и при старте).
+
+Скидка за подтверждённое звание (`settings.discounts`, меняет тех. администратор): `ms` — МС, МСМК, ЗМС (по умолчанию 25%), `kms` — КМС (10%), `r1` — 1 разряд (5%). Цена округляется до рубля.
+
+**Plan:** `{ id, name, price, days, role, about, active, sort, discount, why, final }` — `final` цена со скидкой текущего игрока, `why` — за что скидка.
+**Sub:** `{ id, player?, plan: { id, name, price, days }, status: requested | active | ended | rejected | cancelled, price, discount, starts, ends, note, created, by }`.
+
+### `GET /api/roles`
+`{ roles: [{ key, name, rank, builtin }] }` — для значков и списков ролей.
+
+### `GET /api/plans`
+`{ plans: [Plan], mine: [Sub], request: Sub | null, discounts }` — тарифы с моей скидкой, мои действующие, моя заявка.
+
+### `POST /api/plans/:id/request` — нужен вход
+`{ note? }`. Ответ `201 { request: Sub }`; `409` — заявка уже есть.
+
+### `DELETE /api/plans/requests/:id`
+Отозвать свою заявку.
+
+### `GET /api/admin/plans` — право `plans`
+`{ plans, requests: [Sub + final], active: [Sub], discounts, discountKeys: [{ k, name }] }`.
+
+### `POST /api/admin/plans/grant` — право `plans`
+`{ requestId }` или `{ playerId, planId, days?, note? }`. Тот же тариф уже действует — срок прибавляется к его концу (`plan.extend`), иначе новое подключение с сейчас (`plan.grant`). Ответ `{ sub }`.
+
+### `POST /api/admin/plans/requests/:id/reject` — право `plans`
+`{ note }`.
+
+### `POST /api/admin/plans/subs/:id/end` — право `plans`
+Завершить сейчас; роль пересчитывается.
+
+### `GET /api/admin/players/:id/plans` — право `plans`
+Последние 20 подключений и заявок игрока.
+
+### `POST /api/admin/plans`, `PATCH /api/admin/plans/:id` — тех. администратор
+`{ name, price, days, role, about, active?, sort? }`; роль тарифа — не выше ранга 1.
+
+### `PUT /api/admin/discounts` — тех. администратор
+`{ ms, kms, r1 }`, 0–90.
+
+### `POST /api/admin/roles`, `PATCH /api/admin/roles/:key`, `DELETE /api/admin/roles/:key` — тех. администратор
+`{ name }`. Новая роль получает ключ `roleN` и ранг 1. Встроенные роли не удаляются; роль с игроками или тарифом — `409`.
 
 ## Номера ведущего
 

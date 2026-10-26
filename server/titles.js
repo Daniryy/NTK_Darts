@@ -23,42 +23,36 @@ const words = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[
 const searchUrl = r => 'https://www.minsport.gov.ru/search/?q=' + encodeURIComponent(['приказ', r.order_no, words(r.full_name)[0] || ''].filter(Boolean).join(' '));
 
 // проверки заявки r (строка title_requests) игрока p; c — подключение к базе.
-// Каждая: { k, st: ok | warn | info, text }. warn — администратору стоит присмотреться.
+// Каждая: { k, st: ok | warn | info, label, text } — коротко, в одну строку. warn — администратору стоит присмотреться.
 async function autoCheck(c, r, p) {
-  const out = [], add = (k, st, text) => out.push({ k, st, text }), kind = KIND[r.title];
+  const out = [], add = (k, st, label, text) => out.push({ k, st, label, text }), kind = KIND[r.title];
   const docs = (await c.query('SELECT count(*)::int AS n FROM title_docs WHERE request_id = $1', [r.id])).rows[0].n;
-  add('doc', docs ? 'ok' : 'warn', docs ? 'Документ приложен (' + docs + ' ' + (docs === 1 ? 'файл' : docs < 5 ? 'файла' : 'файлов') + ')' : 'Нет документа');
+  add('doc', docs ? 'ok' : 'warn', 'Документ', docs ? docs + ' ' + (docs === 1 ? 'файл' : docs < 5 ? 'файла' : 'файлов') : 'нет файла');
   // ФИО: все слова имени из профиля есть в ФИО заявки
   const prof = words(p.name), full = words(r.full_name);
   const same = prof.length && prof.every(w => full.includes(w));
-  add('name', same ? 'ok' : 'warn', same ? 'ФИО совпадает с именем в профиле' : 'ФИО в заявке («' + r.full_name + '») не совпадает с именем в профиле («' + p.name + '»)');
-  if (full.length < 2) add('fio', 'warn', 'В ФИО меньше двух слов — нужна фамилия и имя (лучше и отчество)');
-  // приказ: номер и дата
-  const no = String(r.order_no || '').trim();
-  if (!no) add('order', 'warn', 'Не указан номер приказа');
-  else if (!/\d/.test(no) || no.length > 40) add('order', 'warn', 'Номер приказа выглядит странно: «' + no + '»');
-  else add('order', 'ok', 'Номер приказа: ' + no);
-  const now = Date.now();
-  if (!r.order_date) add('date', 'warn', 'Не указана дата приказа');
-  else if (r.order_date > now + 864e5) add('date', 'warn', 'Дата приказа в будущем');
-  else if (r.order_date < Date.UTC(1950, 0, 1)) add('date', 'warn', 'Слишком ранняя дата приказа');
-  else add('date', 'ok', 'Дата приказа: ' + new Date(+r.order_date).toLocaleDateString('ru-RU'));
+  add('name', same && full.length >= 2 ? 'ok' : 'warn', 'ФИО', full.length < 2 ? 'нужны фамилия и имя' : same ? 'совпадает с профилем' : 'не совпадает с профилем: ' + p.name);
+  // приказ: номер и дата одной строкой
+  const no = String(r.order_no || '').trim(), now = Date.now(), dt = r.order_date ? new Date(+r.order_date).toLocaleDateString('ru-RU') : '';
+  const noBad = !no ? 'нет номера' : !/\d/.test(no) || no.length > 40 ? 'странный номер «' + no + '»' : '';
+  const dtBad = !r.order_date ? 'нет даты' : r.order_date > now + 864e5 ? 'дата в будущем' : r.order_date < Date.UTC(1950, 0, 1) ? 'слишком ранняя дата' : '';
+  add('order', noBad || dtBad ? 'warn' : 'ok', 'Приказ', noBad || dtBad ? [noBad, dtBad].filter(Boolean).join(', ') : '№ ' + no + ' от ' + dt);
   // кто присвоил: федеральные звания — только Минспорт России
   const iss = String(r.issuer || '').toLowerCase();
   if (kind.fed) {
-    const ok = /минспорт|министерств[оа] спорта/.test(iss);
-    add('issuer', ok ? 'ok' : 'warn', ok ? 'Присвоил Минспорт России — верно для звания «' + kind.short + '»' : 'Звание «' + kind.short + '» присваивает Минспорт России, а в заявке: «' + (r.issuer || 'не указано') + '»');
-  } else add('issuer', r.issuer ? 'ok' : 'warn', r.issuer ? 'Присвоил: ' + r.issuer + ' (обычно — ' + kind.issuer + ')' : 'Не указано, кто присвоил (обычно — ' + kind.issuer + ')');
+    const ok = /минспорт|министерств[оа] спорта/.test(iss) && !/област|кра[йя]|республик|город/.test(iss);
+    add('issuer', ok ? 'ok' : 'warn', 'Присвоил', ok ? r.issuer : kind.short + ' присваивает Минспорт России, указано: ' + (r.issuer || '—'));
+  } else add('issuer', r.issuer ? 'ok' : 'warn', 'Присвоил', r.issuer || 'не указано');
   // тот же приказ и ФИО уже подтверждены у другого аккаунта
   if (no) {
     const dup = (await c.query(`SELECT r.full_name, p.name, p.code FROM title_requests r JOIN players p ON p.id = r.player_id
       WHERE r.status = 'approved' AND r.player_id <> $1 AND lower(r.order_no) = lower($2) AND r.title = $3`, [p.id, no, r.title])).rows
       .filter(x => { const w = words(x.full_name); return full.length && full.every(y => w.includes(y)); });
-    add('dup', dup.length ? 'warn' : 'ok', dup.length ? 'Этот приказ с тем же ФИО уже подтверждён у другого аккаунта: ' + dup.map(x => x.name + ' (' + x.code + ')').join(', ') : 'Повторов у других аккаунтов нет');
+    add('dup', dup.length ? 'warn' : 'ok', 'Повторы', dup.length ? 'уже у ' + dup.map(x => x.name + ' (' + x.code + ')').join(', ') : 'нет');
   }
   // уже есть звание выше
-  if (p.title && rankOfShort(p.title) > kind.rank) add('rank', 'info', 'Сейчас подтверждено звание выше: ' + p.title);
-  if (kind.fed) add('minsport', 'info', 'Сверьте с приказом на сайте Минспорта: ' + searchUrl(r));
+  if (p.title && rankOfShort(p.title) > kind.rank) add('rank', 'info', 'Сейчас', 'подтверждено звание выше: ' + p.title);
+  if (kind.fed) add('minsport', 'info', 'Минспорт', searchUrl(r));
   return out;
 }
 
