@@ -4,7 +4,8 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer, clearCache } = require('../auth');
-const { needRole } = require('./admin');
+const { needPerm } = require('../auth');
+const { audit } = require('../audit');
 
 const STATUSES = ['pending', 'active', 'rejected', 'closed'];
 const clubJSON = (c, hosts, full) => Object.assign({ id: c.id, name: c.name, city: c.city, address: c.address, contact: c.contact, about: c.about, status: c.status, hosts: hosts || [] },
@@ -63,7 +64,7 @@ module.exports = async function (app) {
 
   // администратор: заявки и клубы
   app.get('/api/admin/clubs', async req => {
-    needRole(req, 'admin', 'Раздел для администратора');
+    needPerm(req, 'clubs', 'Раздел для администратора');
     const st = req.query.status ? V.oneOf(req.query.status, 'status', STATUSES) : null;
     const rows = await all(pool, CLUB_SQL + (st ? ' WHERE c.status = $1' : '') + ` ORDER BY CASE c.status WHEN 'pending' THEN 0 WHEN 'active' THEN 1 ELSE 2 END, c.created_at DESC LIMIT 300`, st ? [st] : []);
     return { clubs: await listJSON(pool, rows, true) };
@@ -71,7 +72,7 @@ module.exports = async function (app) {
 
   // { status: active (подтвердить) | rejected | closed, note, name, city, address, contact, about }
   app.patch('/api/admin/clubs/:id', async req => {
-    const me = needRole(req, 'admin', 'Клубы подтверждает администратор'), b = req.body || {}, set = fields(b, false);
+    const me = needPerm(req, 'clubs', 'Клубы подтверждает администратор'), b = req.body || {}, set = fields(b, false);
     if (b.status !== undefined) set.status = V.oneOf(b.status, 'status', STATUSES);
     if (b.note !== undefined) set.note = V.optStr(b.note, 'note', 300);
     const keys = Object.keys(set);
@@ -85,6 +86,7 @@ module.exports = async function (app) {
       const out = await one(c, `UPDATE clubs SET ${k2.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...k2.map(k => set[k])]);
       if (out.status === 'active' && cur.status !== 'active' && out.owner_id) await c.query('INSERT INTO club_hosts (club_id, player_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [out.id, out.owner_id]);
       for (const h of await all(c, 'SELECT player_id FROM club_hosts WHERE club_id = $1', [out.id])) await syncHostRole(c, h.player_id);
+      await audit(c, me, set.status && set.status !== cur.status ? 'club.' + set.status : 'club.edit', { id: out.id, name: out.name }, Object.assign({}, b));
       return one(c, CLUB_SQL + ' WHERE c.id = $1', [out.id]);
     });
     clearCache();
@@ -93,7 +95,7 @@ module.exports = async function (app) {
 
   // ведущие клуба: добавить { playerId } и убрать
   app.post('/api/admin/clubs/:id/hosts', async req => {
-    needRole(req, 'admin', 'Ведущих назначает администратор');
+    const me = needPerm(req, 'clubs', 'Ведущих назначает администратор');
     const pid = V.id((req.body || {}).playerId, 'playerId');
     const row = await tx(async c => {
       const club = await one(c, 'SELECT * FROM clubs WHERE id = $1 FOR UPDATE', [req.params.id]);
@@ -102,18 +104,20 @@ module.exports = async function (app) {
       if (!await one(c, 'SELECT 1 FROM players WHERE id = $1', [pid])) throw E.notFound('Игрок не найден');
       await c.query('INSERT INTO club_hosts (club_id, player_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [club.id, pid]);
       await syncHostRole(c, pid);
+      await audit(c, me, 'club.host_add', await one(c, 'SELECT id, name FROM players WHERE id = $1', [pid]), { club: club.name });
       return one(c, CLUB_SQL + ' WHERE c.id = $1', [club.id]);
     });
     clearCache();
     return { club: (await listJSON(pool, [row], true))[0] };
   });
   app.delete('/api/admin/clubs/:id/hosts/:pid', async req => {
-    needRole(req, 'admin', 'Ведущих назначает администратор');
+    const me = needPerm(req, 'clubs', 'Ведущих назначает администратор');
     const row = await tx(async c => {
       const club = await one(c, 'SELECT * FROM clubs WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!club) throw E.notFound('Клуб не найден');
       await c.query('DELETE FROM club_hosts WHERE club_id = $1 AND player_id = $2', [club.id, req.params.pid]);
       await syncHostRole(c, req.params.pid);
+      await audit(c, me, 'club.host_rm', await one(c, 'SELECT id, name FROM players WHERE id = $1', [req.params.pid]), { club: club.name });
       return one(c, CLUB_SQL + ' WHERE c.id = $1', [club.id]);
     });
     clearCache();

@@ -10,6 +10,7 @@
     "start": "node --env-file-if-exists=.env server/index.js",
     "migrate": "node --env-file-if-exists=.env db/migrate.js",
     "seed": "node --env-file-if-exists=.env db/seed.js",
+    "admin": "node --env-file-if-exists=.env tools/admin.js",
     "test": "node --env-file-if-exists=.env --test --test-concurrency=1 shared/*.test.js test/*.test.js"
   },
   "dependencies": {

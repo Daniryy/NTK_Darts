@@ -765,6 +765,29 @@ button.banner:hover { border-color: var(--line-bright); }
 .banner .bn-ad { align-self: start; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); opacity: .7; }
 .stag { display: inline-block; min-width: 26px; margin-right: 5px; padding: 0 4px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line); font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: center; letter-spacing: .02em; }
 .pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
+.adm-row.click { cursor: pointer; grid-template-columns: auto minmax(0, 1fr) auto; }
+.adm-row.click:hover { background: var(--surface2); }
+.rolechip.r-blk { color: var(--red); border-color: var(--red); }
+.narrow.wide-adm { max-width: 980px; }
+.ocard.acard { max-width: 640px; display: grid; gap: 14px; }
+.ac-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+.ac-top h2 { margin: 0; }
+.ac-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ac-grid > div { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface2); min-width: 0; overflow-wrap: anywhere; }
+.ac-grid .label { font-size: 10.5px; }
+@media (max-width: 560px) { .ac-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ac-sec { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ac-role { display: grid; gap: 4px; }
+.mini.dng { color: var(--red); }
+.au-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.au-row:last-child { border-bottom: 0; }
+.perm-t { padding: 4px 14px; overflow-x: auto; }
+.perm-r { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(4, 92px); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.perm-r:last-child { border-bottom: 0; }
+.perm-r label, .perm-h span:not(:first-child) { text-align: center; }
+.perm-r input { width: 18px; height: 18px; accent-color: var(--green); }
+.perm-h { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.staff { max-width: 420px; }
 .adm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .adm-row:last-child { border-bottom: 0; }
 .code { font-family: var(--display); font-size: 18px; letter-spacing: .12em; padding: 2px 8px; border-radius: 6px; background: var(--surface2); border: 1px dashed var(--line-bright); user-select: all; }
@@ -1597,8 +1620,8 @@ const S = {
   modalMatch: null, quickModal: null, qualModal: null, settings: false, clearRes: false, gf: 'all', confirmQual: null, hp: null,
   buf: '' // ввод суммы в счётчике, не часть G
 };
-const closeModals = () => { S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -1648,7 +1671,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff'].includes(h)) return true;
   // на сервере турнир, игрок или матч загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -1799,6 +1822,7 @@ function renderModals() {
     return '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
   }
   if (S.login) return loginModal();
+  if (S.admOpen && SRV) return admCardModal();
   if (S.lbox) return '<div class="lbox" data-act="lbox-close" role="dialog" aria-modal="true" aria-label="Фото"><img src="' + esc(S.lbox) + '" alt=""></div>';
   if (S.settings) {
     let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Настройки"><div class="ocard">';
@@ -1830,7 +1854,7 @@ function topView() {
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
     (SRV && Api.ob.total() ? '<span class="pill" title="Подходы сохранены на телефоне и будут отправлены">не отправлено: ' + Api.ob.total() + '</span>' : '') +
     (SRV && !ME ? '<button class="mini go" data-act="login">Войти</button>' : '') +
-    (SRV && Api.can('host') ? '<button class="icon-btn" data-act="go" data-v="admin" title="Панель управления" aria-label="Панель управления">' + I.shield + '</button>' : '') +
+    (anyAdm() ? '<button class="icon-btn" data-act="go" data-v="admin" title="Панель управления" aria-label="Панель управления">' + I.shield + '</button>' : '') +
     '<button class="icon-btn" data-act="open-settings" title="Настройки: тема, цвета, звук" aria-label="Настройки">' + I.gear + '</button>' +
     '</div>';
 }
@@ -2416,7 +2440,7 @@ function newTourView() {
   h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
   if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
-  if (SRV && Api.can('host')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
+  if (SRV && Api.perm('host_nums')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
   h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока: имя или ID" aria-label="Найти или добавить игрока" autocomplete="off">';
   h += '<button class="ghost addp" id="nt-add" data-act="nt-addp"' + (raw && !ntExact(raw) ? '' : ' hidden') + '>+ Добавить «' + esc(raw) + '»</button>';
   const order = p => p.id === ME ? 0 : /^x/.test(p.id) ? 1 : 2;
@@ -3554,7 +3578,7 @@ function meCard() {
   h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
   h += '</div>' + (!me.phone && !me.vk ? '<p class="meta">Привяжите телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
   h += clubCard();
-  if (Api.can('host')) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
+  if (anyAdm()) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
   return h;
 }
 function clubCard() {
@@ -3571,51 +3595,131 @@ function clubCard() {
 }
 
 /* ===== Панель управления: вкладки по роли ===== */
+// есть ли у меня хоть что-то в панели управления
+const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners'].some(k => Api.perm(k));
 function adminView() {
   const head = '<h1 class="h1">Управление</h1>';
   if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
-  if (!Api.can('host')) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
-  const tabs = [['acc', 'Аккаунты'], ['nums', 'Мои номера']].concat(Api.can('admin') ? [['clubs', 'Клубы'], ['stats', 'Сводка']] : [], Api.can('tech') ? [['banners', 'Баннеры']] : []);
-  if (!tabs.some(x => x[0] === S.admTab)) S.admTab = 'acc';
-  let h = '<div class="narrow"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
+  if (!anyAdm()) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
+  const P2 = Api.perm;
+  const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
+    P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
+    Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
+  if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
+  let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  h += S.admTab === 'nums' ? admNums() : S.admTab === 'clubs' ? admClubs() : S.admTab === 'stats' ? admStats() : S.admTab === 'banners' ? admBanners() : admAccounts();
+  const T = S.admTab;
+  h += T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
   return h + '</div>';
 }
 const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
 function admAccounts() {
-  const admin = Api.can('admin'), q = (S.admQ || '').trim(), f = admin ? S.admF || '' : '';
+  const full = Api.perm('players'), q = (S.admQ || '').trim(), f = full ? S.admF || '' : '';
   const e = lz('admin:' + f + ':' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '') + (f === 'blocked' ? '&blocked=1' : f === 'mine' ? '&mine=1' : f ? '&role=' + f : '')));
-  let h = '<div class="panel"><span class="h2">Новый аккаунт</span><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Игрок вводит код от вас и сразу играет со своего телефона, участвует в турнирах. Позже сможет привязать телефон или VK.</p>';
+  let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Игрок вводит код от вас и сразу играет со своего телефона, участвует в турнирах. Позже сможет привязать телефон или VK.</p>';
   h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
-  h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон"><input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px"></div>';
+  h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
   h += '<input class="inp" id="adm-title" maxlength="40" placeholder="Разряд или звание" aria-label="Разряд"><button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
   if (S.admNew) h += codeNote(S.admNew);
-  h += '</div>';
-  if (admin) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон" aria-label="Найти игрока">';
+  h += '</details>';
+  if (full) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон, логин" aria-label="Найти игрока">';
   const st = svState(e, 'игроков');
   if (st) return h + st;
   const rows = e.data.players;
-  if (!rows.length) return h + '<div class="note-box">' + (q || f ? 'Никого не нашли.' : admin ? 'Игроков пока нет.' : 'Вы ещё не заводили аккаунты.') + '</div>';
-  return h + '<div class="card" style="padding:4px 14px">' + rows.map(admRow).join('') + '</div>';
+  if (!rows.length) return h + '<div class="note-box">' + (q || f ? 'Никого не нашли.' : full ? 'Игроков пока нет.' : 'Вы ещё не заводили аккаунты.') + '</div>';
+  return h + '<p class="meta">Нажмите на игрока — откроется карточка со всеми действиями.</p><div class="card" style="padding:4px 14px">' + rows.map(admRow).join('') + '</div>';
 }
+// строка игрока: вся строка открывает карточку
 function admRow(p) {
   svPlayer(p);
-  const admin = Api.can('admin'), tech = Api.can('tech'), mine = p.owner === ME;
-  const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.blocked ? ' · <b style="color:var(--red)">заблокирован</b>' : '');
-  let a = '';
-  if (admin || (mine && !p.vk && !p.phone)) a += '<button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button>';
-  if (!p.vk && (admin || mine)) a += '<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код' : 'Код входа') + '</button>';
-  if (admin) {
-    a += '<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '" title="Подтверждённый игрок">' + (p.ver ? '✓ подтв.' : 'Подтвердить') + '</button>';
-    const locked = p.id === ME || (!tech && (p.role === 'admin' || p.role === 'tech'));
-    if (!locked) {
-      a += '<select class="inp sm" data-role-of="' + p.id + '" aria-label="Роль">' + (tech ? ['player', 'host', 'admin', 'tech'] : ['player', 'host']).map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + ROLE_NAME[r] + '</option>').join('') + '</select>';
-      a += '<button class="mini' + (p.blocked ? ' go' : '') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Блок') + '</button>';
-    }
-  }
-  return '<div class="adm-row">' + avatar(p.id) + '<div style="min-width:0;display:grid">' + '<span>' + pid(p.id) + ' ' + roleChip(p.role) + '</span><span class="meta">' + meta + '</span>' + (p.claim ? '<span class="meta">код входа: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><div class="gacts wrap">' + a + '</div></div>';
+  const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.login ? ' · логин ' + p.login : '');
+  return '<div class="adm-row click" role="button" tabindex="0" data-act="adm-open" data-v="' + p.id + '">' + avatar(p.id) + '<div style="min-width:0;display:grid"><span class="ell"><b>' + esc(p.name) + '</b> ' + roleChip(p.role) + (p.ver ? ' <span class="meta">✓</span>' : '') + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + '</span><span class="meta ell">' + esc(meta) + '</span>' + (p.claim ? '<span class="meta">код входа: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><span class="meta">›</span></div>';
+}
+// карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
+const ACT_NAME = {
+  'login.password': 'вошёл по паролю', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
+  'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
+  'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
+  'club.host_add': 'назначил ведущим', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
+  'cli.login': 'с сервера: выдан логин', 'cli.password': 'с сервера: сменён пароль', 'cli.unlock': 'с сервера: снята блокировка входа', 'cli.off': 'с сервера: убран вход по паролю'
+};
+function auditData(a) {
+  const d = a.data || {};
+  if (a.action === 'player.role') return (ROLE_NAME[d.from] || d.from || '') + ' → ' + (ROLE_NAME[d.role] || d.role);
+  if (a.action === 'player.block') return d.blocked ? 'заблокирован' : 'разблокирован';
+  if (a.action === 'perms') { const nm = k => { const x = SVC.aperms && SVC.aperms.data && SVC.aperms.data.perms.find(y => y.key === k); return x ? x.name : k; }; return Object.keys(d).map(k => nm(k) + ': ' + (d[k].length ? d[k].map(r => ROLE_NAME[r]).join(', ') : 'только тех. администратор')).join('; '); }
+  if (a.action === 'player.edit') return Object.keys(d).map(k => ({ name: 'имя', city: 'город', club: 'клуб', title: 'разряд', ver: d.ver ? 'подтверждён' : 'не подтверждён', code: 'новый код входа' }[k] || k)).join(', ');
+  if (d.club) return d.club;
+  if (d.login) return 'логин ' + d.login;
+  if (d.sessions != null) return 'сеансов: ' + d.sessions;
+  if (d.ip) return d.ip;
+  return '';
+}
+function admCardModal() {
+  const id = S.admOpen, e = lz('acard:' + id, () => Api.get('/api/admin/players/' + id), 15000);
+  const close = '<button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button>';
+  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Карточка игрока"><div class="ocard acard"><div class="ohead"><span class="label">Карточка игрока</span>' + close + '</div>';
+  const st = svState(e, 'карточки');
+  if (st) return h + st + '</div></div>';
+  const d = e.data, p = svPlayer(d.player), full = Api.perm('players'), tech = Api.role === 'tech', mine = p.owner === ME, high = p.role === 'admin' || p.role === 'tech';
+  const canEdit = (full || (mine && !p.vk)) && (!high || tech || p.id === ME);
+  h += '<div class="ac-top">' + avatar(p.id, 'lg') + '<div style="min-width:0;display:grid;gap:4px"><h2 class="ell">' + esc(p.name) + '</h2><span>' + roleChip(p.role) + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + (p.ver ? ' <span class="meta">✓ подтверждён</span>' : '') + '</span><span class="meta">ID ' + esc(p.code) + ' · @' + esc(p.handle) + '</span></div><button class="mini" data-act="go" data-v="p.' + p.id + '">Профиль</button></div>';
+  const kv = (k, v) => '<div><span class="label">' + k + '</span><b>' + v + '</b></div>';
+  h += '<div class="ac-grid">' + kv('Телефон', p.phone ? esc(showPhone(p.phone)) : '—') + kv('VK', p.vk ? 'привязан' : '—') + kv('Логин', p.login ? esc(p.login) + (d.locked ? ' (закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')' : '') : '—') + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
+  if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
+  if (p.claim) h += codeNote(p);
+  // профиль
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div><input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Разряд или звание" aria-label="Разряд"><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button></div></div>';
+  // роль и доступ
+  const roles = tech ? ['player', 'host', 'admin', 'tech'] : Api.perm('give_host') && !high ? ['player', 'host'] : null;
+  const acts = [];
+  if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + ROLE_NAME[r] + '</option>').join('') + '</select></label>');
+  if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
+  if (!p.vk && (full || mine) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
+  if (full && (!high || tech) && p.id !== ME) acts.push('<button class="mini" data-act="ac-logout" data-v="' + p.id + '">Завершить сеансы</button>');
+  if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
+  if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
+  // логин и пароль администратора — выдаёт тех. администратор
+  if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Страница входа: ' + esc(location.origin) + '/#staff. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div></div>';
+  if (d.log.length) h += '<div class="ac-sec"><span class="label">Последние действия</span>' + d.log.map(a => '<div class="au-row"><span class="meta">' + fmtDate(+a.t) + ' ' + new Date(+a.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><span>' + esc(a.actor_name || 'сервер') + ' — ' + esc(ACT_NAME[a.action] || a.action) + (auditData(a) ? ' <span class="meta">' + esc(auditData(a)) + '</span>' : '') + '</span></div>').join('') + '</div>';
+  return h + '</div></div>';
+}
+// права ролей: какие роли что могут; тех. администратору доступно всё
+function admPerms() {
+  const e = lz('aperms', () => Api.get('/api/admin/perms'), 60000);
+  const st = svState(e, 'прав');
+  if (st) return st;
+  const d = e.data, ed = S.permEd || (S.permEd = Object.fromEntries(d.perms.map(x => [x.key, x.roles.slice()])));
+  const changed = d.perms.some(x => x.roles.slice().sort().join() !== ed[x.key].slice().sort().join());
+  let h = '<p class="meta">Отметьте, каким ролям что доступно. Тех. администратору доступно всё; роли администратора и тех. администратора и эту таблицу меняет только он.</p>';
+  const SHORT = { player: 'игрок', host: 'ведущий', admin: 'админ', tech: 'тех. админ' };
+  h += '<div class="card perm-t"><div class="perm-r perm-h"><span>Право</span>' + d.roles.concat(['tech']).map(r => '<span>' + SHORT[r] + '</span>').join('') + '</div>';
+  h += d.perms.map(x => '<div class="perm-r"><span>' + esc(x.name) + '</span>' + d.roles.map(r => '<label><input type="checkbox" data-perm="' + x.key + '|' + r + '"' + (ed[x.key].includes(r) ? ' checked' : '') + ' aria-label="' + esc(x.name + ': ' + ROLE_NAME[r]) + '"></label>').join('') + '<label><input type="checkbox" checked disabled aria-label="тех. администратор"></label></div>').join('') + '</div>';
+  h += '<div class="gacts"><button class="btn sm" data-act="perm-save"' + (changed ? '' : ' disabled') + '>Сохранить права</button>' + (changed ? '<button class="ghost sm" data-act="perm-reset">Отменить</button>' : '') + '<button class="ghost sm" data-act="perm-default">По умолчанию</button></div>';
+  return h;
+}
+// журнал действий
+function admAudit() {
+  lz('aperms', () => Api.get('/api/admin/perms'), 60000);
+  const e = lz('aaudit', () => Api.get('/api/admin/audit?limit=100'), 20000);
+  const st = svState(e, 'журнала');
+  if (st) return st;
+  const items = e.data.items.concat(S.auditMore || []);
+  if (!items.length) return '<div class="note-box">Записей пока нет.</div>';
+  let h = '<div class="card" style="padding:4px 14px">' + items.map(a => '<div class="au-row"><span class="meta">' + fmtDate(a.t) + ' ' + new Date(a.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><span><b>' + esc(a.actor ? a.actor.name : 'сервер') + '</b> — ' + esc(ACT_NAME[a.action] || a.action) + (a.target ? ': ' + (a.target.id && /^p/.test(a.target.id) ? '<button class="lnk" data-act="adm-open" data-v="' + esc(a.target.id) + '">' + esc(a.target.name || a.target.id) + '</button>' : esc(a.target.name || a.target.id)) : '') + (auditData(a) ? ' <span class="meta">' + esc(auditData(a)) + '</span>' : '') + '</span></div>').join('') + '</div>';
+  if (items.length >= 100 && !S.auditEnd) h += '<button class="ghost more" data-act="audit-more" data-v="' + items[items.length - 1].t + '">Показать раньше</button>';
+  return h;
+}
+// мой вход по паролю: смена пароля
+function admMe() {
+  return '<div class="panel"><span class="h2">Мой вход</span><p class="meta">Логин <b>' + esc(Api.me.login) + '</b>. Страница входа: ' + esc(location.origin) + '/#staff — её нет в меню, знают только администраторы.</p><input class="inp" id="me-pass-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль"><input class="inp" id="me-pass-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 10 символов" aria-label="Новый пароль"><input class="inp" id="me-pass-new2" type="password" autocomplete="new-password" placeholder="Новый пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="me-pass">Сменить пароль</button></div>';
+}
+// вход администратора: страница #staff, в меню её нет
+function staffView() {
+  if (!SRV) return '<div class="narrow"><h1 class="h1">Вход для администраторов</h1><div class="note-box">Нужен сервер: в демо-режиме входа нет.</div></div>';
+  if (Api.me && anyAdm()) return '<div class="narrow"><h1 class="h1">Вы вошли</h1><p class="meta">' + esc(Api.me.name) + ' · ' + ROLE_NAME[Api.role] + '</p><button class="btn" data-act="go" data-v="admin">Панель управления</button></div>';
+  return '<div class="narrow staff"><h1 class="h1">Вход для администраторов</h1><div class="panel"><input class="inp big" id="st-login" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин" aria-label="Логин" value="' + esc(S.staffLogin || '') + '"><input class="inp big" id="st-pass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль">' + (S.staffErr ? '<div class="err">' + esc(S.staffErr) + '</div>' : '') + '<button class="btn" data-act="staff-login">Войти</button></div><p class="meta">После 5 неверных паролей вход по этому логину закрывается на 15 минут.</p></div>';
 }
 function admNums() {
   const e = lz('hostnums', () => Api.get('/api/host/nums'), 60000);
@@ -4277,7 +4381,7 @@ function accountBox() {
   if (!SRV) h += '<span class="meta">Демо: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Сервер выключен вручную.' : ' Сервер не отвечает.') + '</span>';
   h += '</div>';
   if (!SRV) return h;
-  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + ROLE_NAME[Api.role] : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (Api.can('host') ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
+  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + ROLE_NAME[Api.role] : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (anyAdm() ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
   else h += '<button class="btn" data-act="login">Войти</button><span class="meta">По номеру телефона, через VK ID или по коду от ведущего.</span>';
   return h;
 }
@@ -4312,6 +4416,7 @@ function render() {
     : R.startsWith('m.') && SRV ? matchView(R.slice(2))
     : R.startsWith('tv.') ? tvView(R.slice(3))
     : R === 'admin' ? adminView()
+    : R === 'staff' ? staffView()
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
     : feedView();
@@ -4448,8 +4553,53 @@ document.addEventListener('click', e => {
       break;
     }
     case 'adm-tab': S.admTab = v; render(); break;
+    case 'adm-new-tg': S.admNewOpen = !S.admNewOpen; render(); break;
+    case 'adm-open': closeModals(); S.admOpen = v; svStale('acard:'); render(); break;
+    case 'ac-save': {
+      const val = k => { const el = $('ac-' + k); return el ? el.value.trim() : ''; };
+      if (val('name').length < 2) { toast('Имя — от 2 символов.'); break; }
+      svDo(Api.patch('/api/admin/players/' + v, { name: val('name'), city: val('city'), club: val('club'), title: val('title') }), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
+      break;
+    }
+    case 'ac-logout': svDo(Api.post('/api/admin/players/' + v + '/logout'), r => { svStale('acard:'); toast('Сеансы завершены: ' + r.sessions + '.'); }); break;
+    case 'ac-login': {
+      const l = $('ac-login'), pw = $('ac-pass');
+      svDo(Api.put('/api/admin/players/' + v + '/login', { login: l ? l.value.trim() : '', password: pw ? pw.value : '' }), () => { svStale('acard:'); svStale('admin:'); toast('Логин и пароль сохранены. Передайте пароль лично.'); });
+      break;
+    }
+    case 'ac-login-off': svDo(Api.del('/api/admin/players/' + v + '/login'), () => { svStale('acard:'); svStale('admin:'); toast('Вход по паролю убран.'); }); break;
+    case 'perm-save': {
+      const d = SVC.aperms && SVC.aperms.data;
+      if (!d || !S.permEd) break;
+      // только изменённые права: в журнале видно, что поменяли
+      const diff = Object.fromEntries(d.perms.filter(x => x.roles.slice().sort().join() !== (S.permEd[x.key] || []).slice().sort().join()).map(x => [x.key, S.permEd[x.key] || []]));
+      if (!Object.keys(diff).length) break;
+      svDo(Api.put('/api/admin/perms', { perms: diff }), r => { SVC.aperms.data = r; S.permEd = null; Api.loadMe().catch(() => {}); svStale('aaudit'); toast('Права сохранены.'); });
+      break;
+    }
+    case 'perm-reset': S.permEd = null; render(); break;
+    case 'perm-default': {
+      const d = SVC.aperms && SVC.aperms.data;
+      if (!d) break;
+      const RK = { player: 0, host: 1, admin: 2, tech: 3 };
+      S.permEd = Object.fromEntries(d.perms.map(x => [x.key, d.roles.filter(r => RK[r] >= RK[x.min])]));
+      render(); break;
+    }
+    case 'audit-more': svDo(Api.get('/api/admin/audit?limit=100&before=' + v), r => { S.auditMore = (S.auditMore || []).concat(r.items); if (r.items.length < 100) S.auditEnd = true; }); break;
+    case 'me-pass': {
+      const g = id => { const el = $(id); return el ? el.value : ''; };
+      if (g('me-pass-new') !== g('me-pass-new2')) { toast('Новые пароли не совпадают.'); break; }
+      svDo(Api.put('/api/me/password', { current: g('me-pass-cur'), password: g('me-pass-new') }), () => { ['me-pass-cur', 'me-pass-new', 'me-pass-new2'].forEach(id => { const el = $(id); if (el) el.value = ''; }); toast('Пароль изменён.'); });
+      break;
+    }
+    case 'staff-login': {
+      const l = $('st-login'), pw = $('st-pass');
+      S.staffErr = '';
+      svDo(Api.passwordLogin(l ? l.value.trim() : '', pw ? pw.value : '').then(() => { S.staffLogin = ''; loggedIn(); go('admin'); }).catch(e => { S.staffErr = e.net ? 'Нет связи с сервером.' : e.message; setTimeout(() => { const el = $('st-pass'); if (el) el.focus(); }, 30); }));
+      break;
+    }
     case 'adm-f': S.admF = v; render(); break;
-    case 'adm-block': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { blocked: on === '1' }), () => { svStale('admin:'); toast(on === '1' ? 'Игрок заблокирован: вход закрыт.' : 'Игрок разблокирован.'); }); break; }
+    case 'adm-block': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { blocked: on === '1' }), () => { svStale('admin:'); svStale('acard:'); toast(on === '1' ? 'Игрок заблокирован: вход закрыт.' : 'Игрок разблокирован.'); }); break; }
     case 'num-set': {
       const el = $('num-n'), n = el ? +el.value : 0;
       if (!Number.isInteger(n) || n < 1 || n > 9999) { toast('Номер — от 1 до 9999.'); break; }
@@ -4634,8 +4784,8 @@ document.addEventListener('click', e => {
       svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title'), phone: val('phone') || null, n }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); if (n) svStale('hostnums'); ['name', 'city', 'club', 'title', 'phone', 'n'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку код.'); });
       break;
     }
-    case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); toast('Новый код готов.'); }); break;
-    case 'adm-ver': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { ver: on === '1' }), () => svStale('admin:')); break; }
+    case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); svStale('acard:'); toast('Новый код готов.'); }); break;
+    case 'adm-ver': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { ver: on === '1' }), () => { svStale('admin:'); svStale('acard:'); }); break; }
     case 'tv-full': try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} break;
     case 'desk-toggle': {
       const [tid, k] = v.split('|'), key = 'oche.desk.' + tid, t = TBY[tid];
@@ -4707,6 +4857,7 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
   if (t.dataset && t.dataset.bnr && S.bnr) { S.bnr[t.dataset.bnr] = t.value; return; }
   if (t.id === 'num-n') { S.numN = t.value; return; }
+  if (t.id === 'st-login') { S.staffLogin = t.value; return; }
   if (t.dataset && t.dataset.numq) { S.numQ = t.value; clearTimeout(S.numT); S.numT = setTimeout(() => { S.numQQ = S.numQ; render(); const el = $('num-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 300); return; }
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
@@ -4726,10 +4877,15 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
-    svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('astats'); toast('Роль: ' + ROLE_NAME[role] + '.'); });
+    svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + ROLE_NAME[role] + '.'); });
     return;
   }
   if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
+  if (t.dataset && t.dataset.perm && S.permEd) {
+    const [k, r] = t.dataset.perm.split('|'), cur = S.permEd[k] || [];
+    S.permEd[k] = t.checked ? cur.concat(cur.includes(r) ? [] : [r]) : cur.filter(x => x !== r);
+    render(); return;
+  }
   if (SRV && t.dataset && t.dataset.num) {
     const [tid, id] = t.dataset.num.split('|'), n = +t.value;
     if (Number.isInteger(n) && n >= 1 && n <= 999) setNum(tid, id, n);
@@ -4749,6 +4905,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
   if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
   if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
+  if (e.key === 'Enter' && t && (t.id === 'st-login' || t.id === 'st-pass')) { e.preventDefault(); if (t.id === 'st-login') { const n = $('st-pass'); if (n) n.focus(); } else { const b = $('app').querySelector('[data-act="staff-login"]'); if (b) b.click(); } return; }
   if (e.key === 'Enter' && t && t.id === 'dev-id') { e.preventDefault(); const b = document.querySelector('[data-act="dev-login"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && t && /^me-/.test(t.id)) { const sb = $('app').querySelector('[data-act="savename"]'); if (sb) sb.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button') { e.preventDefault(); t.click(); return; }

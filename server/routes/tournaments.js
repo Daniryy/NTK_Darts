@@ -5,7 +5,7 @@ const Games = require('../../shared/games.js');
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { atLeast, isAdmin } = require('../roles');
+const { can } = require('../roles');
 const T = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards } = require('../cards');
@@ -86,7 +86,7 @@ function tourFields(b, full, me) {
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
-    if (!isAdmin(me)) throw E.forbidden('Официальный статус задаёт администратор');
+    if (!can(me, 'official')) throw E.forbidden('Официальный статус задаёт администратор');
     if (b.official !== undefined) o.official = V.bool(b.official, 'official');
     if (b.orgName !== undefined) o.org_name = b.orgName == null ? null : V.str(b.orgName, 'orgName', 1, 60);
     if (b.orgVer !== undefined) o.org_ver = V.bool(b.orgVer, 'orgVer');
@@ -100,7 +100,7 @@ async function clubFields(c, v, me) {
   const id = V.id(v, 'clubId');
   const club = await one(c, `SELECT * FROM clubs WHERE id = $1 AND status = 'active'`, [id]);
   if (!club) throw E.notFound('Клуб не найден');
-  if (!isAdmin(me) && !await one(c, 'SELECT 1 FROM club_hosts WHERE club_id = $1 AND player_id = $2', [id, me.id])) throw E.forbidden('Турнир от имени клуба создаёт его ведущий');
+  if (!can(me, 'clubs') && !(can(me, 'club_tour') && await one(c, 'SELECT 1 FROM club_hosts WHERE club_id = $1 AND player_id = $2', [id, me.id]))) throw E.forbidden('Турнир от имени клуба создаёт его ведущий');
   return { club_id: id, official: true, org_name: club.name, org_ver: true };
 }
 
@@ -221,7 +221,7 @@ module.exports = async function (app) {
       if (!Array.isArray(boards) || boards.length > 64 || boards.some(x => !Number.isInteger(x) || x < 1 || x > 64)) throw E.bad('Камера №' + (k + 1) + ': мишени — номера 1–64', 'streams');
       return { title: s.title == null || s.title === '' ? 'Камера ' + (k + 1) : V.str(s.title, 'streams', 1, 40), url: u.href, boards: [...new Set(boards)].sort((x, y) => x - y) };
     });
-    if (!atLeast(me, 'host')) throw E.forbidden('Камеры подключают ведущие клубов — подайте заявку на клуб');
+    if (!can(me, 'streams')) throw E.forbidden('Камеры подключают ведущие клубов — подайте заявку на клуб');
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);

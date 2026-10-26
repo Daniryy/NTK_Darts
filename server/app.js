@@ -40,6 +40,8 @@ function build(opts = {}) {
     req.log.error(err);
     return reply.code(500).send({ error: { code: 'server', message: 'Ошибка сервера' } });
   });
+  // права ролей из настроек — до первого запроса
+  app.addHook('onReady', () => require('./audit').loadSettings());
   app.setNotFoundHandler((req, reply) => reply.code(404).send({ error: { code: 'not_found', message: 'Нет такого адреса' } }));
 
   app.register(async api => {

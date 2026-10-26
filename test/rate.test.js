@@ -1,4 +1,5 @@
 // Ограничение частоты: по устройству (заголовок или ?d= у потока табло), а не по общему IP зала.
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
 process.env.RATE_MAX = '5';
 const test = require('node:test');
 const assert = require('node:assert/strict');
