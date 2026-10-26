@@ -3,6 +3,7 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPerm } = require('../auth');
+const { can } = require('../roles');
 const { audit } = require('../audit');
 
 const PLACES = ['feed', 'tour', 'tv'];
@@ -35,6 +36,8 @@ module.exports = async function (app) {
   // GET /api/banners?place=feed — действующие сейчас
   app.get('/api/banners', async req => {
     const place = V.oneOf(req.query.place, 'place', PLACES), now = Date.now();
+    // Pro — без рекламы; табло в зале смотрят все, там баннеры остаются
+    if (place !== 'tv' && can(req.player, 'pro')) return { banners: [] };
     const rows = await all(pool, `SELECT * FROM banners WHERE place = $1 AND active AND (starts IS NULL OR starts <= $2) AND (ends IS NULL OR ends > $2) ORDER BY created_at DESC LIMIT 5`, [place, now]);
     return { banners: rows.map(pub) };
   });

@@ -105,6 +105,11 @@ function routes(app) {
     if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
     if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
     if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
+    // выходная музыка на табло — в тарифе Pro
+    if (b.walkon !== undefined && b.walkon !== (me.walkon || '')) {
+      if (!can(me, 'pro')) throw E.forbidden('Выходная музыка — в тарифе Pro');
+      set.walkon = V.optStr(b.walkon, 'walkon', 60);
+    }
     // звание — только через подтверждение (POST /api/titles)
     if (b.title !== undefined && b.title !== (me.title || '')) throw E.bad('Звание подтверждается заявкой с документом', 'title');
     const keys = Object.keys(set);

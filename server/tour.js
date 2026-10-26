@@ -1,7 +1,7 @@
 // Турнир из базы в том виде, в каком его хранит страница, и всё, что из него вычисляется.
 const B = require('../shared/bracket.js');
 const { all } = require('./db');
-const { can } = require('./roles');
+const { can, RANK } = require('./roles');
 
 const RR_MAX = 10, BR_MAX = 64;
 // строки турниров всегда берём с именем владельца
@@ -12,7 +12,7 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating, p.photo, p.title
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
   const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished,
@@ -133,6 +133,8 @@ function gameLabel(t, g, rv) {
   return 'круг ' + (g.r + 1) + ' · за ' + placesTxt(lo, lo + c - 1);
 }
 
+// значок PRO: тариф Pro или выше, кроме администраторов
+const isPro = e => can({ role: e.role }, 'pro') && (RANK[e.role] || 0) < RANK.admin;
 const isOwner = (t, me) => !!me && (can(me, 'any_tour') || t._row.owner_id === me.id);
 
 // игроки игры сетки, если её можно начать: { a, b } или null
@@ -166,7 +168,7 @@ const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name |
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me);
   const roster = {};
-  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '' }; });
+  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', pro: isPro(e) }; });
   const out = Object.assign({}, t, {
     org: orgOf(row), roster,
     can: {

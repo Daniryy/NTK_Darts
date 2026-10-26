@@ -2,7 +2,7 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf } = require('../darts');
+const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, activeVisits } = require('../darts');
 const Games = require('../../shared/games.js');
 const { TOUR_SQL, loadTours, readyPair, canScoreGame, isOwner, canClear, refreshTour } = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
@@ -23,12 +23,6 @@ const matchJSON = (m, req, card) => ({
 });
 const eventJSON = e => Object.assign({ seq: e.seq, type: e.type }, e.data, { t: e.t });
 
-// подходы, которые остались после отмен; бросок в булл при ничьей — тоже подход
-function activeVisits(rows) {
-  const v = [];
-  rows.forEach(e => { if (e.type === 'visit') v.push(e.data); else if (e.type === 'bull') v.push(Object.assign({ tb: 1 }, e.data)); else if (e.type === 'undo') v.pop(); });
-  return v;
-}
 
 async function lockMatch(c, id) {
   const m = await one(c, MATCH_SQL + ' WHERE m.id = $1 FOR UPDATE OF m', [id]);

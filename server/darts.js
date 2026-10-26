@@ -29,6 +29,13 @@ function liveState(m, visits) {
   return out;
 }
 
+// подходы, которые остались после отмен; бросок в булл при ничьей — тоже подход
+function activeVisits(rows) {
+  const v = [];
+  rows.forEach(e => { if (e.type === 'visit') v.push(e.data); else if (e.type === 'bull') v.push(Object.assign({ tb: 1 }, e.data)); else if (e.type === 'undo') v.pop(); });
+  return v;
+}
+
 // подход из события: только известные поля
 function visitOf(m, ev) {
   if (ev.type === 'bull') return { leg: ev.leg, p: ev.p, tb: 1 };
@@ -67,4 +74,4 @@ const lineOf = (m, l, k, st) => ({
   sc: m.ex && st ? st.legsLog.map(L => L.tot[k]) : null
 });
 
-module.exports = { IMPOSSIBLE, exOf, stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf };
+module.exports = { IMPOSSIBLE, exOf, stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, activeVisits };

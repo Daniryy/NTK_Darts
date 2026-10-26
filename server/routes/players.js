@@ -47,10 +47,13 @@ module.exports = async function (app) {
     if (!p) throw E.notFound('Игрок не найден');
     const st = await all(pool, 'SELECT * FROM player_stats WHERE player_id = $1', [p.id]);
     const rank = p.rated > 0 ? (await one(pool, 'SELECT count(*) + 1 AS n FROM players WHERE rated > 0 AND rating > $1', [p.rating])).n : null;
+    // лучшее среднее за матч x01 (от 9 дротиков) — для достижений
+    const best = await one(pool, `SELECT max(l.pts::float8 / l.darts * 3) AS a FROM match_lines l JOIN matches m ON m.id = l.match_id
+      WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND (m.ex IS NULL OR m.ex->>'k' = 'x01') AND l.darts >= 9`, [p.id]);
     const tours = await all(pool, `SELECT t.id, t.name, t.start, t.status, t.format, e.place_lo, e.place_hi FROM entries e
       JOIN tournaments t ON t.id = e.tournament_id WHERE e.player_id = $1 ORDER BY t.start DESC LIMIT 100`, [p.id]);
     return {
-      player: playerShort(p), rank,
+      player: playerShort(p), rank, bestAvg: best.a == null ? null : Math.round(best.a * 10) / 10,
       stats: { all: statsJSON(st.find(x => x.scope === 'all')), tour: statsJSON(st.find(x => x.scope === 'tour')) },
       matches: await playerMatches(pool, p.id, 'all', before(null), 50),
       tournaments: tours.map(t => ({ id: t.id, name: t.name, start: t.start, status: t.status, format: t.format, place: t.place_lo == null ? null : [t.place_lo, t.place_hi] }))
