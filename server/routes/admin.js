@@ -85,7 +85,9 @@ module.exports = async function (app) {
       if (phone && await one(c, 'SELECT 1 FROM players WHERE phone = $1', [phone])) throw E.conflict('phone_taken', 'Этот номер уже привязан к другому аккаунту');
       const pl = await createPlayer(c, { name: V.str(b.name, 'name', 2, 32), city: V.optStr(b.city, 'city', 40), club: V.optStr(b.club, 'club', 40), phone, owner_id: me.id });
       if (n) await setNum(c, me.id, n, pl.id);
-      const out = await one(c, 'UPDATE players SET title = $2, claim = $3 WHERE id = $1 RETURNING *', [pl.id, V.optStr(b.title, 'title', 40), await newClaim(c)]);
+      // звание при создании — только с правом titles (оно сразу считается подтверждённым)
+      const title = b.title && can(me, 'titles') ? V.optStr(b.title, 'title', 40) : '';
+      const out = await one(c, 'UPDATE players SET title = $2, claim = $3 WHERE id = $1 RETURNING *', [pl.id, title, await newClaim(c)]);
       await audit(c, me, 'player.create', out, { phone: !!phone });
       return out;
     });
@@ -107,7 +109,10 @@ module.exports = async function (app) {
       if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
       if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
       if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
-      if (b.title !== undefined) set.title = V.optStr(b.title, 'title', 40);
+      if (b.title !== undefined && b.title !== (cur.title || '')) {
+        if (!can(me, 'titles')) throw E.forbidden('Звание подтверждается заявкой — меняет его администратор');
+        set.title = V.optStr(b.title, 'title', 40);
+      }
       if (b.claim === true) {
         if (cur.vk_id != null) throw E.conflict('conflict', 'Аккаунт привязан к VK — игрок входит сам');
         set.claim = await newClaim(c);
@@ -241,6 +246,7 @@ module.exports = async function (app) {
       liveMatches: await n(`SELECT count(*)::int AS n FROM matches WHERE status = 'live'`),
       matchesDay: await n(`SELECT count(*)::int AS n FROM matches WHERE status = 'done' AND finished > $1`, [now - 864e5]),
       clubsPending: await n(`SELECT count(*)::int AS n FROM clubs WHERE status = 'pending'`),
+      titlesPending: await n(`SELECT count(*)::int AS n FROM title_requests WHERE status = 'review'`),
       smsDay: await n('SELECT count(*)::int AS n FROM sms_log WHERE t > $1', [now - 864e5])
     };
   });

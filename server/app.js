@@ -57,6 +57,7 @@ function build(opts = {}) {
     api.register(require('./routes/clubs'));
     api.register(require('./routes/host'));
     api.register(require('./routes/banners'));
+    api.register(require('./routes/titles'));
   });
 
   if (config.serveStatic) {

@@ -105,7 +105,8 @@ function routes(app) {
     if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
     if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
     if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
-    if (b.title !== undefined) set.title = V.optStr(b.title, 'title', 40);
+    // звание — только через подтверждение (POST /api/titles)
+    if (b.title !== undefined && b.title !== (me.title || '')) throw E.bad('Звание подтверждается заявкой с документом', 'title');
     const keys = Object.keys(set);
     if (!keys.length) throw E.bad('Нечего менять');
     const p = await one(pool, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [me.id, ...keys.map(k => set[k])]);

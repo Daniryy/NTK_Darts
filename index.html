@@ -765,6 +765,30 @@ button.banner:hover { border-color: var(--line-bright); }
 .banner .bn-ad { align-self: start; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); opacity: .7; }
 .stag { display: inline-block; min-width: 26px; margin-right: 5px; padding: 0 4px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line); font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: center; letter-spacing: .02em; }
 .pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
+.tchip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--green-ink); background: var(--green); margin-right: 6px; }
+.tsteps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tsteps li { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 12.5px; color: var(--muted); }
+.tsteps li i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; border: 2px solid var(--line-bright); background: var(--surface2); }
+.tsteps li.ts-done i { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--surface2)); color: var(--green); }
+.tsteps li.ts-done span { color: var(--fg); }
+.tsteps li.ts-cur i { border-color: var(--green); color: var(--fg); box-shadow: 0 0 0 4px var(--green-glow); }
+.tsteps li.ts-cur span { color: var(--fg); font-weight: 600; }
+.tsteps li.ts-fail i { border-color: var(--red); color: var(--red); }
+.tsteps li.ts-fail span { color: var(--red); font-weight: 600; }
+.auto { display: grid; gap: 4px; font-size: 13.5px; }
+.auto > div { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; }
+.auto i { font-style: normal; text-align: center; }
+.au-ok i { color: var(--green); }
+.au-warn i { color: #e0a43a; }
+.au-warn span { color: var(--fg); }
+.au-info { color: var(--muted); }
+.tdocs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tdoc { position: relative; width: 120px; height: 90px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--surface2); }
+.tdoc img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.tdoc .tpdf { display: grid; place-items: center; width: 100%; height: 100%; font-weight: 700; color: var(--muted); }
+.tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
+.note-box.ok { border-color: var(--green); }
+.treq { display: grid; gap: 8px; }
 .adm-row.click { cursor: pointer; grid-template-columns: auto minmax(0, 1fr) auto; }
 .adm-row.click:hover { background: var(--surface2); }
 .rolechip.r-blk { color: var(--red); border-color: var(--red); }
@@ -1671,7 +1695,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title'].includes(h)) return true;
   // на сервере турнир, игрок или матч загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -2534,12 +2558,12 @@ function profileHTML(p, s, all, tours) {
   const id = p.id, isMe = id === ME, canPhoto = canEditPlayer(p);
   let h = '<div class="phero"><div style="display:grid;gap:6px;justify-items:center">' + avatar(id, 'lg') + (canPhoto ? '<button class="ghost sm" data-act="photo-pick" data-v="avatar|' + id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button>' + (p.photo ? '<button class="ghost sm dng" data-act="photo-del-av" data-v="' + id + '">Убрать</button>' : '') : '') + '</div><div style="min-width:0">';
   if (isMe && S.editName) {
-    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div><input class="inp" id="me-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Разряд или звание (КМС, МС, 1 разряд…)" aria-label="Разряд"><div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
+    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (SRV ? '<span class="meta">Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button></span>' : '') + '<div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
   } else {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
-  if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + (p.title ? ' · ' + esc(p.title) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
-  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
+  if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
+  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + titleChip(p.title) + roleChip(p.role) + '</div>';
   if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id] && RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
   if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
@@ -3577,7 +3601,7 @@ function meCard() {
   h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? (me.vk ? '<button class="ghost sm" data-act="unlink" data-v="phone">Отвязать</button>' : '') : c.phone ? '<button class="mini" data-act="link-phone">Привязать</button>' : '');
   h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
   h += '</div>' + (!me.phone && !me.vk ? '<p class="meta">Привяжите телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
-  h += clubCard();
+  h += titleCard() + clubCard();
   if (anyAdm()) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
   return h;
 }
@@ -3595,21 +3619,108 @@ function clubCard() {
 }
 
 /* ===== Панель управления: вкладки по роли ===== */
+/* ===== Звания: только по заявке с документом. Стадии: подача → автопроверка → проверка администратором → подтверждено ===== */
+const titleChip = t => t ? '<span class="tchip" title="Звание подтверждено по документу">' + esc(t) + ' ✓</span>' : '';
+const TSTEP = ['Подача', 'Автоматическая проверка', 'Проверка администратором', 'Подтверждено'];
+// стадии заявки: [состояние каждой: done | cur | wait | fail]
+function titleSteps(r) {
+  const st = r.status === 'draft' ? ['cur', 'wait', 'wait', 'wait'] : r.status === 'approved' ? ['done', 'done', 'done', 'done'] : r.status === 'rejected' ? ['done', 'done', 'fail', 'wait'] : ['done', r.autoAt ? 'done' : 'cur', r.autoAt ? 'cur' : 'wait', 'wait'];
+  return '<ol class="tsteps">' + TSTEP.map((l, k) => '<li class="ts-' + st[k] + '"><i>' + (st[k] === 'done' ? (k === 3 ? '✅' : '✓') : st[k] === 'fail' ? '✕' : k + 1) + '</i><span>' + (st[k] === 'fail' ? 'Отклонено' : l) + '</span></li>').join('') + '</ol>';
+}
+const AUTO_ICON = { ok: '✓', warn: '⚠', info: 'ℹ' };
+function autoList(list, admin) {
+  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><span>' + linkify(x.text) + '</span></div>').join('') + '</div>';
+}
+// ссылки https в тексте — кликабельные
+const linkify = s => esc(s).replace(/https:\/\/[^\s<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener noreferrer">поиск на сайте Минспорта</a>');
+function docThumbs(docs, rm) {
+  return '<div class="tdocs">' + docs.map(d => '<div class="tdoc">' + (d.mime === 'application/pdf' ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="tpdf">PDF</a>' : '<img src="' + esc(d.url) + '" alt="Документ" data-act="lbox" data-v="' + esc(d.url) + '">') + (rm ? '<button class="x" data-act="tdoc-rm" data-v="' + esc(d.id) + '" aria-label="Убрать файл">×</button>' : '') + '</div>').join('') + '</div>';
+}
+// страница «Подтверждение звания»
+function titleView() {
+  let h = '<button class="back" data-act="go" data-v="p.me">' + I.back + 'Профиль</button><div class="narrow"><h1 class="h1">Подтверждение звания</h1>';
+  if (!SRV) return h + '<div class="note-box">Звания подтверждаются на сервере: в демо-режиме заявку подать нельзя.</div></div>';
+  if (!ME) return h + '<div class="note-box">Войдите, чтобы подать заявку.</div><button class="btn" data-act="login">Войти</button></div>';
+  const e = lz('titles:mine', () => Api.get('/api/titles/mine'), 15000), k = lz('titles:kinds', () => Api.get('/api/titles/kinds'), 3600e3);
+  const st = svState(e, 'заявок') || svState(k, 'званий');
+  if (st) return h + st + '</div>';
+  const cur = e.data.requests[0], kinds = k.data.kinds;
+  // решение пришло — профиль показывает новое звание
+  if (P[ME] && (P[ME].title || '') !== e.data.title) { P[ME].title = e.data.title; svStale('player:'); }
+  if (e.data.title) h += '<div class="note-box">Подтверждённое звание: ' + titleChip(e.data.title) + '</div>';
+  if (cur && cur.status !== 'cancelled' && !S.tNew) {
+    h += '<div class="panel">' + titleSteps(cur) + '<div><b>' + esc(cur.full) + '</b><div class="meta">' + esc(cur.fullName) + ' · приказ № ' + esc(cur.orderNo) + (cur.orderDate ? ' от ' + new Date(cur.orderDate).toLocaleDateString('ru-RU') : '') + ' · ' + esc(cur.issuer) + '</div></div>';
+    if (cur.status === 'review') h += '<div class="note-box">Автоматическая проверка пройдена — заявка ждёт администратора. Обычно это занимает до нескольких дней.</div>' + autoList(cur.auto) + docThumbs(cur.docs) + '<button class="ghost sm dng" data-act="title-cancel" data-v="' + cur.id + '">Отозвать заявку</button>';
+    else if (cur.status === 'approved') h += '<div class="note-box ok">Звание подтверждено ✅' + (cur.note ? ' — ' + esc(cur.note) : '') + '. Оно видно в профиле, рейтинге, сетке и на табло.</div><button class="ghost sm" data-act="title-new">Подать заявку на другое звание</button>';
+    else h += '<div class="err">Отклонено: ' + esc(cur.note) + '</div><button class="btn sm" data-act="title-new">Подать заново</button>';
+    return h + '</div></div>';
+  }
+  // форма
+  const F = S.tForm || (S.tForm = { fullName: meP().name || '', title: '', orderNo: '', orderDate: '', issuer: '', comment: '', docs: [] });
+  const kd = kinds.find(x => x.k === F.title);
+  h += '<p class="meta">Звание в профиле показывается только после проверки документа. Заполните заявку — автоматическая проверка пройдёт сразу, затем решение примет администратор. Документы видят только вы и проверяющие.</p>';
+  h += '<div class="panel">' + titleSteps({ status: 'draft' });
+  h += '<div class="field"><label class="label" for="tf-fullName">ФИО — как в документе</label><input class="inp" id="tf-fullName" data-tf="fullName" maxlength="100" value="' + esc(F.fullName) + '" placeholder="Фамилия Имя Отчество"></div>';
+  h += '<div class="field"><span class="label">Звание или разряд</span><div class="chips">' + kinds.map(x => '<button class="chip txt' + (F.title === x.k ? ' on' : '') + '" data-act="tf-kind" data-v="' + x.k + '" title="' + esc(x.full) + '">' + esc(x.short) + '</button>').join('') + '</div>' + (kd ? '<span class="meta">' + esc(kd.full) + '. Присваивает: ' + esc(kd.issuer) + '.</span>' : '') + '</div>';
+  h += '<div class="nrow"><div class="field" style="flex:1"><label class="label" for="tf-orderNo">Номер приказа</label><input class="inp" id="tf-orderNo" data-tf="orderNo" maxlength="40" value="' + esc(F.orderNo) + '" placeholder="например, 45 нг"></div><div class="field" style="flex:1"><label class="label" for="tf-orderDate">Дата приказа</label><input class="inp" id="tf-orderDate" data-tf="orderDate" type="date" value="' + esc(F.orderDate) + '"></div></div>';
+  h += '<div class="field"><label class="label" for="tf-issuer">Кто присвоил</label><input class="inp" id="tf-issuer" data-tf="issuer" maxlength="120" list="tf-issuers" value="' + esc(F.issuer) + '" placeholder="' + esc(kd ? kd.issuer : 'Минспорт России, министерство спорта региона…') + '"><datalist id="tf-issuers"><option value="Минспорт России"><option value="Министерство спорта Свердловской области"><option value="Федерация дартса России"></datalist></div>';
+  h += '<div class="field"><span class="label">Документ: удостоверение, зачётная книжка или выписка из приказа</span>' + docThumbs(F.docs, true) + '<label class="ghost addp" style="cursor:pointer;display:inline-flex">+ Фото или PDF<input type="file" id="tf-file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden></label><span class="meta">До 5 файлов, каждый до 8 МБ. На фото должны читаться ФИО, звание и номер приказа.</span></div>';
+  h += '<div class="field"><label class="label" for="tf-comment">Комментарий (необязательно)</label><textarea class="inp" id="tf-comment" data-tf="comment" maxlength="500" rows="2">' + esc(F.comment) + '</textarea></div>';
+  if (S.tErr) h += '<div class="err">' + esc(S.tErr) + '</div>';
+  h += '<button class="btn" data-act="title-send"' + (S.tBusy ? ' disabled' : '') + '>Отправить на проверку</button>' + (cur && S.tNew ? '<button class="ghost sm" data-act="title-back">Назад к заявке</button>' : '') + '</div>';
+  return h + '</div>';
+}
+async function titleUpload(files) {
+  const F = S.tForm;
+  for (const f of files) {
+    if (F.docs.length >= 5) { toast('Не больше 5 файлов.'); break; }
+    if (f.size > 8 * 1024 * 1024) { toast('Файл «' + f.name + '» больше 8 МБ.'); continue; }
+    try { const r = await Api.upload('/api/titles/docs', f); F.docs.push(r.doc); }
+    catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message); }
+    render();
+  }
+}
+// профиль: звание и состояние заявки
+function titleCard() {
+  const e = lz('titles:mine', () => Api.get('/api/titles/mine'), 30000);
+  if (!e.data) return '';
+  if (P[ME] && (P[ME].title || '') !== e.data.title) { P[ME].title = e.data.title; svStale('player:'); }
+  const cur = e.data.requests.find(r => r.status !== 'cancelled'), stage = cur && cur.status === 'review' ? 'Заявка «' + cur.short + '»: ждёт проверки администратором (3 из 4)' : cur && cur.status === 'rejected' ? 'Заявка «' + cur.short + '» отклонена: ' + cur.note : '';
+  return '<div class="card sec"><span class="label">Звание</span>' + (e.data.title ? '<div>' + titleChip(e.data.title) + '</div>' : '<p class="meta">Мастер спорта, КМС, разряд — покажем в профиле, рейтинге и на табло после проверки документа.</p>') + (stage ? '<p class="meta">' + esc(stage) + '</p>' : '') + '<button class="mini" data-act="go" data-v="title">' + (cur && cur.status === 'review' ? 'Посмотреть заявку' : 'Подтвердить звание') + '</button></div>';
+}
+// админка: заявки на звания
+function admTitles() {
+  const f = S.ttF || 'review', e = lz('atitles:' + f, () => Api.get('/api/admin/titles?status=' + f), 20000);
+  let h = '<div class="seg2">' + [['review', 'Ждут проверки'], ['approved', 'Подтверждены'], ['rejected', 'Отклонены'], ['all', 'Все']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="tt-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  const st = svState(e, 'заявок');
+  if (st) return h + st;
+  if (!e.data.requests.length) return h + '<div class="note-box">' + (f === 'review' ? 'Новых заявок нет.' : 'Заявок нет.') + '</div>';
+  return h + e.data.requests.map(r => {
+    let x = '<div class="card sec treq"><div class="tstat"><span><b>' + esc(r.full) + '</b> · <button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> <span class="meta">' + esc(r.player.code) + '</span></span><span class="meta">' + fmtDate(r.created) + '</span></div>';
+    x += '<div class="meta">ФИО в документе: <b>' + esc(r.fullName) + '</b> · приказ № ' + esc(r.orderNo) + (r.orderDate ? ' от ' + new Date(r.orderDate).toLocaleDateString('ru-RU') : '') + ' · ' + esc(r.issuer) + (r.player.title ? ' · сейчас: ' + esc(r.player.title) : '') + '</div>';
+    if (r.comment) x += '<div class="meta">Комментарий: ' + esc(r.comment) + '</div>';
+    x += autoList(r.auto, true) + docThumbs(r.docs);
+    if (r.status === 'review') x += '<input class="inp" id="tt-note-' + r.id + '" maxlength="300" placeholder="Комментарий игроку (при отказе обязателен)" aria-label="Комментарий"><div class="gacts"><button class="mini go" data-act="tt-dec" data-v="' + r.id + '|approved">Подтвердить ✅</button><button class="mini dng" data-act="tt-dec" data-v="' + r.id + '|rejected">Отклонить</button>' + (r.search ? '<a class="mini" href="' + esc(r.search) + '" target="_blank" rel="noopener noreferrer">Найти приказ на сайте Минспорта</a>' : '') + '</div>';
+    else x += '<div class="meta">' + (r.status === 'approved' ? '✅ Подтвердил' : r.status === 'rejected' ? '✕ Отклонил' : 'Отозвана') + (r.decidedBy ? ' ' + esc(r.decidedBy) : '') + (r.decided ? ', ' + fmtDate(r.decided) : '') + (r.note ? ' — ' + esc(r.note) : '') + '</div>';
+    return x + '</div>';
+  }).join('');
+}
+
 // есть ли у меня хоть что-то в панели управления
-const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners'].some(k => Api.perm(k));
+const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners', 'titles'].some(k => Api.perm(k));
 function adminView() {
   const head = '<h1 class="h1">Управление</h1>';
   if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
   if (!anyAdm()) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
-    P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
+    P2('titles') ? [['titles', 'Звания']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
     Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
-  h += T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
+  h += T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
   return h + '</div>';
 }
 const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
@@ -3619,7 +3730,7 @@ function admAccounts() {
   let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Игрок вводит код от вас и сразу играет со своего телефона, участвует в турнирах. Позже сможет привязать телефон или VK.</p>';
   h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
   h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
-  h += '<input class="inp" id="adm-title" maxlength="40" placeholder="Разряд или звание" aria-label="Разряд"><button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
+  h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
   if (S.admNew) h += codeNote(S.admNew);
   h += '</details>';
   if (full) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -3670,11 +3781,12 @@ function admCardModal() {
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
-  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div><input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Разряд или звание" aria-label="Разряд"><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button></div></div>';
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button></div></div>';
   // роль и доступ
   const roles = tech ? ['player', 'host', 'admin', 'tech'] : Api.perm('give_host') && !high ? ['player', 'host'] : null;
   const acts = [];
   if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + ROLE_NAME[r] + '</option>').join('') + '</select></label>');
+  if (p.title && Api.perm('titles')) acts.push('<button class="mini dng" data-act="ac-untitle" data-v="' + p.id + '">Снять звание ' + esc(p.title) + '</button>');
   if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
   if (!p.vk && (full || mine) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
   if (full && (!high || tech) && p.id !== ME) acts.push('<button class="mini" data-act="ac-logout" data-v="' + p.id + '">Завершить сеансы</button>');
@@ -3763,7 +3875,7 @@ function admStats() {
   const st = svState(e, 'сводки');
   if (st) return st;
   const d = e.data, t = (l, v, s) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span>' + (s ? '<span class="s">' + s + '</span>' : '') + '</div>';
-  return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
+  return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('Заявки на звания', d.titlesPending || 0, d.titlesPending ? '<button class="lnk" data-act="adm-tab" data-v="titles">проверить</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
 }
 const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', tv: 'Табло' };
 function admBanners() {
@@ -4417,6 +4529,7 @@ function render() {
     : R.startsWith('tv.') ? tvView(R.slice(3))
     : R === 'admin' ? adminView()
     : R === 'staff' ? staffView()
+    : R === 'title' ? titleView()
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
     : feedView();
@@ -4553,12 +4666,39 @@ document.addEventListener('click', e => {
       break;
     }
     case 'adm-tab': S.admTab = v; render(); break;
+    case 'tf-kind': if (S.tForm) { S.tForm.title = v; const kd = SVC['titles:kinds'] && SVC['titles:kinds'].data.kinds.find(x => x.k === v); if (kd && kd.fed && !S.tForm.issuer) S.tForm.issuer = 'Минспорт России'; render(); } break;
+    case 'tdoc-rm': if (S.tForm) { S.tForm.docs = S.tForm.docs.filter(d => d.id !== v); render(); } break;
+    case 'title-new': S.tNew = true; S.tForm = null; S.tErr = ''; render(); break;
+    case 'title-back': S.tNew = false; render(); break;
+    case 'title-cancel': svDo(Api.del('/api/titles/' + v), () => { svStale('titles:mine'); toast('Заявка отозвана.'); }); break;
+    case 'title-send': {
+      const F = S.tForm;
+      if (!F) break;
+      S.tErr = !F.title ? 'Выберите звание или разряд.' : F.fullName.trim().split(/\s+/).length < 2 ? 'Укажите фамилию и имя, как в документе.' : !F.orderNo.trim() ? 'Укажите номер приказа.' : !F.orderDate ? 'Укажите дату приказа.' : !F.issuer.trim() ? 'Укажите, кто присвоил.' : !F.docs.length ? 'Приложите фото или скан документа.' : '';
+      if (S.tErr) { render(); break; }
+      S.tBusy = true; render();
+      svDo(Api.post('/api/titles', { fullName: F.fullName.trim(), title: F.title, orderNo: F.orderNo.trim(), orderDate: Date.parse(F.orderDate + 'T12:00:00Z'), issuer: F.issuer.trim(), comment: F.comment.trim(), docs: F.docs.map(d => d.id) }).then(() => { S.tForm = null; S.tNew = false; svStale('titles:mine'); toast('Заявка отправлена: автоматическая проверка пройдена, ждёт администратора.'); }).catch(e => { S.tErr = e.net ? 'Нет связи с сервером.' : e.message; }).finally(() => { S.tBusy = false; }));
+      break;
+    }
+    case 'tt-f': S.ttF = v; render(); break;
+    case 'tt-dec': {
+      const [id, st] = v.split('|'), el = $('tt-note-' + id), note = el ? el.value.trim() : '';
+      if (st === 'rejected' && !note) { toast('Напишите причину отказа — игрок её увидит.'); if (el) el.focus(); break; }
+      svDo(Api.patch('/api/admin/titles/' + id, { status: st, note }), () => { svStale('atitles:'); svStale('acard:'); svStale('admin:'); svStale('astats'); toast(st === 'approved' ? 'Звание подтверждено.' : 'Заявка отклонена.'); });
+      break;
+    }
+    case 'ac-untitle': {
+      const note = prompt('Почему снимаете звание? (запишется в журнал)');
+      if (note == null) break;
+      svDo(Api.req('DELETE', '/api/admin/players/' + v + '/title', { note }), () => { svStale('acard:'); svStale('admin:'); svStale('player:'); toast('Звание снято.'); });
+      break;
+    }
     case 'adm-new-tg': S.admNewOpen = !S.admNewOpen; render(); break;
     case 'adm-open': closeModals(); S.admOpen = v; svStale('acard:'); render(); break;
     case 'ac-save': {
       const val = k => { const el = $('ac-' + k); return el ? el.value.trim() : ''; };
       if (val('name').length < 2) { toast('Имя — от 2 символов.'); break; }
-      svDo(Api.patch('/api/admin/players/' + v, { name: val('name'), city: val('city'), club: val('club'), title: val('title') }), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
+      svDo(Api.patch('/api/admin/players/' + v, Object.assign({ name: val('name'), city: val('city'), club: val('club') }, $('ac-title') ? { title: val('title') } : {})), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
       break;
     }
     case 'ac-logout': svDo(Api.post('/api/admin/players/' + v + '/logout'), r => { svStale('acard:'); toast('Сеансы завершены: ' + r.sessions + '.'); }); break;
@@ -4703,16 +4843,15 @@ document.addEventListener('click', e => {
     case 'cancelname': S.editName = false; render(); break;
     case 'savename': {
       const val = k => { const el = $('me-' + k); return el ? el.value.trim() : null; };
-      const nv = val('name'), city = val('city'), club = val('club'), title = val('title');
+      const nv = val('name'), city = val('city'), club = val('club');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '', title: title || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;
       if (city) meP().city = city;
       if (club != null) meP().club = club;
-      if (title != null) meP().title = title;
       if (su.names[0] === old) { su.names[0] = nv; saveSu(); }
       saveDb(); S.editName = false; toast('Профиль обновлён.'); render(); break;
     }
@@ -4858,6 +4997,7 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.bnr && S.bnr) { S.bnr[t.dataset.bnr] = t.value; return; }
   if (t.id === 'num-n') { S.numN = t.value; return; }
   if (t.id === 'st-login') { S.staffLogin = t.value; return; }
+  if (t.dataset && t.dataset.tf && S.tForm) { S.tForm[t.dataset.tf] = t.value; return; }
   if (t.dataset && t.dataset.numq) { S.numQ = t.value; clearTimeout(S.numT); S.numT = setTimeout(() => { S.numQQ = S.numQ; render(); const el = $('num-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 300); return; }
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
@@ -4881,6 +5021,7 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
+  if (t.id === 'tf-file') { titleUpload([...(t.files || [])]); t.value = ''; return; }
   if (t.dataset && t.dataset.perm && S.permEd) {
     const [k, r] = t.dataset.perm.split('|'), cur = S.permEd[k] || [];
     S.permEd[k] = t.checked ? cur.concat(cur.includes(r) ? [] : [r]) : cur.filter(x => x !== r);
