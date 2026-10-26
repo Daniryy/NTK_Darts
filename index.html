@@ -792,6 +792,29 @@ button.banner:hover { border-color: var(--line-bright); }
 .tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
 .note-box.ok { border-color: var(--green); }
 .treq { display: grid; gap: 8px; }
+.achs { display: flex; flex-wrap: wrap; gap: 6px; }
+.ach { font-size: 12.5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.ach.on { color: var(--fg); border-color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.procard { display: grid; gap: 10px; }
+.rolechip.r-pro { text-transform: uppercase; color: #1a1205; background: linear-gradient(135deg, #f7c948, #e8a317); border-color: transparent; font-weight: 800; }
+.dlt { font-weight: 600; }
+.dlt.up { color: var(--green); }
+.dlt.dn { color: var(--red); }
+.pbar { display: grid; grid-template-columns: 70px minmax(0, 1fr) 110px; gap: 10px; align-items: center; font-size: 13px; }
+.pb-t { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.pb-t i { display: block; height: 100%; background: var(--green); border-radius: 4px; }
+.pb-v { text-align: right; font-variant-numeric: tabular-nums; }
+.pform { display: flex; align-items: flex-end; gap: 4px; height: 130px; }
+.pf-c { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
+.pf-c i { display: block; width: 100%; max-width: 34px; background: color-mix(in srgb, var(--green) 70%, transparent); border-radius: 4px 4px 0 0; }
+.pf-v, .pf-d { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.h2h { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; text-align: center; gap: 8px; }
+.h2h b { font-family: var(--display); font-size: 40px; display: block; }
+.h2h b.w { color: var(--green); }
+.walkon { margin: 2px 0; }
+.tvpro { font-size: .45em; font-weight: 800; margin-left: .5vw; padding: .1em .4em; border-radius: .3em; color: #1a1205; background: linear-gradient(135deg, #f7c948, #e8a317); vertical-align: middle; }
+.tvwalk { font-size: max(14px, 1.05vw); font-weight: 600; color: var(--green); padding: .2vw 0 .5vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) { .pbar { grid-template-columns: 58px minmax(0, 1fr) 96px; } .pf-d { display: none; } }
 .ptitle { font-weight: 600; margin: 2px 0 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
 .card.plan { padding: 16px; display: grid; gap: 8px; align-content: start; }
@@ -2565,17 +2588,19 @@ function profileView(id) {
   const p = P[id];
   if (!p) return '<div class="note-box">Игрок не найден.</div>';
   const tours = db.tournaments.filter(t => t.players.includes(id)).sort((a, b) => b.start - a.start).map(t => ({ id: t.id, name: t.name, start: t.start, badge: placeBadge(t, id) }));
-  return profileHTML(p, pStats(id, S.pf === 'off'), pStats(id, false), tours);
+  return profileHTML(p, pStats(id, S.pf === 'off'), pStats(id, false), tours, achDemo(id));
 }
 // p — игрок, s — статистика выбранных матчей (с ms — матчами), all — по всем, tours — [{ id, name, start, badge }]
-function profileHTML(p, s, all, tours) {
+// ax — { best, wins } для достижений
+function profileHTML(p, s, all, tours, ax) {
   const id = p.id, isMe = id === ME, canPhoto = canEditPlayer(p);
   let h = '<div class="phero"><div style="display:grid;gap:6px;justify-items:center">' + avatar(id, 'lg') + (canPhoto ? '<button class="ghost sm" data-act="photo-pick" data-v="avatar|' + id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button>' + (p.photo ? '<button class="ghost sm dng" data-act="photo-del-av" data-v="' + id + '">Убрать</button>' : '') : '') + '</div><div style="min-width:0">';
   if (isMe && S.editName) {
-    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (SRV ? '<span class="meta">Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button></span>' : '') + '<div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
+    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (SRV ? (Api.perm('pro') ? '<input class="inp" id="me-walkon" maxlength="60" value="' + esc(p.walkon || '') + '" placeholder="Выходная музыка: исполнитель — трек" aria-label="Выходная музыка">' : '<span class="meta">Выходная музыка на табло — в <button class="lnk" data-act="go" data-v="plans">тарифе Pro</button></span>') : '') + (SRV ? '<span class="meta">Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button></span>' : '') + '<div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
   } else {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
+  if (!(isMe && S.editName) && p.walkon) h += '<div class="meta walkon" title="Выходная музыка — играет на табло, когда игрок выходит на матч">♪ ' + esc(p.walkon) + '</div>';
   if (!(isMe && S.editName) && p.title) h += '<div class="ptitle" title="Звание подтверждено по документу">' + esc(TITLE_FULL[p.title] || p.title) + ' <span class="tchip">✓ подтверждено</span></div>';
   if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
   if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
@@ -2594,6 +2619,9 @@ function profileHTML(p, s, all, tours) {
     CHART = pts.length >= 2 ? pts : null;
     if (CHART) h += '<div class="card sec"><div class="tstat"><span class="label">Среднее за последние ' + pts.length + ' ' + pl(pts.length, 'матч', 'матча', 'матчей') + '</span></div><div class="chart" id="chart" role="img" aria-label="График среднего набора по матчам"></div></div>';
   }
+  if (ax && all.n) h += achHTML(Object.assign({ n: all.n, w: all.w, c180: all.c180 || 0, hco: all.hco || 0, bl: all.bl || 0 }, ax));
+  if (SRV && isMe) h += proCard();
+  else if (SRV && ME && Api.me) h += h2hCard(id);
   h += '<div class="pgrid"><div class="sec"><span class="label">Последние матчи</span><div class="list">';
   const shown = S.pMore ? s.ms : s.ms.slice(0, 6);
   const mrow = m => {
@@ -3534,7 +3562,7 @@ function roleName(r) {
   if (x) ROLE_NAME[r] = x.name.toLowerCase();
   return x ? ROLE_NAME[r] : r;
 }
-const roleChip = r => r && r !== 'player' ? '<span class="rolechip r-' + (ROLE_NAME[r] && /^(host|admin|tech)$/.test(r) ? r : 'x') + '">' + esc(roleName(r)) + '</span>' : '';
+const roleChip = r => r && r !== 'player' ? '<span class="rolechip r-' + (r === 'plus' ? 'pro' : ROLE_NAME[r] && /^(host|admin|tech)$/.test(r) ? r : 'x') + '">' + esc(roleName(r)) + '</span>' : '';
 const showPhone = p => p ? p.replace(/^\+7(\d{3})(\d{3})(\d{2})(\d{2})$/, '+7 $1 $2-$3-$4') : '';
 // «1 4 7-12» → [1, 4, 7, 8, 9, 10, 11, 12]
 function parseNums(s) {
@@ -3772,6 +3800,68 @@ function admPlans() {
   h += '<div class="card sec plan-ed"><span class="label">Новый тариф</span><div class="nrow"><input class="inp" id="pe-name-new" placeholder="Название" maxlength="40"><input class="inp" id="pe-price-new" placeholder="Цена, ₽" inputmode="numeric" style="max-width:110px"><input class="inp" id="pe-days-new" value="30" inputmode="numeric" style="max-width:80px" aria-label="Дней"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-new', 'plus') + '</div><textarea class="inp" id="pe-about-new" rows="3" maxlength="1000" placeholder="Что даёт — по строке на пункт"></textarea><button class="mini go" data-act="plan-add">Добавить тариф</button><span class="meta">Нужна своя роль для тарифа — добавьте её во вкладке «Права ролей» и отметьте, что ей доступно.</span></div></div>';
   h += '<div class="panel"><span class="h2">Скидка за звание, %</span><div class="nrow">' + d.discountKeys.map(k => '<label class="field" style="flex:1"><span class="label">' + esc(k.name) + '</span><input class="inp" id="disc-' + k.k + '" inputmode="numeric" value="' + d.discounts[k.k] + '"></label>').join('') + '</div><button class="btn sm" data-act="disc-save">Сохранить скидки</button></div>';
   return h;
+}
+
+/* ===== Достижения (для всех) и тариф Pro: статистика за период, личные встречи, выгрузка ===== */
+// x — { n, w, c180, hco, bl } по всем матчам, best — лучшее среднее за матч, wins — выигранных турниров
+const ACH = [
+  ['win', 'Первая победа', x => x.w >= 1], ['m10', '10 матчей', x => x.n >= 10], ['m100', '100 матчей', x => x.n >= 100],
+  ['180', 'Первые 180', x => x.c180 >= 1], ['180x10', '180 × 10', x => x.c180 >= 10], ['ton', 'Закрытие 100+', x => x.hco >= 100], ['170', 'Big Fish — 170', x => x.hco === 170],
+  ['l15', 'Лег за 15 дротиков', x => x.bl > 0 && x.bl <= 15], ['l12', 'Лег за 12 дротиков', x => x.bl > 0 && x.bl <= 12], ['l9', 'Девятидротиковый лег', x => x.bl === 9],
+  ['a60', 'Среднее 60+ за матч', x => x.best >= 60], ['a80', 'Среднее 80+ за матч', x => x.best >= 80], ['a100', 'Среднее 100+ за матч', x => x.best >= 100],
+  ['champ', 'Победа в турнире', x => x.wins >= 1]
+];
+function achHTML(x) {
+  const got = ACH.filter(a => a[2](x)).length;
+  return '<div class="card sec"><div class="tstat"><span class="label">Достижения · ' + got + ' из ' + ACH.length + '</span></div><div class="achs">' + ACH.map(a => { const ok = a[2](x); return '<span class="ach' + (ok ? ' on' : '') + '" title="' + (ok ? 'Получено' : 'Ещё не получено') + '">' + (ok ? '★ ' : '') + esc(a[1]) + '</span>'; }).join('') + '</div></div>';
+}
+// для демо: лучшее среднее и победы в турнирах из локальных данных
+function achDemo(id) {
+  let best = 0;
+  pStats(id, false).ms.forEach(m => { const l = m.pl.find(y => y.id === id); if (l && isPlainX01(m) && l.darts >= 9) best = Math.max(best, l.pts / l.darts * 3); });
+  const wins = db.tournaments.filter(t => t.players.includes(id) && tStatus(t) === 'done' && (t.format === 'rr' ? standings(t)[0].id === id : (placeRange(t, id) || [])[0] === 1 && (placeRange(t, id) || [])[1] === 1)).length;
+  return { best, wins };
+}
+
+const proBtn = () => '<button class="btn sm" data-act="go" data-v="plans">Подключить Pro</button>';
+const delta = (v, p, d) => v == null || p == null ? '' : '<span class="dlt ' + (v > p ? 'up' : v < p ? 'dn' : '') + '">' + (v > p ? '▲' : v < p ? '▼' : '=') + ' ' + Math.abs(Math.round((v - p) * 10) / 10) + (d || '') + '</span>';
+const barRow = (label, pctV, sub) => '<div class="pbar"><span class="pb-l">' + label + '</span><span class="pb-t"><i style="width:' + Math.max(0, Math.min(100, pctV || 0)) + '%"></i></span><span class="pb-v">' + (pctV == null ? '—' : pctV + '%') + (sub ? ' <span class="meta">' + sub + '</span>' : '') + '</span></div>';
+function proCard() {
+  if (!Api.perm('pro')) {
+    return '<div class="card sec procard"><div class="tstat"><span class="label">Статистика Pro</span><span class="rolechip r-pro">pro</span></div><ul class="plan-f"><li>Форма по неделям и сравнение с прошлым периодом</li><li>Закрытия по остаткам: где закрываете, где теряете</li><li>Распределение наборов и рекорды упражнений</li><li>Сравнение с игроками своего уровня</li><li>Личные встречи с любым соперником</li><li>Выгрузка всех матчей в Excel, без рекламы</li></ul>' + proBtn() + '</div>';
+  }
+  const per = S.proP || '90', e = lz('pro:' + per, () => Api.get('/api/me/pro?period=' + per), 60000);
+  let h = '<div class="card sec procard"><div class="tstat"><span class="label">Статистика Pro</span><a class="mini" href="' + esc(Api.base) + '/api/me/export.csv" download>Выгрузить в Excel</a></div>';
+  h += '<div class="seg2">' + [['30', '30 дней'], ['90', '90 дней'], ['365', 'Год'], ['all', 'Всё время']].map(([v, l]) => '<button class="' + (per === v ? 'on' : '') + '" data-act="pro-p" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  const st = svState(e, 'статистики');
+  if (st) return h + st + '</div>';
+  const d = e.data, s = d.summary, p = d.prev;
+  if (!s.n) return h + '<div class="note-box">За этот период матчей x01 нет.</div></div>';
+  const t = (l, v, sub) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span><span class="s">' + (sub || '') + '</span></div>';
+  h += '<div class="tiles">' + t('Среднее', s.avg != null ? s.avg.toFixed(1) : '—', p ? delta(s.avg, p.avg) + ' к прошлому периоду' : s.n + ' ' + pl(s.n, 'матч', 'матча', 'матчей')) + t('Первые 9', s.f9 != null ? s.f9.toFixed(1) : '—', p ? delta(s.f9, p.f9) : '') + t('Закрытия', s.co != null ? s.co + '%' : '—', p ? delta(s.co, p.co, '%') : '') + t('180', s.c180, 'побед ' + s.w + ' из ' + s.n) + '</div>';
+  // форма: столбики среднего по неделям или месяцам
+  if (d.form.length > 1) {
+    const mx = Math.max(...d.form.map(f => f.avg)), mn = Math.min(...d.form.map(f => f.avg)), lo = Math.max(0, Math.floor(mn / 10) * 10 - 10);
+    h += '<span class="label">Форма · среднее по ' + (d.period === 'all' || +d.period > 90 ? 'месяцам' : 'неделям') + '</span><div class="pform">' + d.form.map(f => '<div class="pf-c" title="' + fmtDate(f.t) + ': ' + f.avg + ' · ' + f.n + ' ' + pl(f.n, 'матч', 'матча', 'матчей') + '"><span class="pf-v">' + Math.round(f.avg) + '</span><i style="height:' + Math.max(6, Math.round((f.avg - lo) / Math.max(1, mx - lo) * 100)) + '%"></i><span class="pf-d">' + fmtDate(f.t).replace(/ \d{4}$/, '') + '</span></div>').join('') + '</div>';
+  }
+  h += '<span class="label">Закрытия по остаткам</span>' + d.co.map(b => barRow(b.lo + '–' + b.hi, b.pct, b.att ? b.hit + ' из ' + b.att : '')).join('');
+  if (d.top.length) h += '<span class="label">Частые остатки</span><div class="achs">' + d.top.map(r => '<span class="ach' + (r.pct >= 50 ? ' on' : '') + '"><b>' + r.s + '</b> · ' + r.hit + '/' + r.att + ' (' + Math.round(r.pct) + '%)</span>').join('') + '</div>';
+  if (d.bands.some(b => b.n)) h += '<span class="label">Наборы за подход (вне зоны закрытия)</span>' + d.bands.map(b => barRow(b.label, b.pct, b.n ? b.n + '' : '')).join('');
+  if (d.peers) h += d.peers.n >= 5 ? '<div class="note-box ok">Среди ' + d.peers.n + ' игроков с рейтингом ' + d.peers.lo + '–' + d.peers.hi + ': по среднему вы лучше, чем <b>' + d.peers.avg + '%</b>, по закрытиям — чем <b>' + d.peers.co + '%</b>.</div>' : '<div class="note-box">Для сравнения с игроками вашего уровня пока мало соперников с рейтингом ' + d.peers.lo + '–' + d.peers.hi + '.</div>';
+  if (d.records.length) h += '<span class="label">Рекорды упражнений</span><div class="list">' + d.records.map(r => '<div class="trow"><div style="display:grid;min-width:0"><b>' + esc(r.label) + '</b><span class="meta">' + r.legs + ' ' + pl(r.legs, 'попытка', 'попытки', 'попыток') + (r.at ? ' · рекорд ' + fmtDate(r.at) : '') + '</span></div><span class="num">' + r.best + ' <span class="meta">' + esc(r.unit) + '</span></span></div>').join('') + '</div>';
+  return h + '</div>';
+}
+// личные встречи со мной на странице другого игрока
+function h2hCard(id) {
+  if (!Api.perm('pro')) return '<div class="note-box">Личные встречи с этим игроком — в тарифе Pro. <button class="lnk" data-act="go" data-v="plans">Подробнее</button></div>';
+  const e = lz('h2h:' + id, () => Api.get('/api/players/' + encodeURIComponent(id) + '/h2h'), 60000);
+  const st = svState(e, 'личных встреч');
+  if (st) return st;
+  const d = e.data;
+  if (!d.n) return '<div class="card sec"><span class="label">Личные встречи</span><p class="meta">Вы ещё не играли друг с другом.</p></div>';
+  return '<div class="card sec"><div class="tstat"><span class="label">Личные встречи · ' + d.n + ' ' + pl(d.n, 'матч', 'матча', 'матчей') + '</span><span class="rolechip r-pro">pro</span></div><div class="h2h"><div><b class="' + (d.w > d.l ? 'w' : '') + '">' + d.w + '</b><span class="meta">вы</span></div><div class="meta">победы<br>леги ' + d.legs[0] + ':' + d.legs[1] + '</div><div><b class="' + (d.l > d.w ? 'w' : '') + '">' + d.l + '</b><span class="meta">' + esc((P[id] || {}).name || '') + '</span></div></div>' +
+    (d.avg[0] != null ? '<p class="meta">Среднее в ваших встречах: вы ' + d.avg[0].toFixed(1) + ', соперник ' + (d.avg[1] != null ? d.avg[1].toFixed(1) : '—') + '</p>' : '') +
+    '<div class="list">' + d.matches.map(svMatch).map(m => { const i = m.pl.findIndex(l => l.id === ME), won = m.w === i; return '<div class="prw" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '"><span class="wl' + (won ? ' w' : '') + '">' + (won ? 'В' : 'П') + '</span><span class="num">' + [m.pl[i]].concat(m.pl.filter((x, j) => j !== i)).map(l => l.legs).join(':') + '</span><div style="display:grid;min-width:0"><span class="meta ell">' + esc(matchCtx(m) + ' · ' + fmtDate(m.t)) + '</span></div><span class="meta">' + (m.pl[i].darts ? 'ср. ' + lAvg(m.pl[i]) : '') + '</span></div>'; }).join('') + '</div></div>';
 }
 
 // есть ли у меня хоть что-то в панели управления
@@ -4056,9 +4146,12 @@ function liveTile(t, m) {
   m.players.forEach((p, i) => {
     const ph = O.photos && photoOf(p.id) ? '<img class="tph" src="' + esc(photoOf(p.id)) + '" alt="">' : '';
     const av = O.avg && s.avg && s.avg[i] != null ? '<span class="meta" style="margin-left:.6vw;font-size:.6em;font-weight:500">ср. ' + s.avg[i].toFixed(1) + '</span>' : '';
-    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + ph + (O.nums ? noBadge(t, p.id) : '') + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' + av + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
+    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + ph + (O.nums ? noBadge(t, p.id) : '') + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' + (P[p.id] && P[p.id].pro ? '<span class="tvpro">PRO</span>' : '') + av + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
   });
   const L = s.last;
+  // выход на матч: до первого броска — выходная музыка игроков Pro
+  const walk = !L && (s.leg || 1) === 1 ? m.players.filter(p => P[p.id] && P[p.id].walkon) : [];
+  if (walk.length) h += '<div class="tvwalk">' + walk.map(p => '♪ ' + esc(p.name.split(' ').pop()) + ': ' + esc(P[p.id].walkon)).join(' · ') + '</div>';
   h += '<div class="sub"><span>' + esc(Games.name(ex)) + (O.progress ? (m.players.length > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (N && s.vis ? ' · подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : '') : '') + '</span><span>' + (s.tie ? 'ничья — булл' : O.last && L ? esc((m.players[L.p] || {}).name || '').split(' ').pop() + ': ' + (L.b ? 'перебор' : L.pts) : '') + '</span></div>';
   // перерисовка не перезапускает анимацию: она продолжается с прошедшего момента
   if (fx) h += '<div class="tvfx on ' + fx.k + '" style="animation-delay:-' + (Date.now() - fx.at) + 'ms" aria-hidden="true">' + esc(fx.t) + '</div>';
@@ -4426,7 +4519,7 @@ function svPlayer(p) {
 }
 // турнир сервера — тот же объект, что у страницы (docs/api.md, Tour)
 function svTour(tj) {
-  Object.keys(tj.roster || {}).forEach(id => { const x = tj.roster[id]; svPlayer({ id, name: x.name, city: x.city, club: x.club, r: x.r, photo: x.photo || null, title: x.title || '' }); });
+  Object.keys(tj.roster || {}).forEach(id => { const x = tj.roster[id]; svPlayer({ id, name: x.name, city: x.city, club: x.club, r: x.r, photo: x.photo || null, title: x.title || '', walkon: x.walkon || '', pro: !!x.pro }); });
   TBY[tj.id] = tj;
   return tj;
 }
@@ -4571,7 +4664,8 @@ function profileViewS(id) {
   const d = e.data, p = svPlayer(d.player);
   RANK[id] = d.rank;
   const sc = S.pf === 'off' ? d.stats.tour : d.stats.all, ms = d.matches.map(svMatch).filter(m => S.pf !== 'off' || m.tid);
-  return profileHTML(p, Object.assign({}, sc, { ms }), d.stats.all, d.tournaments.map(t => ({ id: t.id, name: t.name, start: t.start, badge: t.place ? plcBadge(t.place[0], t.place[1], t.place[0] === t.place[1] || t.status === 'done') : '<span class="meta">' + (t.status === 'reg' ? 'записан' : '—') + '</span>' })));
+  const ax = { best: d.bestAvg || 0, wins: d.tournaments.filter(t => t.status === 'done' && t.place && t.place[0] === 1 && t.place[1] === 1).length };
+  return profileHTML(p, Object.assign({}, sc, { ms }), d.stats.all, d.tournaments.map(t => ({ id: t.id, name: t.name, start: t.start, badge: t.place ? plcBadge(t.place[0], t.place[1], t.place[0] === t.place[1] || t.status === 'done') : '<span class="meta">' + (t.status === 'reg' ? 'записан' : '—') + '</span>' })), ax);
 }
 function accountBox() {
   let h = '<div class="field"><span class="label">Данные</span><div class="seg2 full">' + [['server', 'Сервер'], ['demo', 'Демо в браузере']].map(([v, l]) => '<button class="' + ((SRV ? 'server' : 'demo') === v ? 'on' : '') + '" data-act="set-mode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -4766,6 +4860,7 @@ document.addEventListener('click', e => {
       svDo(Api.post('/api/titles', { fullName: F.fullName.trim(), title: F.title, orderNo: F.orderNo.trim(), orderDate: Date.parse(F.orderDate + 'T12:00:00Z'), issuer: F.issuer.trim(), comment: F.comment.trim(), docs: F.docs.map(d => d.id) }).then(() => { S.tForm = null; S.tNew = false; svStale('titles:mine'); toast('Заявка отправлена: автоматическая проверка пройдена, ждёт администратора.'); }).catch(e => { S.tErr = e.net ? 'Нет связи с сервером.' : e.message; }).finally(() => { S.tBusy = false; }));
       break;
     }
+    case 'pro-p': S.proP = v; render(); break;
     case 'plan-req': svDo(Api.post('/api/plans/' + v + '/request'), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф.'); }); break;
     case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
     case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
@@ -4854,7 +4949,7 @@ document.addEventListener('click', e => {
       if (!d) break;
       const RK = { player: 0, host: 1, admin: 2, tech: 3 };
       // по умолчанию права есть только у встроенных ролей
-      S.permEd = Object.fromEntries(d.perms.map(x => [x.key, d.roles.filter(r => r.key in RK && RK[r.key] >= RK[x.min]).map(r => r.key)]));
+      S.permEd = Object.fromEntries(d.perms.map(x => [x.key, d.roles.filter(r => (r.key in RK && RK[r.key] >= RK[x.min]) || (x.extra || []).includes(r.key)).map(r => r.key)]));
       render(); break;
     }
     case 'audit-more': svDo(Api.get('/api/admin/audit?limit=100&before=' + v), r => { S.auditMore = (S.auditMore || []).concat(r.items); if (r.items.length < 100) S.auditEnd = true; }); break;
@@ -4975,10 +5070,10 @@ document.addEventListener('click', e => {
     case 'cancelname': S.editName = false; render(); break;
     case 'savename': {
       const val = k => { const el = $('me-' + k); return el ? el.value.trim() : null; };
-      const nv = val('name'), city = val('city'), club = val('club');
+      const nv = val('name'), city = val('city'), club = val('club'), walkon = val('walkon');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', Object.assign({ name: nv, city: city || '', club: club || '' }, walkon != null ? { walkon } : {})), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;

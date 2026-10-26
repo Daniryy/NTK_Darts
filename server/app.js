@@ -59,6 +59,7 @@ function build(opts = {}) {
     api.register(require('./routes/banners'));
     api.register(require('./routes/titles'));
     api.register(require('./routes/plans'));
+    api.register(require('./routes/pro'));
   });
 
   if (config.serveStatic) {

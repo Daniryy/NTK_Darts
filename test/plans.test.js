@@ -39,7 +39,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 
 test('тарифы и цена со скидкой за звание', async () => {
   plans = ok(await call(null, 'GET', '/api/plans')).plans;
-  assert.deepEqual(plans.map(p => [p.name, p.price, p.final, p.role]), [['Игрок+', 249, 249, 'plus'], ['Ведущий', 799, 799, 'host']]);
+  assert.deepEqual(plans.map(p => [p.name, p.price, p.final, p.role]), [['Pro', 249, 249, 'plus'], ['Ведущий', 799, 799, 'host']]);
   const host = id => plans.find(p => p.role === 'host').id;
   const v = async u => ok(await call(u, 'GET', '/api/plans')).plans.find(p => p.role === 'host');
   assert.deepEqual([(await v(MS)).discount, (await v(MS)).final], [25, 599]);

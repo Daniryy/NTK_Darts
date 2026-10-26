@@ -9,8 +9,9 @@ const ROLE_NAME = { player: 'игрок', host: 'ведущий', admin: 'адм
 const ROLES = Object.keys(RANK);
 const atLeast = (p, role) => !!p && !p.blocked && (RANK[p.role] || 0) >= RANK[role];
 
-// [ключ, роль по умолчанию, что разрешает]
+// [ключ, роль по умолчанию, что разрешает, свои роли, которым право дано по умолчанию]
 const PERMS = [
+  ['pro', 'host', 'Pro: расширенная статистика, личные встречи, выходная музыка, без рекламы', ['plus']],
   ['club_tour', 'host', 'Турниры от имени своего клуба (официальные)'],
   ['streams', 'host', 'Камеры (трансляции) в своих турнирах'],
   ['accounts', 'host', 'Заводить аккаунты с кодом входа'],
@@ -27,11 +28,11 @@ const PERMS = [
   ['audit', 'admin', 'Журнал действий'],
   ['banners', 'tech', 'Баннеры']
 ];
-const PERM = Object.fromEntries(PERMS.map(([k, min, name]) => [k, { min, name }]));
+const PERM = Object.fromEntries(PERMS.map(([k, min, name, extra]) => [k, { min, name, extra: extra || [] }]));
 // роли, которым право можно дать в настройках (тех. администратору доступно всё и так)
 const grantable = () => ROLES.filter(r => r !== 'tech');
 // по умолчанию: роли не ниже нужной; свои роли (ранг 1) по умолчанию прав ведущего не получают
-const byDefault = k => grantable().filter(r => (r in { player: 1, host: 1, admin: 1 }) && RANK[r] >= RANK[PERM[k].min]);
+const byDefault = k => grantable().filter(r => ((r in { player: 1, host: 1, admin: 1 }) && RANK[r] >= RANK[PERM[k].min]) || PERM[k].extra.includes(r));
 
 let custom = {};
 // настройки из базы: { ключ: [роли] }; неизвестное отбрасывается
@@ -52,7 +53,7 @@ const rolesOf = k => custom[k] || byDefault(k);
 const can = (p, k) => !!p && !p.blocked && !!PERM[k] && (p.role === 'tech' || rolesOf(k).includes(p.role));
 const permsOf = p => Object.keys(PERM).filter(k => can(p, k));
 // таблица для панели: [{ key, name, min, roles }]
-const permTable = () => PERMS.map(([key, min, name]) => ({ key, name, min, roles: rolesOf(key) }));
+const permTable = () => PERMS.map(([key, min, name, extra]) => ({ key, name, min, extra: extra || [], roles: rolesOf(key) }));
 // старое «администратор или выше» — для мест, где права не делятся
 const isAdmin = p => atLeast(p, 'admin');
 
