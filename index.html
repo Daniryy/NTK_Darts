@@ -3652,10 +3652,9 @@ function titleSteps(r) {
 }
 const AUTO_ICON = { ok: '✓', warn: '⚠', info: 'ℹ' };
 function autoList(list, admin) {
-  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><b>' + esc(x.label || '') + '</b><span>' + (x.k === 'minsport' ? '<a href="' + esc(x.text) + '" target="_blank" rel="noopener noreferrer">найти приказ на сайте Минспорта</a>' : linkify(x.text)) + '</span></div>').join('') + '</div>';
+  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><b>' + esc(x.label || '') + '</b><span>' + (x.k === 'minsport' ? '<a href="' + esc(x.text) + '" target="_blank" rel="noopener noreferrer">найти приказ на сайте Минспорта</a>' : esc(x.text)) + '</span></div>').join('') + '</div>';
 }
 // ссылки https в тексте — кликабельные
-const linkify = s => esc(s).replace(/https:\/\/[^\s<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener noreferrer">поиск на сайте Минспорта</a>');
 function docThumbs(docs, rm) {
   return '<div class="tdocs">' + docs.map(d => '<div class="tdoc">' + (d.mime === 'application/pdf' ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="tpdf">PDF</a>' : '<img src="' + esc(d.url) + '" alt="Документ" data-act="lbox" data-v="' + esc(d.url) + '">') + (rm ? '<button class="x" data-act="tdoc-rm" data-v="' + esc(d.id) + '" aria-label="Убрать файл">×</button>' : '') + '</div>').join('') + '</div>';
 }
@@ -3822,14 +3821,19 @@ const ACT_NAME = {
   'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
   'club.host_add': 'назначил ведущим', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
+  'title.submit': 'подал заявку на звание', 'title.approved': 'подтвердил звание', 'title.rejected': 'отклонил звание', 'title.revoke': 'снял звание',
+  'plan.request': 'оставил заявку на тариф', 'plan.grant': 'подключил тариф', 'plan.extend': 'продлил тариф', 'plan.reject': 'отклонил заявку на тариф', 'plan.end': 'завершил тариф',
+  'plan.create': 'добавил тариф', 'plan.edit': 'изменил тариф', discounts: 'изменил скидки за звание', 'role.create': 'добавил роль', 'role.rename': 'переименовал роль', 'role.delete': 'удалил роль',
   'cli.login': 'с сервера: выдан логин', 'cli.password': 'с сервера: сменён пароль', 'cli.unlock': 'с сервера: снята блокировка входа', 'cli.off': 'с сервера: убран вход по паролю'
 };
 function auditData(a) {
   const d = a.data || {};
   if (a.action === 'player.role') return roleName(d.from || '') + ' → ' + roleName(d.role);
+  if (a.action === 'discounts') return 'МС и выше −' + d.ms + '%, КМС −' + d.kms + '%, 1 разряд −' + d.r1 + '%';
+  if (/^title\./.test(a.action)) return [d.title, d.order ? 'приказ ' + d.order : '', d.note].filter(Boolean).join(' · ');
   if (/^plan\./.test(a.action)) return [d.plan, d.days ? d.days + ' дн.' : '', d.price != null ? rub(d.price) : '', d.note].filter(Boolean).join(' · ');
   if (a.action === 'player.block') return d.blocked ? 'заблокирован' : 'разблокирован';
-  if (a.action === 'perms') { const nm = k => { const x = SVC.aperms && SVC.aperms.data && SVC.aperms.data.perms.find(y => y.key === k); return x ? x.name : k; }; return Object.keys(d).map(k => nm(k) + ': ' + (d[k].length ? d[k].map(r => ROLE_NAME[r]).join(', ') : 'только тех. администратор')).join('; '); }
+  if (a.action === 'perms') { const nm = k => { const x = SVC.aperms && SVC.aperms.data && SVC.aperms.data.perms.find(y => y.key === k); return x ? x.name : k; }; return Object.keys(d).map(k => nm(k) + ': ' + (d[k].length ? d[k].map(r => roleName(r)).join(', ') : 'только тех. администратор')).join('; '); }
   if (a.action === 'player.edit') return Object.keys(d).map(k => ({ name: 'имя', city: 'город', club: 'клуб', title: 'разряд', ver: d.ver ? 'подтверждён' : 'не подтверждён', code: 'новый код входа' }[k] || k)).join(', ');
   if (d.club) return d.club;
   if (d.login) return 'логин ' + d.login;
@@ -3859,7 +3863,8 @@ function admCardModal() {
   if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + esc(roleName(r)) + '</option>').join('') + '</select></label>');
   if (p.title && Api.perm('titles')) acts.push('<button class="mini dng" data-act="ac-untitle" data-v="' + p.id + '">Снять звание ' + esc(p.title) + '</button>');
   if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
-  if (!p.vk && (full || mine) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
+  // аккаунту с телефоном новый код выдаёт только администратор (игрок входит по номеру)
+  if (!p.vk && (full || mine && !p.phone && !p.login) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
   if (full && (!high || tech) && p.id !== ME) acts.push('<button class="mini" data-act="ac-logout" data-v="' + p.id + '">Завершить сеансы</button>');
   if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
@@ -3910,7 +3915,7 @@ function admMe() {
 // вход администратора: страница #staff, в меню её нет
 function staffView() {
   if (!SRV) return '<div class="narrow"><h1 class="h1">Вход для администраторов</h1><div class="note-box">Нужен сервер: в демо-режиме входа нет.</div></div>';
-  if (Api.me && anyAdm()) return '<div class="narrow"><h1 class="h1">Вы вошли</h1><p class="meta">' + esc(Api.me.name) + ' · ' + ROLE_NAME[Api.role] + '</p><button class="btn" data-act="go" data-v="admin">Панель управления</button></div>';
+  if (Api.me && anyAdm()) return '<div class="narrow"><h1 class="h1">Вы вошли</h1><p class="meta">' + esc(Api.me.name) + ' · ' + esc(roleName(Api.role)) + '</p><button class="btn" data-act="go" data-v="admin">Панель управления</button></div>';
   return '<div class="narrow staff"><h1 class="h1">Вход для администраторов</h1><div class="panel"><input class="inp big" id="st-login" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин" aria-label="Логин" value="' + esc(S.staffLogin || '') + '"><input class="inp big" id="st-pass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль">' + (S.staffErr ? '<div class="err">' + esc(S.staffErr) + '</div>' : '') + '<button class="btn" data-act="staff-login">Войти</button></div><p class="meta">После 5 неверных паролей вход по этому логину закрывается на 15 минут.</p></div>';
 }
 function admNums() {
@@ -4573,7 +4578,7 @@ function accountBox() {
   if (!SRV) h += '<span class="meta">Демо: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Сервер выключен вручную.' : ' Сервер не отвечает.') + '</span>';
   h += '</div>';
   if (!SRV) return h;
-  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + ROLE_NAME[Api.role] : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (anyAdm() ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
+  if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + esc(roleName(Api.role)) : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (anyAdm() ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
   else h += '<button class="btn" data-act="login">Войти</button><span class="meta">По номеру телефона, через VK ID или по коду от ведущего.</span>';
   return h;
 }
