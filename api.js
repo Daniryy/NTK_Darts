@@ -33,7 +33,7 @@
   const NET_MSG = 'Нет связи с сервером';
 
   const Api = {
-    mode: 'demo', config: { vk: false, phone: false, dev: false }, me: null, admin: false, role: null, clubs: [], base: '',
+    mode: 'demo', config: { vk: false, phone: false, dev: false }, me: null, admin: false, role: null, perms: [], clubs: [], base: '',
     ApiError,
     get device() { return deviceId(); },
 
@@ -99,12 +99,17 @@
     // ответ «кто я» (/api/me, вход, правка профиля): игрок, роль, клубы ведущего; запоминается для входа без сети
     setMe(r) {
       Api.me = r.player || r.me || null; Api.admin = !!r.admin; Api.role = Api.me ? r.role || Api.me.role || 'player' : null; Api.clubs = r.clubs || [];
-      if (Api.mode === 'server') ls.set('oche.lastMe', Api.me ? { player: Api.me, admin: Api.admin, role: Api.role, clubs: Api.clubs, config: Api.config } : null);
+      Api.perms = Api.me ? r.perms || [] : [];
+      if (Api.mode === 'server') ls.set('oche.lastMe', Api.me ? { player: Api.me, admin: Api.admin, role: Api.role, perms: Api.perms, clubs: Api.clubs, config: Api.config } : null);
       return r;
     },
     async loadMe() { return Api.setMe(await Api.get('/api/me')); },
     // роль не ниже: player < host < admin < tech
     can: role => !!Api.me && ['player', 'host', 'admin', 'tech'].indexOf(Api.role) >= ['player', 'host', 'admin', 'tech'].indexOf(role),
+    // право из настроек ролей сервера (club_tour, streams, accounts, host_nums, players, block, give_host, clubs, …)
+    perm: k => !!Api.me && (Api.role === 'tech' || Api.perms.includes(k)),
+    // вход администратора по логину и паролю
+    async passwordLogin(login, password) { return Api.setMe(await Api.post('/api/auth/password', { login, password })); },
     // link — привязать VK к аккаунту, в который уже вошли
     loginUrl: (ret, link) => '/api/auth/vk?return=' + encodeURIComponent(ret || '/') + (link ? '&link=1' : ''),
     async devLogin(playerId) { await Api.post('/api/auth/dev', { playerId }); return Api.loadMe(); },

@@ -1,9 +1,12 @@
-// Вход: сессия в httpOnly-cookie; VK ID (OAuth 2.1 + PKCE), телефон с кодом из SMS, код от ведущего, вход для разработки.
+// Вход: сессия в httpOnly-cookie; VK ID (OAuth 2.1 + PKCE), телефон с кодом, код от ведущего,
+// логин и пароль администраторов, вход для разработки.
 const crypto = require('node:crypto');
 const config = require('./config');
 const { pool, tx, one } = require('./db');
 const { E, V, ApiError } = require('./errors');
-const { isAdmin } = require('./roles');
+const { isAdmin, atLeast, can, permsOf } = require('./roles');
+const { hit } = require('./limits');
+const { hashPassword, verifyPassword, passwordProblem, normLogin } = require('./password');
 const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
 
@@ -24,11 +27,12 @@ async function playerBySession(token) {
   return p;
 }
 
-async function startSession(reply, c, playerId, device) {
-  const token = b64url(crypto.randomBytes(32)), now = Date.now();
+// ms — срок сессии: обычный вход полгода, вход администратора по паролю — 30 дней
+async function startSession(reply, c, playerId, device, ms) {
+  const token = b64url(crypto.randomBytes(32)), now = Date.now(), ttl = ms || SESSION_MS;
   await c.query('INSERT INTO sessions (token_hash, player_id, device_id, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)',
-    [sha(token), playerId, device || null, now, now + SESSION_MS]);
-  reply.setCookie(SID, token, { path: '/', httpOnly: true, sameSite: 'lax', secure, maxAge: SESSION_MS / 1000 });
+    [sha(token), playerId, device || null, now, now + ttl]);
+  reply.setCookie(SID, token, { path: '/', httpOnly: true, sameSite: 'lax', secure, maxAge: Math.floor(ttl / 1000) });
 }
 
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -50,11 +54,19 @@ function hooks(app) {
 // сессии хранят игрока: после смены имени, фото или владельца аккаунта кэш сбрасывается
 const clearCache = () => cache.clear();
 const needPlayer = req => { if (!req.player) throw E.auth(); return req.player; };
-// ответ «кто я»: игрок, роль и клубы, где он ведущий
+// право из настроек ролей (roles.js): нет — 403
+const needPerm = (req, k, msg) => { const me = needPlayer(req); if (!can(me, k)) throw E.forbidden(msg || 'Нет прав'); return me; };
+// ответ «кто я»: игрок, роль, права и клубы, где он ведущий
 async function meResp(c, p) {
   const clubs = p ? await c.query(`SELECT c.id, c.name FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 AND c.status = 'active' ORDER BY c.name`, [p.id]) : { rows: [] };
-  return { player: meJSON(p), admin: isAdmin(p), role: p ? p.role : null, clubs: clubs.rows };
+  return { player: meJSON(p), admin: isAdmin(p), role: p ? p.role : null, perms: permsOf(p), clubs: clubs.rows };
 }
+// лимит попыток входа с одного IP: 429 с Retry-After
+function ipLimit(req, kind, max, ms) {
+  const wait = hit(kind + ':' + req.ip, max, ms);
+  if (wait) throw tooMany(wait, 'Слишком много попыток входа с этого адреса — повторите через ' + Math.ceil(wait / 60) + ' мин');
+}
+const PASS_FAILS = 5, PASS_LOCK = 15 * 6e4, PASS_SESSION = 30 * 864e5;
 const blockedErr = () => E.forbidden('Аккаунт заблокирован администратором');
 
 // телефон в виде +79991234567: 8… и 9… без кода страны считаем российскими
@@ -104,6 +116,7 @@ function routes(app) {
   // привязать аккаунт, созданный администратором: { code }. Свой новый аккаунт (без матчей и турниров) растворяется в нём.
   app.post('/api/me/claim', async req => {
     const me = needPlayer(req), code = normCode((req.body || {}).code);
+    ipLimit(req, 'code', 60, 10 * 6e4);
     const p = await tx(async c => {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
       if (!t) throw E.notFound('Код не найден — проверьте у организатора');
@@ -128,6 +141,7 @@ function routes(app) {
   // вход по коду от ведущего: аккаунт для тех, у кого нет VK и кто не хочет SMS. Код одноразовый.
   app.post('/api/auth/code', async (req, reply) => {
     const code = normCode((req.body || {}).code);
+    ipLimit(req, 'code', 60, 10 * 6e4);
     const p = await tx(async c => {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
       if (!t) throw E.notFound('Код не найден — проверьте у ведущего');
@@ -143,6 +157,7 @@ function routes(app) {
   app.post('/api/auth/phone', async (req, reply) => {
     if (!phoneOn()) throw E.notFound('Вход по телефону не настроен');
     const phone = normPhone((req.body || {}).phone), now = Date.now(), method = config.sms.method;
+    ipLimit(req, 'sms', 30, 36e5);
     // лимиты и запись в журнал — до отправки: ошибки провайдера тоже считаются
     await tx(async c => {
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [phone]);
@@ -170,6 +185,7 @@ function routes(app) {
   // шаг 2: { phone, code } → вход (новый номер — новый игрок); { link: true } — привязать номер к своему аккаунту
   app.post('/api/auth/phone/verify', async (req, reply) => {
     const b = req.body || {}, phone = normPhone(b.phone), code = String(b.code == null ? '' : b.code).replace(/\D/g, ''), now = Date.now();
+    ipLimit(req, 'verify', 60, 10 * 6e4);
     if (code.length !== DIGITS.call && code.length !== DIGITS.sms) throw E.bad('Код — 4 последние цифры номера, с которого звонили, или 6 цифр из SMS', 'code');
     const link = b.link === true, me = link ? needPlayer(req) : null;
     // попытка считается сразу и вне транзакции: неверный код не откатывает счётчик
@@ -195,12 +211,55 @@ function routes(app) {
     return Object.assign(await meResp(pool, p), { created });
   });
 
+  // вход администратора по логину и паролю (страница #staff). Логин и пароль задаются командой на сервере
+  // (npm run admin) или тех. администратором в панели; после 5 неверных паролей вход по логину закрыт на 15 минут.
+  app.post('/api/auth/password', async (req, reply) => {
+    const b = req.body || {}, login = normLogin(b.login), pw = typeof b.password === 'string' ? b.password : '';
+    ipLimit(req, 'pass', 10, 10 * 6e4);
+    const bad = () => E.conflict('bad_login', 'Неверный логин или пароль');
+    if (!login || !pw || pw.length > 200) throw bad();
+    const p = await one(pool, 'SELECT * FROM players WHERE login = $1', [login]);
+    // нет такого логина — всё равно считаем хэш: ответ по времени не выдаёт, есть ли логин
+    if (!p || !p.pass_hash) { await verifyPassword(pw, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'); throw bad(); }
+    const now = Date.now();
+    if (p.pass_lock_until && p.pass_lock_until > now) throw tooMany(Math.ceil((p.pass_lock_until - now) / 1000), 'Вход по логину временно закрыт после неверных паролей — повторите через ' + Math.ceil((p.pass_lock_until - now) / 6e4) + ' мин');
+    if (!await verifyPassword(pw, p.pass_hash)) {
+      await pool.query('UPDATE players SET pass_fails = pass_fails + 1, pass_lock_until = CASE WHEN pass_fails + 1 >= $2 THEN $3 ELSE pass_lock_until END WHERE id = $1', [p.id, PASS_FAILS, now + PASS_LOCK]);
+      req.log.warn({ login }, 'bad admin password');
+      throw bad();
+    }
+    if (p.blocked) throw blockedErr();
+    if (!atLeast(p, 'admin')) throw E.forbidden('Вход по паролю — только для администраторов');
+    await tx(async c => {
+      await c.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
+      await startSession(reply, c, p.id, req.device, PASS_SESSION);
+      await require('./audit').audit(c, p, 'login.password', p, { ip: req.ip });
+    });
+    return meResp(pool, p);
+  });
+
+  // сменить свой пароль: { current, password }
+  app.put('/api/me/password', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    ipLimit(req, 'pass', 10, 10 * 6e4);
+    const cur = await one(pool, 'SELECT * FROM players WHERE id = $1', [me.id]);
+    if (!cur.login || !cur.pass_hash) throw E.conflict('conflict', 'У вас нет входа по паролю');
+    if (!await verifyPassword(typeof b.current === 'string' ? b.current : '', cur.pass_hash)) throw E.conflict('bad_login', 'Текущий пароль неверный');
+    const bad = passwordProblem(b.password);
+    if (bad) throw E.bad(bad, 'password');
+    await tx(async c => {
+      await c.query('UPDATE players SET pass_hash = $2, pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [me.id, await hashPassword(b.password)]);
+      await require('./audit').audit(c, me, 'password.change', me, null);
+    });
+    return { ok: true };
+  });
+
   // отвязать способ входа: { phone | vk }; хотя бы один должен остаться
   app.delete('/api/me/login/:kind', async req => {
     const me = needPlayer(req), kind = V.oneOf(req.params.kind, 'kind', ['phone', 'vk']);
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
-      if ((kind === 'phone' ? cur.vk_id : cur.phone) == null) throw E.conflict('conflict', 'Это единственный способ входа — сначала привяжите другой');
+      if ((kind === 'phone' ? cur.vk_id : cur.phone) == null && !(cur.login && cur.pass_hash)) throw E.conflict('conflict', 'Это единственный способ входа — сначала привяжите другой');
       return one(c, `UPDATE players SET ${kind === 'phone' ? 'phone' : 'vk_id'} = NULL WHERE id = $1 RETURNING *`, [me.id]);
     });
     cache.clear();
@@ -280,4 +339,4 @@ function routes(app) {
   });
 }
 
-module.exports = { hooks, routes, needPlayer, startSession, clearCache, meResp, normPhone };
+module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone };

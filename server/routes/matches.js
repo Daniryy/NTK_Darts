@@ -9,7 +9,7 @@ const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards, lineJSON } = require('../cards');
 const { version, forget } = require('../versions');
 const B = require('../../shared/bracket.js');
-const { isAdmin } = require('../roles');
+const { can } = require('../roles');
 
 const ID_RE = /^g[a-z0-9]{10,30}$/;
 const LOCK_MS = 10 * 60000;
@@ -221,7 +221,7 @@ module.exports = async function (app) {
       const m = await lockMatch(c, req.params.id);
       if (m.status !== 'live') throw E.conflict('bad_state', 'Матч уже завершён');
       const inMatch = m.players.some(p => p.id === me.id);
-      const ok = m.tournament_id ? inMatch || isOwner(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || isAdmin(me);
+      const ok = m.tournament_id ? inMatch || isOwner(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || can(me, 'any_tour');
       if (!ok) throw E.forbidden('Забрать счёт может организатор или игрок этого матча');
       await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, version = version + 1 WHERE id = $1', [m.id, req.device, me.id, Date.now() + LOCK_MS]);
       forget('m', m.id);
@@ -253,7 +253,7 @@ module.exports = async function (app) {
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
       const t = m.tournament_id ? await tourOf(c, m.tournament_id, true) : null;
-      const owner = t ? isOwner(t, me) : m.created_by === me.id || isAdmin(me);
+      const owner = t ? isOwner(t, me) : m.created_by === me.id || can(me, 'any_tour');
       if (m.status === 'live') {
         if (!owner && m.lock_device !== req.device) throw E.forbidden('Бросить матч может тот, кто ведёт счёт, или организатор');
         await c.query('DELETE FROM matches WHERE id = $1', [m.id]);

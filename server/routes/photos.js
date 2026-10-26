@@ -9,7 +9,7 @@ const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
 const { playerShort } = require('../players');
 const { isOwner, TOUR_SQL, loadTours } = require('../tour');
-const { atLeast, isAdmin } = require('../roles');
+const { can } = require('../roles');
 const { forget } = require('../versions');
 const { clearCache } = require('../auth');
 
@@ -40,7 +40,7 @@ async function avatarTarget(c, me, pid) {
   if (!pid || pid === me.id) return me;
   const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p) throw E.notFound('Игрок не найден');
-  if (!isAdmin(me) && !(p.vk_id == null && p.phone == null && p.owner_id === me.id)) throw E.forbidden('Менять фото можно себе, своим гостям или администратору');
+  if (!can(me, 'players') && !(p.vk_id == null && p.phone == null && p.owner_id === me.id)) throw E.forbidden('Менять фото можно себе, своим гостям или администратору');
   return p;
 }
 
@@ -57,7 +57,7 @@ module.exports = async function (app) {
     const ext = kindOf(buf);
     if (!ext) throw E.bad('Это не JPEG, WebP или PNG', 'body');
     const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'banner']);
-    if (kind === 'banner' && !atLeast(me, 'tech')) throw E.forbidden('Баннеры ведёт тех. администратор');
+    if (kind === 'banner' && !can(me, 'banners')) throw E.forbidden('Баннерами занимается тех. администратор');
     const w = V.int(+q.w, 'w', 16, 4096), h = V.int(+q.h, 'h', 16, 4096);
     const id = crypto.randomBytes(12).toString('hex'), file = id + '.' + ext;
     await fs.promises.mkdir(config.uploadDir, { recursive: true });

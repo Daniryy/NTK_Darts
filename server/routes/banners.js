@@ -2,7 +2,8 @@
 // Заводит тех. администратор; переходы по баннеру считаются.
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
-const { needRole } = require('./admin');
+const { needPerm } = require('../auth');
+const { audit } = require('../audit');
 
 const PLACES = ['feed', 'tour', 'tv'];
 const pub = b => ({ id: b.id, place: b.place, title: b.title, body: b.body, image: b.image, link: b.link });
@@ -28,7 +29,7 @@ function fields(b, all) {
   if (b.ends !== undefined) o.ends = V.optTime(b.ends, 'ends');
   return o;
 }
-const need = req => needRole(req, 'tech', 'Баннеры ведёт тех. администратор');
+const need = req => needPerm(req, 'banners', 'Баннерами занимается тех. администратор');
 
 module.exports = async function (app) {
   // GET /api/banners?place=feed — действующие сейчас
@@ -53,22 +54,25 @@ module.exports = async function (app) {
     const row = await one(pool, `INSERT INTO banners (place, title, body, image, link, active, starts, ends, created_by, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
     [f.place, f.title, f.body, f.image, f.link, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now()]);
+    await audit(pool, me, 'banner.create', { id: row.id, name: row.title }, { place: row.place });
     return reply.code(201).send({ banner: full(row) });
   });
   app.patch('/api/admin/banners/:id', async req => {
-    need(req);
+    const me = need(req);
     const f = fields(req.body || {}, false), keys = Object.keys(f);
     if (!keys.length) throw E.bad('Нечего менять');
     const row = await one(pool, `UPDATE banners SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [req.params.id, ...keys.map(k => f[k])]);
     if (!row) throw E.notFound('Баннер не найден');
+    await audit(pool, me, 'banner.edit', { id: row.id, name: row.title }, f);
     return { banner: full(row) };
   });
   // удалить баннер и его загруженную картинку
   app.delete('/api/admin/banners/:id', async req => {
-    need(req);
+    const me = need(req);
     const files = await tx(async c => {
       const row = await one(c, 'DELETE FROM banners WHERE id = $1 RETURNING *', [req.params.id]);
       if (!row) throw E.notFound('Баннер не найден');
+      await audit(c, me, 'banner.delete', { id: row.id, name: row.title }, null);
       const m = row.image && row.image.match(/^\/uploads\/([\w.-]+)$/);
       if (!m || await one(c, 'SELECT 1 FROM banners WHERE image = $1', [row.image])) return [];
       return (await all(c, `DELETE FROM photos WHERE file = $1 AND kind = 'banner' RETURNING file`, [m[1]])).map(x => x.file);

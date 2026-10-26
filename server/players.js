@@ -37,6 +37,6 @@ async function createPlayer(c, p) {
 
 const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '', role: p.role });
 // свой профиль: ещё способы входа (телефон целиком — только себе)
-const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, phone: p.phone || null, vk: p.vk_id != null } : null;
+const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, phone: p.phone || null, vk: p.vk_id != null, login: p.login || null } : null;
 
 module.exports = { createPlayer, playerShort, meJSON };
