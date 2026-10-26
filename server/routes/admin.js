@@ -8,7 +8,7 @@ const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer, needPerm, clearCache, normPhone } = require('../auth');
 const { createPlayer, playerShort } = require('../players');
-const { RANK, ROLES, PERM, GRANTABLE, can, permTable, setPerms } = require('../roles');
+const { RANK, ROLES, ROLE_NAME, PERM, grantable, can, permTable, setPerms } = require('../roles');
 const { audit } = require('../audit');
 const { hashPassword, passwordProblem, LOGIN_RE, normLogin } = require('../password');
 
@@ -198,16 +198,17 @@ module.exports = async function (app) {
   });
 
   // права ролей: таблица и изменение (тех. администратор). PUT { perms: { ключ: [роли] } }
+  const permsResp = () => ({ perms: permTable(), roles: grantable().map(k => ({ key: k, name: ROLE_NAME[k], rank: RANK[k] })) });
   app.get('/api/admin/perms', async req => {
     needPlayer(req);
-    return { perms: permTable(), roles: GRANTABLE };
+    return permsResp();
   });
   app.put('/api/admin/perms', async req => {
     const me = needTech(req), b = req.body || {};
     if (!b.perms || typeof b.perms !== 'object' || Array.isArray(b.perms)) throw E.bad('perms: { ключ: [роли] }', 'perms');
     for (const [k, v] of Object.entries(b.perms)) {
       if (!PERM[k]) throw E.bad('Неизвестное право: ' + k, 'perms');
-      if (!Array.isArray(v) || v.some(r => !GRANTABLE.includes(r))) throw E.bad('Роли права ' + k + ': ' + GRANTABLE.join(', '), 'perms');
+      if (!Array.isArray(v) || v.some(r => !grantable().includes(r))) throw E.bad('Роли права ' + k + ': ' + grantable().join(', '), 'perms');
     }
     const saved = await tx(async c => {
       const cur = await one(c, `SELECT value FROM settings WHERE key = 'perms' FOR UPDATE`);
@@ -219,7 +220,7 @@ module.exports = async function (app) {
     });
     setPerms(saved);
     clearCache();
-    return { perms: permTable(), roles: GRANTABLE };
+    return permsResp();
   });
 
   // журнал: GET /api/admin/audit?limit=&before=время&target=

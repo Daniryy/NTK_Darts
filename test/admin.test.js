@@ -101,7 +101,7 @@ test('логин администратору выдаёт только тех. 
 
 test('права ролей: тех. администратор настраивает, остальные получают по настройке', async () => {
   const t = ok(await call(PL, 'GET', '/api/admin/perms'));
-  assert.deepEqual(t.roles, ['player', 'host', 'admin']);
+  assert.deepEqual(t.roles.map(r => r.key), ['player', 'host', 'plus', 'admin']);
   assert.deepEqual(t.perms.find(x => x.key === 'streams').roles, ['host', 'admin']);
   err(await call(ADMIN, 'PUT', '/api/admin/perms', { perms: { streams: ['player'] } }), 403);
   err(await call(TECH, 'PUT', '/api/admin/perms', { perms: { nope: [] } }), 400);

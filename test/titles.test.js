@@ -75,7 +75,7 @@ test('заявка: автопроверка сразу, стадия «ждёт
   assert.equal(st.doc, 'ok');
   assert.equal(st.name, 'ok', 'Игорь Белов есть в ФИО');
   assert.equal(st.order, 'ok');
-  assert.equal(st.date, 'ok');
+  assert.equal(r.auto.find(x => x.k === 'order').text, '№ 45 нг от 10.03.2025');
   assert.equal(st.issuer, 'warn', 'МС присваивает Минспорт, а не федерация');
   assert.equal(st.minsport, 'info');
   assert.equal(r.docs.length, 2);

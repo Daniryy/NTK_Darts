@@ -767,7 +767,8 @@ button.banner:hover { border-color: var(--line-bright); }
 .pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
 .tchip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--green-ink); background: var(--green); margin-right: 6px; }
 .tsteps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.tsteps li { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 12.5px; color: var(--muted); }
+.tsteps li { display: grid; justify-items: center; align-content: start; gap: 6px; text-align: center; font-size: 12.5px; line-height: 1.25; color: var(--muted); }
+@media (max-width: 480px) { .tsteps { gap: 2px; } .tsteps li { font-size: 11px; } }
 .tsteps li i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; border: 2px solid var(--line-bright); background: var(--surface2); }
 .tsteps li.ts-done i { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--surface2)); color: var(--green); }
 .tsteps li.ts-done span { color: var(--fg); }
@@ -776,7 +777,9 @@ button.banner:hover { border-color: var(--line-bright); }
 .tsteps li.ts-fail i { border-color: var(--red); color: var(--red); }
 .tsteps li.ts-fail span { color: var(--red); font-weight: 600; }
 .auto { display: grid; gap: 4px; font-size: 13.5px; }
-.auto > div { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; }
+.auto > div { display: grid; grid-template-columns: 20px 110px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.auto b { font-weight: 600; color: var(--muted); font-size: 12.5px; }
+@media (max-width: 480px) { .auto > div { grid-template-columns: 20px 92px minmax(0, 1fr); } }
 .auto i { font-style: normal; text-align: center; }
 .au-ok i { color: var(--green); }
 .au-warn i { color: #e0a43a; }
@@ -789,6 +792,17 @@ button.banner:hover { border-color: var(--line-bright); }
 .tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
 .note-box.ok { border-color: var(--green); }
 .treq { display: grid; gap: 8px; }
+.ptitle { font-weight: 600; margin: 2px 0 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.card.plan { padding: 16px; display: grid; gap: 8px; align-content: start; }
+.card.plan.on { border-color: var(--green); }
+.plan-h { display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
+.plan-p { font-family: var(--display); font-size: 30px; }
+.plan-p s { color: var(--muted); font-size: 20px; }
+.plan-f { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 3px; }
+.plan-ed { display: grid; gap: 8px; }
+.plan-ed .mini, .panel .nrow .mini { white-space: nowrap; }
+.rolechip.r-x { color: var(--fg); border-color: var(--line-bright); }
 .adm-row.click { cursor: pointer; grid-template-columns: auto minmax(0, 1fr) auto; }
 .adm-row.click:hover { background: var(--surface2); }
 .rolechip.r-blk { color: var(--red); border-color: var(--red); }
@@ -1695,7 +1709,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans'].includes(h)) return true;
   // на сервере турнир, игрок или матч загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -2562,8 +2576,9 @@ function profileHTML(p, s, all, tours) {
   } else {
     h += '<h1>' + esc(p.name) + '</h1>';
   }
+  if (!(isMe && S.editName) && p.title) h += '<div class="ptitle" title="Звание подтверждено по документу">' + esc(TITLE_FULL[p.title] || p.title) + ' <span class="tchip">✓ подтверждено</span></div>';
   if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
-  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + titleChip(p.title) + roleChip(p.role) + '</div>';
+  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
   if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id] && RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
   if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
@@ -3512,7 +3527,14 @@ function claimBox() {
 }
 /* ===== Вход и роли: игрок, ведущий (клуб подтверждён), администратор, тех. администратор ===== */
 const ROLE_NAME = { player: 'игрок', host: 'ведущий', admin: 'администратор', tech: 'тех. администратор' };
-const roleChip = r => r && r !== 'player' ? '<span class="rolechip r-' + r + '">' + ROLE_NAME[r] + '</span>' : '';
+// свои роли (например, тарифов) — названия с сервера
+function roleName(r) {
+  if (ROLE_NAME[r]) return ROLE_NAME[r];
+  const e = SRV && lz('roles', () => Api.get('/api/roles'), 600000), x = e && e.data && e.data.roles.find(y => y.key === r);
+  if (x) ROLE_NAME[r] = x.name.toLowerCase();
+  return x ? ROLE_NAME[r] : r;
+}
+const roleChip = r => r && r !== 'player' ? '<span class="rolechip r-' + (ROLE_NAME[r] && /^(host|admin|tech)$/.test(r) ? r : 'x') + '">' + esc(roleName(r)) + '</span>' : '';
 const showPhone = p => p ? p.replace(/^\+7(\d{3})(\d{3})(\d{2})(\d{2})$/, '+7 $1 $2-$3-$4') : '';
 // «1 4 7-12» → [1, 4, 7, 8, 9, 10, 11, 12]
 function parseNums(s) {
@@ -3601,7 +3623,7 @@ function meCard() {
   h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? (me.vk ? '<button class="ghost sm" data-act="unlink" data-v="phone">Отвязать</button>' : '') : c.phone ? '<button class="mini" data-act="link-phone">Привязать</button>' : '');
   h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
   h += '</div>' + (!me.phone && !me.vk ? '<p class="meta">Привяжите телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
-  h += titleCard() + clubCard();
+  h += titleCard() + planCard() + clubCard();
   if (anyAdm()) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
   return h;
 }
@@ -3620,8 +3642,9 @@ function clubCard() {
 
 /* ===== Панель управления: вкладки по роли ===== */
 /* ===== Звания: только по заявке с документом. Стадии: подача → автопроверка → проверка администратором → подтверждено ===== */
+const TITLE_FULL = { 'ЗМС': 'Заслуженный мастер спорта России', 'МСМК': 'Мастер спорта России международного класса', 'МС': 'Мастер спорта России', 'КМС': 'Кандидат в мастера спорта', '1 разряд': '1 спортивный разряд', '2 разряд': '2 спортивный разряд', '3 разряд': '3 спортивный разряд', '1 юн. разряд': '1 юношеский разряд', '2 юн. разряд': '2 юношеский разряд', '3 юн. разряд': '3 юношеский разряд' };
 const titleChip = t => t ? '<span class="tchip" title="Звание подтверждено по документу">' + esc(t) + ' ✓</span>' : '';
-const TSTEP = ['Подача', 'Автоматическая проверка', 'Проверка администратором', 'Подтверждено'];
+const TSTEP = ['Подача', 'Автопроверка', 'Ручная проверка', 'Подтверждено'];
 // стадии заявки: [состояние каждой: done | cur | wait | fail]
 function titleSteps(r) {
   const st = r.status === 'draft' ? ['cur', 'wait', 'wait', 'wait'] : r.status === 'approved' ? ['done', 'done', 'done', 'done'] : r.status === 'rejected' ? ['done', 'done', 'fail', 'wait'] : ['done', r.autoAt ? 'done' : 'cur', r.autoAt ? 'cur' : 'wait', 'wait'];
@@ -3629,7 +3652,7 @@ function titleSteps(r) {
 }
 const AUTO_ICON = { ok: '✓', warn: '⚠', info: 'ℹ' };
 function autoList(list, admin) {
-  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><span>' + linkify(x.text) + '</span></div>').join('') + '</div>';
+  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><b>' + esc(x.label || '') + '</b><span>' + (x.k === 'minsport' ? '<a href="' + esc(x.text) + '" target="_blank" rel="noopener noreferrer">найти приказ на сайте Минспорта</a>' : linkify(x.text)) + '</span></div>').join('') + '</div>';
 }
 // ссылки https в тексте — кликабельные
 const linkify = s => esc(s).replace(/https:\/\/[^\s<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener noreferrer">поиск на сайте Минспорта</a>');
@@ -3706,21 +3729,67 @@ function admTitles() {
   }).join('');
 }
 
+/* ===== Тарифы: цена со скидкой за звание, заявка, подключает администратор (онлайн-оплаты пока нет) ===== */
+const rub = n => n.toLocaleString('ru-RU') + ' ₽';
+const daysTxt = d => d % 365 === 0 ? (d / 365 === 1 ? 'год' : d / 365 + ' ' + pl(d / 365, 'год', 'года', 'лет')) : d % 30 === 0 ? (d / 30 === 1 ? 'месяц' : d / 30 + ' ' + pl(d / 30, 'месяц', 'месяца', 'месяцев')) : d + ' ' + pl(d, 'день', 'дня', 'дней');
+function plansView() {
+  let h = '<button class="back" data-act="go" data-v="p.me">' + I.back + 'Профиль</button><div class="narrow"><h1 class="h1">Тарифы</h1>';
+  if (!SRV) return h + '<div class="note-box">Тарифы работают с сервером.</div></div>';
+  const e = lz('plans', () => Api.get('/api/plans'), 30000);
+  const st = svState(e, 'тарифов');
+  if (st) return h + st + '</div>';
+  const d = e.data, ds = d.discounts;
+  h += '<p class="meta">Скидка за подтверждённое звание: МС и выше −' + ds.ms + '%, КМС −' + ds.kms + '%, 1 разряд −' + ds.r1 + '%.' + (ME && !(meP().title) ? ' <button class="lnk" data-act="go" data-v="title">Подтвердить звание</button>' : '') + '</p>';
+  if (d.mine.length) h += d.mine.map(s => '<div class="note-box ok">Подключён тариф <b>' + esc(s.plan.name) + '</b> до ' + new Date(s.ends).toLocaleDateString('ru-RU') + '.</div>').join('');
+  if (d.request) h += '<div class="note-box">Заявка на тариф <b>' + esc(d.request.plan.name) + '</b> отправлена — администратор подключит его и свяжется с вами. <button class="lnk" data-act="plan-unreq" data-v="' + d.request.id + '">Отозвать</button></div>';
+  h += '<div class="plans">' + d.plans.map(p => {
+    const on = d.mine.some(s => s.plan.id === p.id);
+    return '<div class="card plan' + (on ? ' on' : '') + '"><div class="plan-h"><b>' + esc(p.name) + '</b>' + (on ? '<span class="tchip">подключён</span>' : '') + '</div><div class="plan-p">' + (p.discount ? '<s>' + rub(p.price) + '</s> ' : '') + '<b>' + rub(p.final) + '</b><span class="meta"> / ' + daysTxt(p.days) + '</span></div>' + (p.discount ? '<div class="meta">−' + p.discount + '% · ' + esc(p.why) + '</div>' : '') +
+      '<ul class="plan-f">' + p.about.split('\n').filter(Boolean).map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' +
+      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + '">' + (on ? 'Продлить' : 'Подключить') + '</button>') + '</div>';
+  }).join('') + '</div><p class="meta">Онлайн-оплата появится позже. Сейчас после заявки тариф подключает администратор.</p>';
+  return h + '</div>';
+}
+function planCard() {
+  const e = lz('plans', () => Api.get('/api/plans'), 60000);
+  if (!e.data) return '';
+  const m = e.data.mine[0];
+  return '<div class="card sec"><span class="label">Тариф</span>' + (m ? '<div><b>' + esc(m.plan.name) + '</b> <span class="meta">до ' + new Date(m.ends).toLocaleDateString('ru-RU') + '</span></div>' : e.data.request ? '<p class="meta">Заявка на «' + esc(e.data.request.plan.name) + '» ждёт подключения.</p>' : '<p class="meta">Обычный аккаунт. Тарифы: Игрок+, Ведущий — для турниров от клуба.</p>') + '<button class="mini" data-act="go" data-v="plans">Тарифы</button></div>';
+}
+// админка: заявки, действующие, подключить вручную; тех. администратор — тарифы и скидки
+function admPlans() {
+  const e = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
+  const st = svState(e, 'тарифов');
+  if (st) return st;
+  const d = e.data, tech = Api.role === 'tech';
+  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b></span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
+  h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
+  h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
+  if (!tech) return h;
+  // тарифы и скидки
+  const roles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles.filter(r => r.rank < 2);
+  const roleSel = (id, cur) => '<select class="inp sm" id="' + id + '" aria-label="Роль">' + roles.map(r => '<option value="' + r.key + '"' + (r.key === cur ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>';
+  h += '<div class="sec"><span class="label">Тарифы (видит тех. администратор)</span>' + d.plans.map(p => '<div class="card sec plan-ed"><div class="nrow"><input class="inp" id="pe-name-' + p.id + '" value="' + esc(p.name) + '" maxlength="40" aria-label="Название"><input class="inp" id="pe-price-' + p.id + '" value="' + p.price + '" inputmode="numeric" aria-label="Цена" style="max-width:110px"><input class="inp" id="pe-days-' + p.id + '" value="' + p.days + '" inputmode="numeric" aria-label="Дней" style="max-width:80px"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-' + p.id, p.role) + '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pe-active-' + p.id + '"' + (p.active ? ' checked' : '') + '> показывать</label></div><textarea class="inp" id="pe-about-' + p.id + '" rows="' + Math.max(3, p.about.split('\n').length + 1) + '" maxlength="1000" aria-label="Что даёт">' + esc(p.about) + '</textarea><button class="mini" data-act="plan-save" data-v="' + p.id + '">Сохранить тариф</button></div>').join('');
+  h += '<div class="card sec plan-ed"><span class="label">Новый тариф</span><div class="nrow"><input class="inp" id="pe-name-new" placeholder="Название" maxlength="40"><input class="inp" id="pe-price-new" placeholder="Цена, ₽" inputmode="numeric" style="max-width:110px"><input class="inp" id="pe-days-new" value="30" inputmode="numeric" style="max-width:80px" aria-label="Дней"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-new', 'plus') + '</div><textarea class="inp" id="pe-about-new" rows="3" maxlength="1000" placeholder="Что даёт — по строке на пункт"></textarea><button class="mini go" data-act="plan-add">Добавить тариф</button><span class="meta">Нужна своя роль для тарифа — добавьте её во вкладке «Права ролей» и отметьте, что ей доступно.</span></div></div>';
+  h += '<div class="panel"><span class="h2">Скидка за звание, %</span><div class="nrow">' + d.discountKeys.map(k => '<label class="field" style="flex:1"><span class="label">' + esc(k.name) + '</span><input class="inp" id="disc-' + k.k + '" inputmode="numeric" value="' + d.discounts[k.k] + '"></label>').join('') + '</div><button class="btn sm" data-act="disc-save">Сохранить скидки</button></div>';
+  return h;
+}
+
 // есть ли у меня хоть что-то в панели управления
-const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners', 'titles'].some(k => Api.perm(k));
+const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners', 'titles', 'plans'].some(k => Api.perm(k));
 function adminView() {
   const head = '<h1 class="h1">Управление</h1>';
   if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
   if (!anyAdm()) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
-    P2('titles') ? [['titles', 'Звания']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
+    P2('titles') ? [['titles', 'Звания']] : [], P2('plans') ? [['plans', 'Тарифы']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
     Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
-  h += T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
+  h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
   return h + '</div>';
 }
 const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
@@ -3757,7 +3826,8 @@ const ACT_NAME = {
 };
 function auditData(a) {
   const d = a.data || {};
-  if (a.action === 'player.role') return (ROLE_NAME[d.from] || d.from || '') + ' → ' + (ROLE_NAME[d.role] || d.role);
+  if (a.action === 'player.role') return roleName(d.from || '') + ' → ' + roleName(d.role);
+  if (/^plan\./.test(a.action)) return [d.plan, d.days ? d.days + ' дн.' : '', d.price != null ? rub(d.price) : '', d.note].filter(Boolean).join(' · ');
   if (a.action === 'player.block') return d.blocked ? 'заблокирован' : 'разблокирован';
   if (a.action === 'perms') { const nm = k => { const x = SVC.aperms && SVC.aperms.data && SVC.aperms.data.perms.find(y => y.key === k); return x ? x.name : k; }; return Object.keys(d).map(k => nm(k) + ': ' + (d[k].length ? d[k].map(r => ROLE_NAME[r]).join(', ') : 'только тех. администратор')).join('; '); }
   if (a.action === 'player.edit') return Object.keys(d).map(k => ({ name: 'имя', city: 'город', club: 'клуб', title: 'разряд', ver: d.ver ? 'подтверждён' : 'не подтверждён', code: 'новый код входа' }[k] || k)).join(', ');
@@ -3783,9 +3853,10 @@ function admCardModal() {
   // профиль
   if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button></div></div>';
   // роль и доступ
-  const roles = tech ? ['player', 'host', 'admin', 'tech'] : Api.perm('give_host') && !high ? ['player', 'host'] : null;
+  const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles;
+  const roles = tech ? allRoles.map(r => r.key) : Api.perm('give_host') && !high ? allRoles.filter(r => r.rank < 2).map(r => r.key) : null;
   const acts = [];
-  if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + ROLE_NAME[r] + '</option>').join('') + '</select></label>');
+  if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + esc(roleName(r)) + '</option>').join('') + '</select></label>');
   if (p.title && Api.perm('titles')) acts.push('<button class="mini dng" data-act="ac-untitle" data-v="' + p.id + '">Снять звание ' + esc(p.title) + '</button>');
   if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
   if (!p.vk && (full || mine) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
@@ -3794,6 +3865,11 @@ function admCardModal() {
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
   // логин и пароль администратора — выдаёт тех. администратор
   if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Страница входа: ' + esc(location.origin) + '/#staff. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div></div>';
+  if (Api.perm('plans')) {
+    const pe = lz('acplans:' + p.id, () => Api.get('/api/admin/players/' + p.id + '/plans'), 15000), ap = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
+    const subs = pe.data ? pe.data.subs.filter(x => x.status === 'active' && x.ends > Date.now()) : [];
+    h += '<div class="ac-sec"><span class="label">Тариф</span>' + (subs.length ? subs.map(x => '<div class="meta"><b>' + esc(x.plan.name) + '</b> до ' + new Date(x.ends).toLocaleDateString('ru-RU') + ' <button class="lnk dng" data-act="plan-end" data-v="' + x.id + '">завершить</button></div>').join('') : '<div class="meta">Нет тарифа.</div>') + (ap.data ? '<div class="nrow"><select class="inp sm" id="ac-plan" aria-label="Тариф">' + ap.data.plans.filter(x => x.active).map(x => '<option value="' + x.id + '">' + esc(x.name) + ' · ' + rub(x.price) + '</option>').join('') + '</select><button class="mini" data-act="ac-plan" data-v="' + p.id + '">Подключить</button></div>' : '') + '</div>';
+  }
   if (d.log.length) h += '<div class="ac-sec"><span class="label">Последние действия</span>' + d.log.map(a => '<div class="au-row"><span class="meta">' + fmtDate(+a.t) + ' ' + new Date(+a.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><span>' + esc(a.actor_name || 'сервер') + ' — ' + esc(ACT_NAME[a.action] || a.action) + (auditData(a) ? ' <span class="meta">' + esc(auditData(a)) + '</span>' : '') + '</span></div>').join('') + '</div>';
   return h + '</div></div>';
 }
@@ -3805,10 +3881,14 @@ function admPerms() {
   const d = e.data, ed = S.permEd || (S.permEd = Object.fromEntries(d.perms.map(x => [x.key, x.roles.slice()])));
   const changed = d.perms.some(x => x.roles.slice().sort().join() !== ed[x.key].slice().sort().join());
   let h = '<p class="meta">Отметьте, каким ролям что доступно. Тех. администратору доступно всё; роли администратора и тех. администратора и эту таблицу меняет только он.</p>';
-  const SHORT = { player: 'игрок', host: 'ведущий', admin: 'админ', tech: 'тех. админ' };
-  h += '<div class="card perm-t"><div class="perm-r perm-h"><span>Право</span>' + d.roles.concat(['tech']).map(r => '<span>' + SHORT[r] + '</span>').join('') + '</div>';
-  h += d.perms.map(x => '<div class="perm-r"><span>' + esc(x.name) + '</span>' + d.roles.map(r => '<label><input type="checkbox" data-perm="' + x.key + '|' + r + '"' + (ed[x.key].includes(r) ? ' checked' : '') + ' aria-label="' + esc(x.name + ': ' + ROLE_NAME[r]) + '"></label>').join('') + '<label><input type="checkbox" checked disabled aria-label="тех. администратор"></label></div>').join('') + '</div>';
+  const SHORT = { player: 'игрок', host: 'ведущий', admin: 'админ' }, cols = d.roles.concat([{ key: 'tech', name: 'тех. админ' }]), gtc = 'minmax(200px, 1fr) repeat(' + cols.length + ', 86px)';
+  h += '<div class="card perm-t"><div class="perm-r perm-h" style="grid-template-columns:' + gtc + '"><span>Право</span>' + cols.map(r => '<span>' + esc(SHORT[r.key] || r.name) + '</span>').join('') + '</div>';
+  h += d.perms.map(x => '<div class="perm-r" style="grid-template-columns:' + gtc + '"><span>' + esc(x.name) + '</span>' + d.roles.map(r => '<label><input type="checkbox" data-perm="' + x.key + '|' + r.key + '"' + (ed[x.key].includes(r.key) ? ' checked' : '') + ' aria-label="' + esc(x.name + ': ' + r.name) + '"></label>').join('') + '<label><input type="checkbox" checked disabled aria-label="тех. администратор"></label></div>').join('') + '</div>';
   h += '<div class="gacts"><button class="btn sm" data-act="perm-save"' + (changed ? '' : ' disabled') + '>Сохранить права</button>' + (changed ? '<button class="ghost sm" data-act="perm-reset">Отменить</button>' : '') + '<button class="ghost sm" data-act="perm-default">По умолчанию</button></div>';
+  // свои роли: для тарифов и особых групп игроков
+  const RL = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles;
+  const own = d.roles.filter(r => !['player', 'host', 'admin'].includes(r.key)).map(r => Object.assign({}, r, { name: (RL.find(x => x.key === r.key) || r).name }));
+  h += '<div class="panel"><span class="h2">Свои роли</span><p class="meta">Например, для тарифа: добавьте роль, отметьте выше, что ей доступно, и выберите её в тарифе.</p>' + own.map(r => '<div class="nrow"><input class="inp" id="role-name-' + r.key + '" value="' + esc(r.name) + '" maxlength="30" aria-label="Название роли"><button class="mini" data-act="role-ren" data-v="' + r.key + '">Переименовать</button><button class="mini dng" data-act="role-del" data-v="' + r.key + '">Удалить</button></div>').join('') + '<div class="nrow"><input class="inp" id="role-new" maxlength="30" placeholder="Новая роль, например «Игрок Про»" aria-label="Новая роль"><button class="mini go" data-act="role-add">Добавить роль</button></div></div>';
   return h;
 }
 // журнал действий
@@ -4530,6 +4610,7 @@ function render() {
     : R === 'admin' ? adminView()
     : R === 'staff' ? staffView()
     : R === 'title' ? titleView()
+    : R === 'plans' ? plansView()
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
     : feedView();
@@ -4680,6 +4761,51 @@ document.addEventListener('click', e => {
       svDo(Api.post('/api/titles', { fullName: F.fullName.trim(), title: F.title, orderNo: F.orderNo.trim(), orderDate: Date.parse(F.orderDate + 'T12:00:00Z'), issuer: F.issuer.trim(), comment: F.comment.trim(), docs: F.docs.map(d => d.id) }).then(() => { S.tForm = null; S.tNew = false; svStale('titles:mine'); toast('Заявка отправлена: автоматическая проверка пройдена, ждёт администратора.'); }).catch(e => { S.tErr = e.net ? 'Нет связи с сервером.' : e.message; }).finally(() => { S.tBusy = false; }));
       break;
     }
+    case 'plan-req': svDo(Api.post('/api/plans/' + v + '/request'), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф.'); }); break;
+    case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
+    case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
+    case 'plan-rej': {
+      const note = prompt('Причина отказа (увидит игрок в журнале)');
+      if (note == null) break;
+      svDo(Api.post('/api/admin/plans/requests/' + v + '/reject', { note }), () => { svStale('aplans'); toast('Заявка отклонена.'); });
+      break;
+    }
+    case 'plan-grant': case 'ac-plan': {
+      const pl = $(a === 'ac-plan' ? 'ac-plan' : 'pg-plan'), dd = $('pg-days'), days = a === 'plan-grant' && dd && dd.value.trim() ? +dd.value.trim() : null;
+      const go2 = pid => Api.post('/api/admin/plans/grant', Object.assign({ playerId: pid, planId: pl ? pl.value : '' }, days ? { days } : {}));
+      let job;
+      if (a === 'ac-plan') job = go2(v);
+      else {
+        const q = ($('pg-player') || {}).value || '';
+        if (!q.trim()) { toast('Введите ID игрока.'); break; }
+        job = Api.get('/api/players?limit=5&q=' + encodeURIComponent(q.trim())).then(r => {
+          const k = q.trim().toLowerCase().replace(/^#/, ''), hit = r.players.filter(x => x.code.toLowerCase() === k || 'och-' + k === x.code.toLowerCase() || x.id === k);
+          const pp = hit.length === 1 ? hit[0] : r.players.length === 1 ? r.players[0] : null;
+          if (!pp) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (OCH-…)');
+          return go2(pp.id);
+        });
+      }
+      svDo(job, () => { svStale('aplans'); svStale('acplans:'); svStale('acard:'); svStale('admin:'); toast('Тариф подключён.'); });
+      break;
+    }
+    case 'plan-ext': { const [pid, plid] = v.split('|'); svDo(Api.post('/api/admin/plans/grant', { playerId: pid, planId: plid }), () => { svStale('aplans'); toast('Тариф продлён.'); }); break; }
+    case 'plan-end': if (confirm('Завершить тариф сейчас? Роль тарифа снимется.')) svDo(Api.post('/api/admin/plans/subs/' + v + '/end'), () => { svStale('aplans'); svStale('acplans:'); svStale('acard:'); svStale('admin:'); toast('Тариф завершён.'); }); break;
+    case 'plan-save': case 'plan-add': {
+      const id = a === 'plan-add' ? 'new' : v, g = k => { const el = $('pe-' + k + '-' + id); return el ? el.value : ''; };
+      const body = { name: g('name').trim(), price: +g('price'), days: +g('days'), role: g('role'), about: g('about') };
+      if (a === 'plan-save') { const ac = $('pe-active-' + id); body.active = !!(ac && ac.checked); }
+      if (!Number.isInteger(body.price) || !Number.isInteger(body.days)) { toast('Цена и срок — целые числа.'); break; }
+      svDo(a === 'plan-add' ? Api.post('/api/admin/plans', body) : Api.patch('/api/admin/plans/' + id, body), () => { svStale('aplans'); svStale('plans'); toast(a === 'plan-add' ? 'Тариф добавлен.' : 'Тариф сохранён.'); });
+      break;
+    }
+    case 'disc-save': {
+      const g = k => +(($('disc-' + k) || {}).value || 0);
+      svDo(Api.put('/api/admin/discounts', { ms: g('ms'), kms: g('kms'), r1: g('r1') }), () => { svStale('aplans'); svStale('plans'); toast('Скидки сохранены.'); });
+      break;
+    }
+    case 'role-add': { const el = $('role-new'); svDo(Api.post('/api/admin/roles', { name: el ? el.value.trim() : '' }), () => { svStale('aperms'); svStale('roles'); S.permEd = null; toast('Роль добавлена.'); }); break; }
+    case 'role-ren': { const el = $('role-name-' + v); svDo(Api.patch('/api/admin/roles/' + v, { name: el ? el.value.trim() : '' }), () => { delete ROLE_NAME[v]; svStale('aperms'); svStale('roles'); toast('Роль переименована.'); }); break; }
+    case 'role-del': if (confirm('Удалить роль?')) svDo(Api.del('/api/admin/roles/' + v), () => { svStale('aperms'); svStale('roles'); S.permEd = null; toast('Роль удалена.'); }); break;
     case 'tt-f': S.ttF = v; render(); break;
     case 'tt-dec': {
       const [id, st] = v.split('|'), el = $('tt-note-' + id), note = el ? el.value.trim() : '';
@@ -4722,7 +4848,8 @@ document.addEventListener('click', e => {
       const d = SVC.aperms && SVC.aperms.data;
       if (!d) break;
       const RK = { player: 0, host: 1, admin: 2, tech: 3 };
-      S.permEd = Object.fromEntries(d.perms.map(x => [x.key, d.roles.filter(r => RK[r] >= RK[x.min])]));
+      // по умолчанию права есть только у встроенных ролей
+      S.permEd = Object.fromEntries(d.perms.map(x => [x.key, d.roles.filter(r => r.key in RK && RK[r.key] >= RK[x.min]).map(r => r.key)]));
       render(); break;
     }
     case 'audit-more': svDo(Api.get('/api/admin/audit?limit=100&before=' + v), r => { S.auditMore = (S.auditMore || []).concat(r.items); if (r.items.length < 100) S.auditEnd = true; }); break;
@@ -5017,7 +5144,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
-    svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + ROLE_NAME[role] + '.'); });
+    svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + roleName(role) + '.'); });
     return;
   }
   if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
