@@ -429,6 +429,23 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .back { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14px; font-weight: 500; justify-self: start; padding: 4px 0; }
 .back:hover { color: var(--fg); }
 .tstat { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hint { display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.hint .row { display: flex; gap: 8px; align-items: center; }
+.hlp { padding: 2px 16px; }
+.hlp details { border-bottom: 1px solid var(--line); }
+.hlp details:last-child { border-bottom: 0; }
+.hlp summary { cursor: pointer; padding: 14px 0; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.hlp summary::-webkit-details-marker { display: none; }
+.hlp summary::after { content: '+'; color: var(--muted); font-weight: 400; }
+.hlp details[open] summary::after { content: '−'; }
+.hlp p { margin: 0 0 14px; color: var(--muted); line-height: 1.5; }
+.pbs { display: grid; gap: 8px; margin: 10px 0 4px; text-align: left; }
+.pb { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--green); background: var(--green-glow); }
+.pb .trophy { width: 38px; height: 38px; border-radius: 10px; }
+.yourm { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-glow); display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.yourm .label { color: var(--green); }
+.yourm b { font-size: 18px; }
+.yourm .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .seg2 { display: flex; gap: 4px; padding: 4px; border-radius: 11px; background: var(--surface); border: 1px solid var(--line); justify-self: start; max-width: 100%; overflow-x: auto; }
 .seg2 button { padding: 8px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
 .seg2 button:hover { color: var(--fg); }
@@ -1196,6 +1213,20 @@ function routeFor(rem, left, dbl) {
 }
 const routeText = r => r.map(x => x.l).join(' · ');
 
+// озвучка счёта голосом браузера (русский голос, если есть); queue — не перебивать предыдущую фразу (табло)
+function say(text, queue) {
+  try {
+    const sp = window.speechSynthesis;
+    if (!sp || !text) return;
+    if (!queue) sp.cancel();
+    const u = new SpeechSynthesisUtterance(text), v = sp.getVoices().find(x => /^ru/i.test(x.lang));
+    u.lang = 'ru-RU'; u.rate = 1.05; if (v) u.voice = v;
+    sp.speak(u);
+  } catch (e) {}
+}
+// подходы при пересчёте из журнала (отмена) не озвучиваются
+let QUIET = false;
+
 let audioCtx = null;
 function playSfx(kind) {
   if (S.sfx && navigator.vibrate) {
@@ -1741,6 +1772,7 @@ const S = {
   theme: lsGet('oche2.theme') === 'light' ? 'light' : 'dark',
   palette: PALETTES.some(x => x.id === lsGet('oche2.palette')) ? lsGet('oche2.palette') : 'amber',
   sfx: lsGet('oche2.sfx') !== false,
+  voice: lsGet('oche2.voice') === true,
   photos: lsGet('oche2.photos') !== false, crop: null, lbox: null, linkErr: '',
   modalMatch: null, quickModal: null, qualModal: null, settings: false, clearRes: false, gf: 'all', confirmQual: null, hp: null,
   buf: '' // ввод суммы в счётчике, не часть G
@@ -1796,7 +1828,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans', 'clubs'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans', 'clubs', 'help'].includes(h)) return true;
   // на сервере турнир, игрок, матч или клуб загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch|club)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -1954,7 +1986,9 @@ function renderModals() {
     h += '<div class="seg2 full">' + [['dark', I.moon + ' Тёмная'], ['light', I.sun + ' Светлая']].map(([v, l]) => '<button class="' + (S.theme === v ? 'on' : '') + '" data-act="set-theme" data-v="' + v + '" aria-pressed="' + (S.theme === v) + '">' + l + '</button>').join('') + '</div>';
     h += '<div class="sws">' + PALETTES.map(p => '<button class="sw' + (S.palette === p.id ? ' on' : '') + '" data-act="set-palette" data-v="' + p.id + '" aria-pressed="' + (S.palette === p.id) + '"><i style="background:' + p.acc[S.theme === 'light' ? 1 : 0] + '"></i>' + p.name + '</button>').join('') + '</div>';
     h += '<button class="set-row" data-act="sfx" aria-pressed="' + S.sfx + '"><b>Звук и вибрация</b><span class="switch' + (S.sfx ? ' on' : '') + '" aria-hidden="true"></span></button>';
+    h += '<button class="set-row" data-act="voice-tg" aria-pressed="' + S.voice + '"><span><b>Озвучка счёта</b><br><span class="meta">Голосом: набор, перебор, сколько осталось</span></span><span class="switch' + (S.voice ? ' on' : '') + '" aria-hidden="true"></span></button>';
     h += '<button class="set-row" data-act="photos-tg" aria-pressed="' + S.photos + '"><b>Фото игроков в счётчике</b><span class="switch' + (S.photos ? ' on' : '') + '" aria-hidden="true"></span></button>';
+    h += '<button class="set-row" data-act="go" data-v="help"><b>Как пользоваться</b><span class="meta">→</span></button>';
     h += accountBox();
     h += installBox();
     if (!SRV) h += S.confirmReset
@@ -2009,6 +2043,7 @@ function feedView() {
   const items = feedItems();
   let h = '<div class="phead"><h1 class="h1">Лента</h1></div>';
   h += '<div class="fgrid"><div class="sec">';
+  h += live.map(t => yourMatch(t, true)).join('') + helpHint();
   if (live.length) h += liveBlock(live, tourCard);
   h += invitesHTML(db.tournaments.filter(t => tStatus(t) === 'reg').sort((a, b) => a.start - b.start));
   h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['res', 'Итоги турниров'], ['my', 'Мои матчи']].map(([v, l]) => '<button class="fchip' + (S.feedF === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -2071,6 +2106,35 @@ function gameActs(t, g, st, live) {
   if (liveCtxIs(t.id, g.r, g.i)) return '<button class="mini go" data-act="tplay" data-v="' + gref(t, g) + '">' + I.clock + 'Идёт · продолжить</button>';
   return '<button class="mini go" data-act="tplay" data-v="' + gref(t, g) + '">Играть</button><button class="mini" data-act="qscore" data-v="' + gref(t, g) + '">Счёт</button>';
 }
+// «Ваш матч»: готовая к игре встреча, где играет вошедший игрок
+function myGame(t) {
+  if (!ME || !t || !t.games || tStatus(t) !== 'live' || t.stage === 'qual' || !t.players.includes(ME)) return null;
+  const cx = bctx(t);
+  const list = t.games.map(g => ({ g, ...gameState(t, g, cx.rv) })).filter(x => x.st === 'ready' && (x.a === ME || x.b === ME));
+  if (!list.length) return null;
+  const x = list.sort((p, q) => (cx.nums.get(p.g.r + ':' + p.g.i) || 0) - (cx.nums.get(q.g.r + ':' + q.g.i) || 0))[0];
+  return { g: x.g, opp: x.a === ME ? x.b : x.a, n: cx.nums.get(x.g.r + ':' + x.g.i) || 0 };
+}
+// о каком матче уже предупредили — помним между перезагрузками, чтобы не повторять
+const YM_SEEN = new Set([].concat(lsGet('oche2.ym') || []));
+// link — показать кнопку перехода в турнир (в ленте)
+function yourMatch(t, link) {
+  const m = myGame(t);
+  if (!m) return '';
+  const key = t.id + ':' + m.g.r + ':' + m.g.i, b = boardOf(t, m.g.r, m.g.i), opp = P[m.opp] ? P[m.opp].name : 'соперник';
+  const going = liveCtxIs(t.id, m.g.r, m.g.i) || !!otherLive(t, m.g);
+  // первый раз — вибрация и подсказка, чтобы не пропустить вызов к мишени
+  if (!YM_SEEN.has(key) && !going) {
+    YM_SEEN.add(key); lsSet('oche2.ym', [...YM_SEEN].slice(-30));
+    // вибрация разрешена только после касания страницы
+    try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([200, 100, 200]); } catch (e) {}
+    setTimeout(() => toast('Ваш матч готов: против ' + opp + (b ? ', мишень ' + b : '')), 0);
+  }
+  const acts = gameActs(t, m.g, 'ready', true);
+  return '<div class="card yourm" role="status"><div style="display:grid;gap:2px;min-width:0"><span class="label">' + (going ? 'Ваш матч идёт' : 'Ваш матч') + (gName(t, m.g, m.n) ? ' · ' + gName(t, m.g, m.n) : '') + '</span><b>против ' + esc(opp) + '</b><span class="meta">' + (link ? esc(t.name) + ' · ' : '') + (b ? 'Мишень ' + b : 'Мишень назначит организатор') + '</span></div><div class="row">' +
+    (acts || '<span class="meta">Счёт ведёт организатор</span>') + (link ? '<button class="mini" data-act="go" data-v="t.' + t.id + '">К турниру</button>' : '') + '</div></div>';
+}
+
 // средний набор игрока в сыгранной игре: «84.5» или ''
 // side — 0 у игрока a, 1 у игрока b (на сервере средние приходят в res.avg)
 function resAvg(g, id, side) {
@@ -2269,6 +2333,7 @@ function tourView(id) {
   h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
+  if (st === 'live') h += yourMatch(t);
   h += '<div class="card tstat">';
   if (st === 'reg') {
     const inn = t.players.includes(ME), n = t.players.length, max = isBracket(t) ? BR_MAX : RR_MAX;
@@ -2280,6 +2345,7 @@ function tourView(id) {
     } else {
       h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (SRV && !ME ? '<button class="btn sm" data-act="login">Войти, чтобы записаться</button>' : canDo(t, 'join') || inn ? '<button class="btn sm' + (inn ? ' alt' : '') + '" data-act="join" data-v="' + t.id + '">' + (inn ? 'Отменить запись' : 'Записаться') + '</button>' : '<span class="meta">Мест нет</span>');
       if (canLaunch && canDo(t, 'launch')) h += '<button class="btn sm alt" data-act="launch-ask" data-v="' + t.id + '">Начать турнир</button>';
+      h += '<button class="btn sm alt" data-act="ics" data-v="' + t.id + '" title="Событие в календарь телефона или компьютера">В календарь</button>';
       h += '</div>';
     }
   } else if (st === 'live') {
@@ -2846,7 +2912,39 @@ function newGame(list, o, ctx, starter) {
     players: list.map(x => ({ id: x.id || null, name: x.name, score: o.mode, legs: 0, darts: 0, points: 0, highest: 0, c100: 0, c140: 0, c180: 0, last: '', legDarts: 0, legVisits: 0, f9p: 0, f9d: 0, coa: 0, hco: 0, bl: 0 }))
   };
   undo = []; S.inGame = true; S.confirmDrop = false; S.buf = '';
+  pbLoad();
   saveGame();
+}
+// личные рекорды до матча — чтобы после матча поздравить с новыми
+function pbOf(o, best) { return o && o.n ? { avg: best || 0, hco: o.hco || 0, hi: o.hi || 0, bl: o.bl || 0 } : null; }
+function pbLoad() {
+  const g = G; g.pb = {};
+  g.players.forEach(p => {
+    if (!p.id) return;
+    if (!SRV) {
+      const ms = db.matches.filter(m => isPlainX01(m) && m.pl.some(l => l.id === p.id));
+      const best = Math.max(0, ...ms.map(m => { const l = m.pl.find(x => x.id === p.id); return l.darts ? l.pts / l.darts * 3 : 0; }));
+      g.pb[p.id] = pbOf(pStats(p.id), best);
+    } else Api.get('/api/players/' + encodeURIComponent(p.id)).then(d => { if (G === g && d) { g.pb[p.id] = pbOf(d.stats.all, d.bestAvg); saveGame(); } }).catch(() => {});
+  });
+}
+// новые рекорды игрока за этот матч: [['Средний набор', '78.4', '72.1'], ...]
+function pbHits(g, p) {
+  const b = g.pb && g.pb[p.id];
+  if (!b || !p.darts) return [];
+  const out = [], a = p.points / p.darts * 3;
+  if (p.darts >= 9 && a > b.avg + 0.05) out.push(['средний набор', a.toFixed(1), b.avg ? b.avg.toFixed(1) : '']);
+  if (p.hco > b.hco) out.push(['закрытие', p.hco, b.hco || '']);
+  if (g.mode === 501 && p.bl && (!b.bl || p.bl < b.bl)) out.push(['лучший лег', p.bl + ' ' + pl(p.bl, 'дротик', 'дротика', 'дротиков'), b.bl || '']);
+  if (p.highest === 180 && b.hi < 180) out.push(['первые 180', '180', '']);
+  else if (p.highest > b.hi) out.push(['лучший подход', p.highest, b.hi || '']);
+  return out;
+}
+function pbHTML(g) {
+  const rows = g.players.map(p => [p, pbHits(g, p)]).filter(x => x[1].length);
+  if (!rows.length) return '';
+  return '<div class="pbs">' + rows.map(([p, hs]) => '<div class="pb"><span class="trophy">' + I.trophy + '</span><div><b>' + (p.id === ME ? 'Ваш личный рекорд' : 'Личный рекорд · ' + esc(p.name)) + '</b><div class="meta">' +
+    hs.map(([k, v, was]) => k + ' <b>' + v + '</b>' + (was !== '' ? ' (было ' + was + ')' : '')).join(' · ') + '</div></div></div>').join('') + '</div>';
 }
 function startFromSetup() {
   const su = S.setup;
@@ -2970,6 +3068,7 @@ function endVisit(bust, win, n) {
     if (pts === 180) p.c180++;
   }
   G.visit = [];
+  if (S.voice && !QUIET) say(win ? 'Игра! Закрытие ' + pts : bust ? 'Перебор' : (pts === 180 ? 'Сто восемьдесят!' : pts ? pts + '.' : 'Ноль.') + (p.score <= 170 && routeFor(p.score, 3, G.dbl) ? ' Осталось ' + p.score : ''));
   if (win) {
     if (pts > p.hco) p.hco = pts;
     if (!p.bl || p.legDarts < p.bl) p.bl = p.legDarts;
@@ -3223,6 +3322,7 @@ function gameView() {
       h += '<button class="btn" data-act="next">Лег ' + (g.legNo + 1) + ' · начинает ' + esc(g.players[(g.starter + 1) % n].name) + '</button>';
     } else {
       if (g.res && g.res.msg) h += '<p class="msg">' + esc(g.res.msg) + '</p>';
+      h += pbHTML(g);
       h += n === 2 ? '<div class="cmp">' + statRows(gStat(g.players[0]), gStat(g.players[1])) + '</div>' : gStatTable(g.players);
       h += '<div class="row2">' + (g.ctx ? '<button class="btn" data-act="leave" data-v="tour">К турниру</button>' : '<button class="btn" data-act="rematch">Реванш</button>') + '<button class="btn alt" data-act="leave" data-v="play">Готово</button></div>';
     }
@@ -3345,8 +3445,9 @@ function replayX01(vis) {
 // как endVisit/legWon, но без звука и без записи матча (он уже на сервере)
 function endVisitQuiet(bust, win, n, d) {
   const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; };
+  QUIET = true;
   try { endVisit(bust, win, n); if (d && G.log.length) G.log[G.log.length - 1].d = d; }
-  finally { commitMatch = c; }
+  finally { commitMatch = c; QUIET = false; }
 }
 function legWonQuiet() { const c = commitMatch; commitMatch = () => { G.res = { msg: '' }; }; try { legWon(); } finally { commitMatch = c; } }
 
@@ -4145,6 +4246,14 @@ function saveBlob(blob, name) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
+// событие на весь день турнира для календаря телефона (.ics)
+function tourIcs(t) {
+  const d = new Date(t.start), ymd = x => x.getFullYear() + String(x.getMonth() + 1).padStart(2, '0') + String(x.getDate()).padStart(2, '0');
+  const e = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Oche//RU', 'BEGIN:VEVENT', 'UID:' + t.id + '@oche', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]|\.\d+/g, ''),
+    'DTSTART;VALUE=DATE:' + ymd(d), 'DTEND;VALUE=DATE:' + ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)), 'SUMMARY:' + e('Дартс: ' + t.name),
+    'LOCATION:' + e([t.city, venueOf(t)].filter(Boolean).join(', ')), 'DESCRIPTION:' + e(fmtLine(t) + '\n' + tourUrl(t.id)), 'URL:' + tourUrl(t.id), 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+}
 // карточка итогов в ленте: общее фото и призёры. r — { id, name, at, cover, podium: [{ id, name, lo, hi }], count }
 function resultCard(r) {
   const medal = lo => lo === 1 ? '🥇' : lo === 2 ? '🥈' : '🥉';
@@ -4513,13 +4622,18 @@ function tvFx(m) {
   else if (ex.k === 'x01' && L.b) fx = { k: 'bust', t: 'Перебор' };
   else if ((ex.k === 'x01' || ex.k === 'score') && L.pts === 180) fx = { k: 'f180', t: '180' };
   if (fx) TVFX[m.id] = Object.assign(fx, { at: Date.now() });
+  // голосом — только яркое, чтобы несколько матчей не говорили наперебой
+  if (tvo().voice && (legUp || fx && fx.k === 'f180')) {
+    const who = (m.players[L.p] || {}).name || '';
+    say(legUp ? 'Лег. ' + who + (ex.k === 'x01' && !L.tb ? ', закрытие ' + L.pts : '') : 'Сто восемьдесят! ' + who, true);
+  }
 }
 // плитка идущего матча
 /* Что показывать на табло и экране организатора — организатор включает и выключает, выбор хранится на устройстве */
 const TVO_LIST = [['photos', 'Фото игроков'], ['avg', 'Средний набор'], ['last', 'Последний подход'], ['progress', 'Подходы и лег'], ['boards', 'Мишени'], ['nums', 'Номера игроков'], ['fx', 'Вспышки 180 и закрытий'],
-  ['calls', 'К мишеням'], ['recent', 'Последние результаты'], ['stages', 'Ход турнира'], ['cams', 'Камеры'], ['qr', 'QR-код турнира'], ['clock', 'Часы']];
+  ['calls', 'К мишеням'], ['recent', 'Последние результаты'], ['stages', 'Ход турнира'], ['cams', 'Камеры'], ['qr', 'QR-код турнира'], ['clock', 'Часы'], ['voice', 'Озвучка 180 и легов']];
 const TVO_DELAYS = [0, 3, 5, 8, 12, 15];
-const TVO_OFF = ['qr'];
+const TVO_OFF = ['qr', 'voice'];
 function tvo() {
   const o = lsGet('oche.tvopt') || {};
   TVO_LIST.forEach(([k]) => { if (o[k] == null) o[k] = !TVO_OFF.includes(k); });
@@ -5000,6 +5114,8 @@ function feedViewS() {
   // баннер: на ПК — в боковой колонке, на телефоне — в ленте после третьей записи
   const bn = bannerHTML('feed');
   let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">';
+  h += helpHint();
+  if (lv.data) h += lv.data.tournaments.filter(t => t.joined).slice(0, 3).map(c => { const e = tourE(c.id); return e.data ? yourMatch(TBY[c.id] || e.data, true) : ''; }).join('');
   if (lv.data && lv.data.tournaments.length) h += liveBlock(lv.data.tournaments, tourCardS);
   if (rg.data) h += invitesHTML(rg.data.tournaments.slice().sort((a, b) => a.start - b.start));
   h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['res', 'Итоги турниров']].concat(ME ? [['my', 'Мои матчи']] : []).map(([v, l]) => '<button class="fchip' + ((only ? 'res' : f) === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -5109,6 +5225,7 @@ function render() {
     : R === 'title' ? titleView()
     : R === 'plans' ? plansView()
     : R === 'clubs' ? clubsView()
+    : R === 'help' ? helpView()
     : R.startsWith('club.') ? clubView(R.slice(5))
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
@@ -5156,9 +5273,11 @@ document.addEventListener('click', e => {
   const saveSu = () => lsSet('oche2.setup', su);
   switch (a) {
     case 'go': go(v); break;
+    case 'hlp-hide': lsSet('oche2.hlp', true); render(); break;
     case 'set-theme': S.theme = v; applyTheme(); render(); break;
     case 'open-settings': closeModals(); S.settings = true; render(); break;
     case 'set-palette': S.palette = v; applyTheme(); render(); break;
+    case 'voice-tg': S.voice = !S.voice; lsSet('oche2.voice', S.voice); if (S.voice) say('Озвучка включена'); render(); break;
     case 'sfx': S.sfx = !S.sfx; lsSet('oche2.sfx', S.sfx); if (!document.body.classList.contains('ingame')) toast(S.sfx ? 'Звук включён' : 'Звук выключен'); render(); break;
     case 'minfo': closeModals(); S.modalMatch = v; render(); break;
     case 'res-ask': S.clearRes = true; render(); break;
@@ -5263,6 +5382,7 @@ document.addEventListener('click', e => {
     }
     case 'pro-p': S.proP = v; render(); break;
     case 'res-img': resultsImage(v).catch(() => toast('Не удалось сделать картинку.')); break;
+    case 'ics': if (TBY[v]) saveBlob(new Blob([tourIcs(TBY[v])], { type: 'text/calendar' }), 'Turnir-' + (latin(TBY[v].name) || 'oche') + '.ics'); break;
     case 'res-post': if (TBY[v]) copyText(resultsPost(TBY[v]), 'Текст для поста скопирован — вставьте в VK или Telegram.'); break;
     case 'res-doc': if (TBY[v]) { saveBlob(resultsDocx(TBY[v]), 'Itogi-' + (latin(TBY[v].name) || TBY[v].id) + '.docx'); toast('Документ сохранён — откроется в Word.'); } break;
     case 'cover-set': case 'cover-rm': {
@@ -5578,7 +5698,7 @@ document.addEventListener('click', e => {
       const ids = o.all ? [mid] : o.ids.includes(mid) ? o.ids.filter(x => x !== mid) : o.ids.concat([mid]);
       lsSet('oche.watch.' + tid, { all: !ids.length, ids }); render(); break;
     }
-    case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); render(); break; }
+    case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); if (v === 'voice' && o.voice) say('Озвучка табло включена'); render(); break; }
     case 'tvo-show': S.tvoOpen = !S.tvoOpen; render(); break;
     case 'qr-show': closeModals(); S.qr = v; loadQr(); render(); break;
     case 'qr-copy': copyText(v, 'Ссылка скопирована.'); break;
@@ -5807,6 +5927,35 @@ window.addEventListener('offline', netBar);
 let installEv = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; });
 window.addEventListener('appinstalled', () => { installEv = null; toast('Oche на экране телефона.'); });
+/* ===== Как пользоваться: коротко для игроков и ведущих ===== */
+const HELP = [
+  ['Игроку', [
+    ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу.'],
+    ['Когда мой матч', 'Как только ваш матч можно играть, в ленте и в турнире появится яркая плашка «Ваш матч»: соперник и мишень, телефон коротко завибрирует. Кнопка «Играть» открывает счётчик уже с этим матчем.'],
+    ['Как вести счёт', '«Сумма» — набираете очки за подход и жмёте ввод, это быстрее всего. «По дротикам» — каждый дротик отдельно (Дубль/Трипл перед числом), тогда считаются попытки на дубль. Ошиблись — «Отмена» снимает последний бросок, можно отменять подряд.'],
+    ['Подсказки закрытия и озвучка', 'Когда остаётся 170 и меньше, счётчик показывает, как закрыть. В настройках (шестерёнка) можно включить «Озвучка счёта»: телефон проговорит набор, перебор и сколько осталось — не нужно смотреть на экран.'],
+    ['Пропала сеть', 'Ничего не теряется: подходы сохраняются на телефоне (вверху видно «не отправлено: N») и уйдут на сервер, когда сеть появится. Если счёт начали на другом телефоне — «Забрать ведение счёта».'],
+    ['Рейтинг и рекорды', 'Рейтинг Эло считается по турнирным матчам: старт 1500, за матч до ±32. После матча счётчик поздравит с личным рекордом: лучший средний набор, закрытие, лег, подход.'],
+    ['Как приложение на телефоне', 'Настройки → «Установить на экран телефона» (на iPhone: «Поделиться» → «На экран Домой»). Открывается без адресной строки, экран не гаснет во время игры.']
+  ]],
+  ['Ведущему', [
+    ['Создать турнир', '«Турниры» → «+ Создать турнир»: название, дата, формат и число легов. Форматы: «Круговая» — все со всеми; «На вылет» — проиграл и выбыл; «Все места» — проигравшие продолжают и разыгрывают каждое место; квалификация + сетки — как в лиге NDL. Взнос — по желанию, с суммой.'],
+    ['Начать и вести', 'Когда все записались — «Начать турнир». На вкладке «Матчи» фильтр «Можно играть» показывает, кого звать к мишеням; число мишеней задаётся кнопками +/−, матчи раскладываются по ним сами. Счёт вводят сами игроки со своих телефонов или вы — кнопкой «Счёт».'],
+    ['Табло и экран организатора', '«Табло для ТВ» — на телевизор в зале: идущие матчи, вспышки 180 и закрытий, вызовы к мишеням, по желанию QR и озвучка. «Экран организатора» — всё управление на одном экране, «Слежка за матчами» — все матчи сразу.'],
+    ['Взносы', 'Если у турнира есть взнос, на вкладке «Взносы» отмечайте, кто оплатил — видно только вам и помощникам.'],
+    ['Итоги для соцсетей', 'После турнира в карточке итогов: «Картинка итогов» (готовая под пост), «Текст для поста» и «Документ Word». Там же можно прикрепить общее фото всех игроков — оно появится в ленте вместе с итогами.'],
+    ['Камеры и фото', 'На вкладке «Трансляция» добавьте ссылки на камеры VK — они покажутся на странице турнира и на табло; если видео отстаёт, задержите счёт на табло. Фото и ссылки на посты — во вкладке «Фото и ссылки».']
+  ]]
+];
+// подсказка в ленте для новичка: скрывается крестиком навсегда (на этом устройстве)
+const helpHint = () => lsGet('oche2.hlp') ? '' : '<div class="card hint"><div><b>Впервые здесь?</b><div class="meta">Как записаться, вести счёт и провести турнир — за пару минут.</div></div><div class="row"><button class="mini go" data-act="go" data-v="help">Как пользоваться</button><button class="icon-btn" data-act="hlp-hide" aria-label="Скрыть подсказку">✕</button></div></div>';
+function helpView() {
+  let h = '<div class="narrow"><div class="phead"><h1 class="h1">Как пользоваться</h1></div>';
+  HELP.forEach(([sec, items]) => {
+    h += '<div class="sec"><span class="label">' + sec + '</span><div class="card hlp">' + items.map(([q, a]) => '<details><summary>' + esc(q) + '</summary><p>' + esc(a) + '</p></details>').join('') + '</div></div>';
+  });
+  return h + '<p class="meta">Остались вопросы — напишите организатору своего клуба.</p></div>';
+}
 function installBox() {
   if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return '';
   if (installEv) return '<button class="btn alt" data-act="install">Установить на экран телефона</button>';
