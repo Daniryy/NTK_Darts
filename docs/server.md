@@ -90,27 +90,30 @@ cd /srv/oche/app && sudo -u oche bash -c 'set -a; . /etc/oche.env; set +a; npm r
 
 Страница отправляет на вход обычной ссылкой: `/api/auth/vk?return=/текущий/путь`.
 
-## VPS (Ubuntu 24.04, 2 vCPU / 4 ГБ)
+## VPS (Ubuntu 24.04)
 
-### Подготовка
-1. Купить VPS и домен.
-2. В DNS домена создать запись `A` на IP сервера.
-3. Репозиторий закрытый? Тогда нужен ключ на чтение:
-   - на сервере: `ssh-keygen -t ed25519 -f /root/.ssh/oche_deploy -N ''`;
-   - на GitHub: Settings → Deploy keys → вставить `/root/.ssh/oche_deploy.pub`;
-   - в `/root/.ssh/config`: `Host github.com` + `IdentityFile /root/.ssh/oche_deploy`;
-   - `REPO=git@github.com:Daniryy/NTK_Darts.git`.
+Для проверки хватит 1 vCPU / 1 ГБ / 10 ГБ (на маленьком сервере скрипт сам добавит подкачку 2 ГБ), для работы с игроками — 2 vCPU / 2–4 ГБ. Нужен **внешний IPv4-адрес**: без него сайт не открыть снаружи, а сервер не скачает пакеты и код. Репозиторий открытый — ключи для GitHub не нужны.
 
-### Установка (один раз, от root)
+### Тест без домена — сайт по IP (один раз, от root)
 ```
-curl -fsSLO https://raw.githubusercontent.com/Daniryy/NTK_Darts/main/deploy/setup.sh   # или скопировать файл вручную
-DOMAIN=oche.ru EMAIL=you@mail.ru REPO=git@github.com:Daniryy/NTK_Darts.git BRANCH=main bash setup.sh
+ssh root@IP_СЕРВЕРА
+curl -fsSLO https://raw.githubusercontent.com/Daniryy/NTK_Darts/main/deploy/setup.sh && bash setup.sh
 ```
-Скрипт ставит nginx, PostgreSQL, Node 22 и certbot, создаёт базу и `/etc/oche.env` со случайными паролями. Он же запускает службу `oche`, получает HTTPS, включает брандмауэр (открыты SSH, 80, 443), ночные копии базы и проверку раз в 5 минут.
+Скрипт ставит nginx, PostgreSQL и Node 22, скачивает код, создаёт базу и `/etc/oche.env` со случайными паролями, запускает службу `oche`, включает брандмауэр (SSH и 80), ночные копии и проверку раз в 5 минут. По ходу спросит:
+- заполнить ли демо-данными (игроки, турниры, матчи) — чтобы было что посмотреть;
+- имя, логин и пароль тех. администратора — это вы.
 
-После установки вписать `VK_APP_ID` и `TELEGRAM_*` в `/etc/oche.env`, затем выполнить `systemctl restart oche`.
+В конце покажет адрес `http://IP_СЕРВЕРА`. Вход администратора — `http://IP_СЕРВЕРА/#staff`; игрокам выдаёте коды в «Панели управления» → «+ Новый аккаунт», они входят по коду. Без домена не работают вход через VK и установка на экран телефона (нужен HTTPS); вход по телефону — когда подключён сервис звонков (выше).
 
-Для закрытого репозитория ключ нужен и пользователю `oche`: команде `git pull` в `deploy.sh`. Скопируйте ключ в `/srv/oche/.ssh/`, `chown -R oche`, `chmod 600`.
+Без вопросов (например, по SSH-скрипту): `DEMO=1 ADMIN_NAME="Имя Фамилия" ADMIN_LOGIN=danil ADMIN_PASSWORD='…' bash setup.sh`.
+
+### С доменом и HTTPS
+1. Купить домен, в DNS создать запись `A` на IP сервера, дождаться, пока она заработает (`ping домен` показывает IP).
+2. Запустить тот же скрипт с доменом — на новом сервере или поверх теста (данные сохранятся, сменится только адрес):
+```
+DOMAIN=oche.ru EMAIL=you@mail.ru bash setup.sh
+```
+Скрипт получит сертификат HTTPS (certbot, продлевается сам) и откроет порт 443. После установки вписать `VK_APP_ID`, `SMS_*` и `TELEGRAM_*` в `/etc/oche.env`, затем выполнить `systemctl restart oche`.
 
 ### Обновление
 ```

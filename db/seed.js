@@ -275,7 +275,7 @@ async function main() {
   const n = (await pool.query('SELECT count(*) AS n FROM players')).rows[0].n;
   if (n > 0) { console.log('База уже заполнена (' + n + ' игроков). Для пересоздания: npm run seed -- --reset'); return; }
   const r = await tx(seed);
-  console.log('Демо-данные: ' + r.players + ' игроков, ' + r.tours + ' турниров, ' + r.matches + ' матчей. Вход для разработки: ' + ME);
+  console.log('Демо-данные: ' + r.players + ' игроков, ' + r.tours + ' турниров, ' + r.matches + ' матчей.' + (process.env.NODE_ENV === 'production' ? '' : ' Вход для разработки: ' + ME));
 }
 
 if (require.main === module) main().then(() => pool.end()).catch(e => { console.error(e); process.exit(1); });
