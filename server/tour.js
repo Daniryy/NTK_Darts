@@ -29,6 +29,8 @@ async function loadTours(c, rows) {
   return rows.map(row => {
     const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
     t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
+    // общее фото игроков — одно из фото турнира
+    t.cover = row.cover ? t.photos.find(p => p.id === row.cover) || null : null;
     t.links = row.links || [];
     t.streams = row.streams || [];
     const hs = hosts.filter(h => h.club_id === row.club_id);
@@ -99,6 +101,27 @@ function champion(t) {
   if (tStatus(t) !== 'done') return null;
   if (B.isBracket(t)) { const w = B.resolver(t).outcome(B.bRounds(t) - 1, 0).w; return B.isReal(w) ? w : null; }
   return standings(t)[0].id;
+}
+
+// призёры для ленты: до 4 мест [{ id, name, lo, hi }]
+function podiumOf(t) {
+  const pl = placesOf(t);
+  return Object.keys(pl).filter(id => pl[id][0] <= 3).sort((a, b) => pl[a][0] - pl[b][0] || (a < b ? -1 : 1)).slice(0, 4)
+    .map(id => ({ id, name: (t._ents.find(e => e.player_id === id) || {}).name || '—', lo: pl[id][0], hi: pl[id][1] }));
+}
+// лучшее в сыгранном турнире: среднее за матч, закрытие, 180 — для итогов и поста
+async function tourBest(c, tid) {
+  const rows = await all(c, `SELECT l.player_id AS id, l.name, l.pts, l.darts, l.hco, l.c180 FROM match_lines l JOIN matches m ON m.id = l.match_id
+    WHERE m.tournament_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND (m.ex IS NULL OR m.ex->>'k' = 'x01') AND l.player_id IS NOT NULL`, [tid]);
+  let avg = null, hco = null;
+  const c180 = new Map();
+  rows.forEach(r => {
+    if (r.darts >= 9) { const v = Math.round(r.pts / r.darts * 30) / 10; if (!avg || v > avg.v) avg = { id: r.id, name: r.name, v }; }
+    if (r.hco && (!hco || r.hco > hco.v)) hco = { id: r.id, name: r.name, v: r.hco };
+    if (r.c180) c180.set(r.id, { id: r.id, name: r.name, n: ((c180.get(r.id) || {}).n || 0) + r.c180 });
+  });
+  const top = [...c180.values()].sort((a, b) => b.n - a.n)[0] || null;
+  return { avg, hco, c180: { total: [...c180.values()].reduce((a, x) => a + x.n, 0), top } };
 }
 
 // места всех участников: { id: [lo, hi] }
@@ -201,7 +224,8 @@ function tourJSON(t, me) {
     }
   });
   out.games = t.games.map(g => Object.assign({}, g));
-  // взносы видит только команда турнира
+  out.fee = row.fee == null ? null : row.fee;
+  // отметки «оплатил» видит только команда турнира
   if (fees) out.fees = { fee: row.fee, paid: t._ents.filter(e => e.paid).map(e => e.player_id) };
   return out;
 }
@@ -213,11 +237,12 @@ function tourCard(t, me) {
     status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, cap: t.cap, count: t.players.length,
     ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null, layout: t.layout || null, labels: t.labels || null,
     progress: t.status === 'reg' ? { done: 0, total: 0 } : t.stage === 'qual' ? { done: qualDone(t), total: t.players.length } : B.tProgress(t),
-    champion: e ? { id: ch, name: e.name } : null, joined: !!me && t.players.includes(me.id), version: t.version
+    champion: e ? { id: ch, name: e.name } : null, joined: !!me && t.players.includes(me.id), version: t.version,
+    fee: row.fee == null ? null : row.fee, cover: t.cover, podium: t.status === 'done' ? podiumOf(t) : null
   };
 }
 
 module.exports = {
   RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour,
-  roundLabel, gameLabel, isOwner, isStaff, feesOn, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
+  roundLabel, gameLabel, isOwner, isStaff, feesOn, tourBest, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
 };

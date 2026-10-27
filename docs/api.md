@@ -105,6 +105,7 @@
 
 ### `POST /api/photos?kind=avatar[&playerId=p5]&w=400&h=400` — нужен вход
 ### `POST /api/photos?kind=tour&tournamentId=t4&w=1280&h=960` — организатор
+С `&cover=1` фото становится общим фото игроков (`cover` турнира).
 ### `POST /api/photos?kind=banner&w=1200&h=300` — тех. администратор, картинка баннера
 С `&clubId=c1` — картинка спонсора клуба (ведущий клуба с правом `club_tools`).
 
@@ -504,9 +505,9 @@
 { "id": "t4", "name": "…", "official": true, "org": { "id": "p1", "name": "…", "ver": true }, "city": "Москва", "venue": "…",
   "start": 1760000000000, "regUntil": null, "status": "live", "format": "pl", "mode": 501, "ltw": 3, "cap": 16,
   "count": 16, "progress": { "done": 18, "total": 32 }, "champion": null, "joined": true, "version": 57,
-  "ex": null, "qual": null, "split": null, "stage": null }
+  "ex": null, "qual": null, "split": null, "stage": null, "fee": 500, "cover": null, "podium": null }
 ```
-Во время квалификации `progress` — сколько игроков сдали из всех.
+Во время квалификации `progress` — сколько игроков сдали из всех. `fee` — взнос или `null`; у сыгранного турнира `cover` (общее фото) и `podium: [{ id, name, lo, hi }]` — призёры (места 1–3, до 4 человек) для карточки итогов в ленте.
 
 ### `GET /api/tournaments?status=reg|live|done&city=&q=&mine=1&limit=30&offset=0`
 Ответ `{ "total": 12, "tournaments": [TourCard] }`. `mine=1` — я участник или организатор (нужен вход).
@@ -606,7 +607,10 @@
 
 Ответ `{ "tournament": Tour }`.
 
-`can.staff` — организатор или помощник клуба; `can.fees` — взносы (команда турнира с тарифом «Ведущий»), только тогда в ответе `fees`. `org.logo` — логотип клуба с тарифом «Ведущий». В `POST` и `PATCH` турнира — `fee` (взнос, ₽, 0–100000 или `null`; с правом `club_tools`), его можно менять и после старта.
+`fee` — взнос, ₽ (`null` — без взноса), виден всем; `cover` — общее фото игроков `{ id, url, w, h }` или `null`; у сыгранного турнира ещё `best: { avg: { id, name, v }, hco: { id, name, v }, c180: { total, top: { id, name, n } } }` — лучшее среднее за матч (от 9 дротиков), максимальное закрытие и 180. `can.staff` — организатор или помощник клуба; `can.fees` — взносы (команда турнира с тарифом «Ведущий»), только тогда в ответе `fees`. `org.logo` — логотип клуба с тарифом «Ведущий». В `POST` и `PATCH` турнира — `fee` (взнос, ₽, 0–100000 или `null` — без взноса; любой организатор), его можно менять и после старта.
+
+### `PATCH /api/tournaments/:id/cover` — организатор
+`{ "photoId": "…" }` — общее фото игроков из фото турнира (`404`, если фото чужое), `null` — убрать. Удалили фото — общего фото нет. Ответ `{ tournament }`.
 
 ### `PATCH /api/tournaments/:id/paid` — команда турнира, `can.fees`
 `{ "playerId", "paid": true | false }` — отметка «оплатил». Ответ `{ tournament }`.

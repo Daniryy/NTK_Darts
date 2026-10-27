@@ -97,7 +97,8 @@ module.exports = async function (app) {
         if ((await one(c, 'SELECT count(*) AS n FROM photos WHERE tournament_id = $1', [t.id])).n >= TOUR_MAX) throw E.conflict('conflict', 'У турнира уже ' + TOUR_MAX + ' фото');
         const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, tournament_id, w, h, bytes, created_at) VALUES ($1, $2, 'tour', $3, $4, $5, $6, $7, $8) RETURNING *`,
           [id, file, me.id, t.id, w, h, buf.length, Date.now()]);
-        await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [t.id]);
+        // &cover=1 — это общее фото игроков
+        await c.query('UPDATE tournaments SET version = version + 1' + (q.cover === '1' ? ', cover = $2' : '') + ' WHERE id = $1', q.cover === '1' ? [t.id, row.id] : [t.id]);
         forget('t', t.id);
         return { photo: photoJSON(row) };
       });

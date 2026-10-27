@@ -84,8 +84,12 @@ test('взносы: сумма у турнира, отметки «оплати�
   err(await call(PL, 'PATCH', '/api/tournaments/' + tour.id + '/paid', { playerId: 'p6', paid: false }), 403);
   err(await call(HOST, 'PATCH', '/api/tournaments/' + tour.id + '/paid', { playerId: 'p2', paid: true }), 404);
   ok(await call(HOST, 'PATCH', '/api/tournaments/' + tour.id, { fee: 700 }));
-  // без тарифа взнос не поставить
-  err(await call(PL, 'POST', '/api/tournaments', { name: 'Свой', format: 'pl', mode: 501, ltw: 1, fee: 300, players: ['p6', 'p10', 'p12'] }), 403);
+  // сумму взноса может указать любой организатор, её видят все; отметки «оплатил» — только с тарифом
+  const own = ok(await call(PL, 'POST', '/api/tournaments', { name: 'Свой', format: 'pl', mode: 501, ltw: 1, fee: 300, players: ['p6', 'p10', 'p12'] }), 201).tournament;
+  assert.deepEqual([own.fee, own.fees, own.can.fees], [300, undefined, false]);
+  assert.equal(ok(await call(null, 'GET', '/api/tournaments/' + own.id)).tournament.fee, 300);
+  assert.equal(ok(await call(null, 'GET', '/api/tournaments?status=live')).tournaments.find(x => x.id === own.id).fee, 300);
+  err(await call(PL, 'PATCH', '/api/tournaments/' + own.id + '/paid', { playerId: 'p10', paid: true }), 403);
   assert.equal(ok(await call(HOST, 'GET', '/api/clubs/c1')).stats.cash30, 1400, 'касса за 30 дней: двое оплатили по 700');
 });
 

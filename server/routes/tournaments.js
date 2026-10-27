@@ -18,7 +18,11 @@ async function getTour(c, id, lock) {
   if (!row) throw E.notFound('Турнир не найден');
   return (await T.loadTours(c, [row]))[0];
 }
-const tourResp = async (c, id, me) => ({ tournament: T.tourJSON(await getTour(c, id, false), me) });
+const tourResp = async (c, id, me) => {
+  const t = await getTour(c, id, false), out = T.tourJSON(t, me);
+  if (t.status === 'done') out.best = await T.tourBest(c, t.id);
+  return { tournament: out };
+};
 const needOwner = (t, me) => { if (!T.isOwner(t, me)) throw E.forbidden('Это может только организатор'); };
 // организатор или помощник клуба
 const needStaff = (t, me) => { if (!T.isStaff(t, me)) throw E.forbidden('Это может организатор или помощник'); };
@@ -87,11 +91,8 @@ function tourFields(b, full, me) {
   if (b.labels != null) o.labels = V.oneOf(b.labels, 'labels', ['ab', 'num']);
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
-  // взнос за участие, ₽ — в тарифе «Ведущий»
-  if (b.fee !== undefined) {
-    if (b.fee !== null && !can(me, 'club_tools')) throw E.forbidden('Взносы — в тарифе «Ведущий»');
-    o.fee = b.fee === null ? null : V.int(b.fee, 'fee', 0, 100000);
-  }
+  // взнос за участие, ₽ (null — без взноса); отметки «оплатил» — в тарифе «Ведущий»
+  if (b.fee !== undefined) o.fee = b.fee === null ? null : V.int(b.fee, 'fee', 0, 100000);
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
     if (!can(me, 'official')) throw E.forbidden('Официальный статус задаёт администратор');
     if (b.official !== undefined) o.official = V.bool(b.official, 'official');
@@ -388,6 +389,20 @@ module.exports = async function (app) {
         [t.id, JSON.stringify(g.slots), g.block || null, JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])))]);
       await T.refreshTour(c, await getTour(c, t.id, false));
       forget('t', t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // общее фото игроков (организатор): { photoId } — одно из фото турнира, null — убрать
+  app.patch('/api/tournaments/:id/cover', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      const pid = b.photoId == null ? null : V.str(b.photoId, 'photoId', 1, 64);
+      if (pid && !t.photos.some(p => p.id === pid)) throw E.notFound('Фото не из этого турнира');
+      await c.query('UPDATE tournaments SET cover = $2 WHERE id = $1', [t.id, pid]);
+      await bump(c, t.id);
       return tourResp(c, t.id, me);
     });
   });
