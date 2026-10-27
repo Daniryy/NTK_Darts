@@ -196,7 +196,7 @@ test('клуб: заявка, подтверждение — подавший с
   assert.ok(ok(await call(null, 'GET', '/api/clubs')).clubs.some(x => x.id === c.id));
   const t = ok(await call(U, 'POST', '/api/tournaments', { name: 'От клуба', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p10', 'p3', 'p5'] }), 201).tournament;
   assert.equal(t.official, true);
-  assert.deepEqual(t.org, { id: 'p10', name: 'Казанский дротик', ver: true, club: c.id });
+  assert.deepEqual(t.org, { id: 'p10', name: 'Казанский дротик', ver: true, club: c.id, logo: null });
   assert.equal(t.can.stream, true);
   ok(await call(U, 'PATCH', '/api/tournaments/' + t.id + '/streams', { streams: [{ url: 'https://vk.com/video-1_2' }] }));
   // чужой клуб в турнир не подставить

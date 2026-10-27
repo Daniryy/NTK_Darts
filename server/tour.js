@@ -12,7 +12,7 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
   const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished,
@@ -20,11 +20,22 @@ async function loadTours(c, rows) {
     FROM matches m WHERE m.tournament_id = ANY($1)`, [ids]);
   const ph = await all(c, `SELECT id, file, tournament_id, w, h FROM photos WHERE tournament_id = ANY($1) ORDER BY created_at`, [ids]);
   const qs = rows.some(r => r.qual) ? await all(c, 'SELECT * FROM qual_results WHERE tournament_id = ANY($1) ORDER BY try', [ids]) : [];
+  // турниры клуба: ведущие клуба (соорганизаторы), помощники, логотип
+  const cids = [...new Set(rows.map(r => r.club_id).filter(Boolean))];
+  const hosts = cids.length ? await all(c, `SELECT h.club_id, h.player_id, p.role FROM club_hosts h JOIN players p ON p.id = h.player_id JOIN clubs c ON c.id = h.club_id
+    WHERE h.club_id = ANY($1) AND c.status = 'active' AND NOT p.blocked`, [cids]) : [];
+  const helpers = cids.length ? await all(c, 'SELECT club_id, player_id FROM club_helpers WHERE club_id = ANY($1)', [cids]) : [];
+  const logos = cids.length ? await all(c, 'SELECT id, logo FROM clubs WHERE id = ANY($1)', [cids]) : [];
   return rows.map(row => {
     const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
     t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
     t.links = row.links || [];
     t.streams = row.streams || [];
+    const hs = hosts.filter(h => h.club_id === row.club_id);
+    Object.defineProperty(t, '_club', { value: row.club_id ? {
+      hosts: new Set(hs.map(h => h.player_id)), helpers: new Set(helpers.filter(h => h.club_id === row.club_id).map(h => h.player_id)),
+      branded: hs.some(h => can({ role: h.role }, 'club_tools')), logo: (logos.find(x => x.id === row.club_id) || {}).logo || null
+    } : null });
     return t;
   });
 }
@@ -135,7 +146,12 @@ function gameLabel(t, g, rv) {
 
 // значок PRO: тариф Pro или выше, кроме администраторов
 const isPro = e => can({ role: e.role }, 'pro') && (RANK[e.role] || 0) < RANK.admin;
-const isOwner = (t, me) => !!me && (can(me, 'any_tour') || t._row.owner_id === me.id);
+// организатор: создатель, ведущие клуба турнира, администратор с правом any_tour
+const isOwner = (t, me) => !!me && (can(me, 'any_tour') || t._row.owner_id === me.id || !!(t._club && t._club.hosts.has(me.id)));
+// команда турнира: организатор и помощники клуба — ведут счёт, ставят мишени, отмечают взносы
+const isStaff = (t, me) => isOwner(t, me) || !!(me && t._club && t._club.helpers.has(me.id));
+// взносы — в тарифе «Ведущий»: у клуба, где ведущий с этим правом, или у организатора с ним
+const feesOn = (t, me) => isStaff(t, me) && (can(me, 'club_tools') || !!(t._club && t._club.branded));
 
 // игроки игры сетки, если её можно начать: { a, b } или null
 function readyPair(t, r, i) {
@@ -144,7 +160,7 @@ function readyPair(t, r, i) {
   const s = B.gameState(t, g);
   return s.st === 'ready' ? { g, a: s.a, b: s.b } : null;
 }
-const canScoreGame = (t, me, a, b) => !!me && (isOwner(t, me) || me.id === a || me.id === b);
+const canScoreGame = (t, me, a, b) => !!me && (isStaff(t, me) || me.id === a || me.id === b);
 
 // можно ли снять результат игры g: дальше нет зависящих сыгранных матчей, идущие матчи остаются готовыми
 function canClear(t, g, liveMatches) {
@@ -163,32 +179,37 @@ function qualOrder(t) {
   return t.players.slice().sort((a, b) => { const ka = key(a), kb = key(b); return kb[0] - ka[0] || kb[1] - ka[1] || r[b] - r[a] || (a < b ? -1 : 1); });
 }
 
-const orgOf = row => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver, club: row.club_id || null });
+// logo — у клуба с тарифом «Ведущий»
+const orgOf = (row, t) => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver, club: row.club_id || null, logo: t && t._club && t._club.branded ? t._club.logo : null });
 
 function tourJSON(t, me) {
-  const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me);
+  const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me), staff = isStaff(t, me), fees = feesOn(t, me);
   const roster = {};
   t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', pro: isPro(e) }; });
   const out = Object.assign({}, t, {
-    org: orgOf(row), roster,
+    org: orgOf(row, t), roster,
     can: {
       org: owner,
       stream: owner && can(me, 'streams'),
       edit: owner && t.status === 'reg',
       delete: owner,
       launch: owner && t.status === 'reg',
-      score: !!me && t.status === 'live' && (owner || joined),
+      score: !!me && t.status === 'live' && (staff || joined),
+      staff,
+      fees,
       join: !!me && t.status === 'reg' && (joined || t.players.length < t.cap)
     }
   });
   out.games = t.games.map(g => Object.assign({}, g));
+  // взносы видит только команда турнира
+  if (fees) out.fees = { fee: row.fee, paid: t._ents.filter(e => e.paid).map(e => e.player_id) };
   return out;
 }
 
 function tourCard(t, me) {
   const row = t._row, ch = champion(t), e = ch && t._ents.find(x => x.player_id === ch);
   return {
-    id: t.id, name: t.name, official: t.official, org: orgOf(row), city: t.city, venue: t.venue, start: t.start, regUntil: t.regUntil,
+    id: t.id, name: t.name, official: t.official, org: orgOf(row, t), city: t.city, venue: t.venue, start: t.start, regUntil: t.regUntil,
     status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, cap: t.cap, count: t.players.length,
     ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null, layout: t.layout || null, labels: t.labels || null,
     progress: t.status === 'reg' ? { done: 0, total: 0 } : t.stage === 'qual' ? { done: qualDone(t), total: t.players.length } : B.tProgress(t),
@@ -198,5 +219,5 @@ function tourCard(t, me) {
 
 module.exports = {
   RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour,
-  roundLabel, gameLabel, isOwner, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
+  roundLabel, gameLabel, isOwner, isStaff, feesOn, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
 };

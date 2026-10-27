@@ -106,6 +106,10 @@
 ### `POST /api/photos?kind=avatar[&playerId=p5]&w=400&h=400` — нужен вход
 ### `POST /api/photos?kind=tour&tournamentId=t4&w=1280&h=960` — организатор
 ### `POST /api/photos?kind=banner&w=1200&h=300` — тех. администратор, картинка баннера
+С `&clubId=c1` — картинка спонсора клуба (ведущий клуба с правом `club_tools`).
+
+### `POST /api/photos?kind=club&clubId=c1&w=400&h=400` — логотип клуба
+Ведущий клуба с правом `club_tools`; прежний логотип удаляется. Ответ `201 { photo }`, адрес — в `clubs.logo`.
 Тело — сама картинка, `Content-Type: image/jpeg | image/webp | image/png`, до 3 МБ. `w`, `h` — размер в точках (16–4096).
 - Аватар: свой; гостя, которого создал я; любой — администратору. Новый заменяет старый.
 - Итоги турнира: до 60 фото, меняет версию турнира.
@@ -153,6 +157,7 @@
 | Право | По умолчанию | Что разрешает |
 |---|---|---|
 | `club_tour` | ведущий | турниры от имени своего клуба |
+| `club_tools` | ведущий | логотип и спонсоры клуба на табло, помощники, взносы, статистика клуба |
 | `streams` | ведущий | камеры в своих турнирах |
 | `accounts` | ведущий | заводить аккаунты с кодом входа (видеть свои) |
 | `host_nums` | ведущий | свои номера игроков |
@@ -170,7 +175,7 @@
 | `banners` | тех. администратор | баннеры |
 
 ### `GET /api/admin/audit?limit=50&before=время&target=id` — право `audit`
-Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `password.change`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
+Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `password.change`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `club.helper_add|helper_rm`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
 
 ## Звания
 
@@ -318,6 +323,21 @@
 ### `POST /api/admin/clubs/:id/hosts`, `DELETE /api/admin/clubs/:id/hosts/:playerId` — администратор
 Добавить (`{ "playerId" }`) или убрать ведущего подтверждённого клуба.
 
+### `GET /api/clubs/:id` — страница клуба, всем
+`{ club: Club + logo, upcoming: [TourCard], past: [TourCard], players: [PlayerShort + visits], photos: [{ id, url, w, h, tid }], manage, tools }` — расписание (регистрация и идущие), 10 прошедших, 10 сильнейших игроков клуба за полгода, 12 последних фото. `manage` — я ведущий клуба (или администратор с правом `clubs`); `tools` — ещё и право `club_tools` (тариф «Ведущий»), тогда в ответе:
+- `helpers: [PlayerShort]` — помощники;
+- `banners: [{ id, place, title, body, image, link, active, clicks }]` — спонсоры клуба;
+- `stats: { months: [{ t, players, visits }], regulars: [{ id, name, n }], lapsed: [{ id, name, last }], newMonth, cash30 }` — игроки на турнирах клуба по 6 месяцам, постоянные (3+ турнира за 60 дней), пропавшие (2+ турнира 60–180 дней назад и ни одного за 60 дней), новые за 30 дней, касса за 30 дней по отметкам «оплатил».
+
+### `PATCH /api/clubs/:id` — ведущий клуба
+`{ city?, address?, contact?, about? }`; название меняет администратор (`403`).
+
+### `POST /api/clubs/:id/helpers`, `DELETE /api/clubs/:id/helpers/:playerId` — ведущий клуба, право `club_tools`
+Помощники (до 5): в турнирах клуба ведут счёт любой пары, ставят мишени, вносят результаты квалификации и отмечают взносы (`can.staff`). Менять, запускать и удалять турнир, ссылки и камеры — нельзя. Ведущие клуба — соорганизаторы всех турниров клуба (`can.org`).
+
+### `POST /api/clubs/:id/banners`, `PATCH /api/clubs/:id/banners/:bid`, `DELETE …` — ведущий клуба, право `club_tools`
+Спонсоры клуба: поля как у баннеров, `place` — `tour` или `tv`, не больше 10. На турнирах клуба, где хотя бы у одного ведущего есть право `club_tools`, `GET /api/banners?place=…&tid=…` отдаёт только их (`club: true`), без баннеров Oche; там же `org.logo` — логотип клуба.
+
 ## Баннеры
 
 Реклама в ленте (`feed`), на странице турнира (`tour`) и на табло (`tv`). Ведёт тех. администратор.
@@ -447,7 +467,8 @@
   "live": { "0:1": "gq7p0c2mzt" },
   "roster": { "p1": { "name": "Артём Волков", "city": "Москва", "club": "…", "r": 1704 } },
   "version": 57,
-  "can": { "edit": false, "delete": false, "launch": false, "score": true, "join": false }
+  "can": { "org": false, "stream": false, "edit": false, "delete": false, "launch": false, "score": true, "staff": false, "fees": false, "join": false },
+  "fees": { "fee": 500, "paid": ["p1"] }
 }
 ```
 - **`status`:**
@@ -585,7 +606,12 @@
 
 Ответ `{ "tournament": Tour }`.
 
-### `PATCH /api/tournaments/:id/boards` — организатор, после старта
+`can.staff` — организатор или помощник клуба; `can.fees` — взносы (команда турнира с тарифом «Ведущий»), только тогда в ответе `fees`. `org.logo` — логотип клуба с тарифом «Ведущий». В `POST` и `PATCH` турнира — `fee` (взнос, ₽, 0–100000 или `null`; с правом `club_tools`), его можно менять и после старта.
+
+### `PATCH /api/tournaments/:id/paid` — команда турнира, `can.fees`
+`{ "playerId", "paid": true | false }` — отметка «оплатил». Ответ `{ tournament }`.
+
+### `PATCH /api/tournaments/:id/boards` — организатор или помощник, после старта
 - `{ "n": 6 }` — сколько мишеней (0 — без мишеней);
 - `{ "r": 1, "i": 3, "board": 2 }` — поставить готовой игре мишень; у другой игры она снимается, та получает свободную.
 

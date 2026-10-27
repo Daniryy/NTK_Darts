@@ -56,8 +56,10 @@ module.exports = async function (app) {
     if (!Buffer.isBuffer(buf) || !buf.length) throw E.bad('Нужна картинка: JPEG, WebP или PNG', 'body');
     const ext = kindOf(buf);
     if (!ext) throw E.bad('Это не JPEG, WebP или PNG', 'body');
-    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'banner']);
-    if (kind === 'banner' && !can(me, 'banners')) throw E.forbidden('Баннерами занимается тех. администратор');
+    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'banner', 'club']);
+    // логотип клуба и картинки спонсоров — ведущему клуба с тарифом «Ведущий»
+    const clubId = kind === 'club' || (kind === 'banner' && q.clubId != null) ? V.id(q.clubId, 'clubId') : null;
+    if (kind === 'banner' && !clubId && !can(me, 'banners')) throw E.forbidden('Баннерами занимается тех. администратор');
     const w = V.int(+q.w, 'w', 16, 4096), h = V.int(+q.h, 'h', 16, 4096);
     const id = crypto.randomBytes(12).toString('hex'), file = id + '.' + ext;
     await fs.promises.mkdir(config.uploadDir, { recursive: true });
@@ -72,6 +74,19 @@ module.exports = async function (app) {
             [id, file, me.id, p.id, w, h, buf.length, Date.now()]);
           const pl = await one(c, 'UPDATE players SET photo = $2 WHERE id = $1 RETURNING *', [p.id, urlOf(file)]);
           return { photo: photoJSON(row), player: playerShort(pl) };
+        }
+        if (clubId) {
+          const host = await one(c, `SELECT 1 FROM club_hosts h JOIN clubs cl ON cl.id = h.club_id WHERE h.club_id = $1 AND h.player_id = $2 AND cl.status = 'active'`, [clubId, me.id]);
+          if (!(host || can(me, 'clubs')) || !can(me, 'club_tools')) throw E.forbidden('Логотип и спонсоры клуба — в тарифе «Ведущий»');
+        }
+        if (kind === 'club') {
+          const cur = await one(c, 'SELECT logo FROM clubs WHERE id = $1 FOR UPDATE', [clubId]);
+          if (!cur) throw E.notFound('Клуб не найден');
+          if (cur.logo) (await all(c, `DELETE FROM photos WHERE file = $1 AND kind = 'club' RETURNING file`, [cur.logo.replace('/uploads/', '')])).forEach(x => old.push(x.file));
+          const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'club', $3, $4, $5, $6, $7) RETURNING *`,
+            [id, file, me.id, w, h, buf.length, Date.now()]);
+          await c.query('UPDATE clubs SET logo = $2 WHERE id = $1', [clubId, urlOf(file)]);
+          return { photo: photoJSON(row) };
         }
         if (kind === 'banner') {
           const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'banner', $3, $4, $5, $6, $7) RETURNING *`,

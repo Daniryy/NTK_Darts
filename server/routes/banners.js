@@ -1,9 +1,12 @@
 // Баннеры: показываются в ленте (feed), на странице турнира (tour) и на табло (tv).
-// Заводит тех. администратор; переходы по баннеру считаются.
+// Заводит тех. администратор; переходы по баннеру считаются. У клуба с тарифом «Ведущий» на его турнирах —
+// свои спонсоры (banners.club_id) вместо баннеров Oche.
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPerm } = require('../auth');
-const { can } = require('../roles');
+const { can, ROLES } = require('../roles');
+// роли, у которых есть право (тех. администратору доступно всё)
+const rolesWith = k => ROLES.filter(r => can({ role: r }, k));
 const { audit } = require('../audit');
 
 const PLACES = ['feed', 'tour', 'tv'];
@@ -33,12 +36,20 @@ function fields(b, all) {
 const need = req => needPerm(req, 'banners', 'Баннерами занимается тех. администратор');
 
 module.exports = async function (app) {
-  // GET /api/banners?place=feed — действующие сейчас
+  // GET /api/banners?place=feed[&tid=турнир] — действующие сейчас
   app.get('/api/banners', async req => {
     const place = V.oneOf(req.query.place, 'place', PLACES), now = Date.now();
     // Pro — без рекламы; табло в зале смотрят все, там баннеры остаются
     if (place !== 'tv' && can(req.player, 'pro')) return { banners: [] };
-    const rows = await all(pool, `SELECT * FROM banners WHERE place = $1 AND active AND (starts IS NULL OR starts <= $2) AND (ends IS NULL OR ends > $2) ORDER BY created_at DESC LIMIT 5`, [place, now]);
+    const live = `active AND (starts IS NULL OR starts <= $2) AND (ends IS NULL OR ends > $2)`;
+    // турнир клуба с тарифом «Ведущий»: только его спонсоры (или ничего), без баннеров Oche
+    if (req.query.tid && place !== 'feed') {
+      const club = await one(pool, `SELECT t.club_id FROM tournaments t WHERE t.id = $1 AND t.club_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM club_hosts h JOIN players p ON p.id = h.player_id JOIN clubs c ON c.id = h.club_id WHERE h.club_id = t.club_id AND c.status = 'active' AND p.role = ANY($2))`,
+      [String(req.query.tid), rolesWith('club_tools')]);
+      if (club) return { banners: (await all(pool, `SELECT * FROM banners WHERE place = $1 AND club_id = $3 AND ${live} ORDER BY created_at DESC LIMIT 5`, [place, now, club.club_id])).map(pub), club: true };
+    }
+    const rows = await all(pool, `SELECT * FROM banners WHERE place = $1 AND club_id IS NULL AND ${live} ORDER BY created_at DESC LIMIT 5`, [place, now]);
     return { banners: rows.map(pub) };
   });
   // переход по баннеру: страница шлёт перед открытием ссылки
@@ -49,7 +60,7 @@ module.exports = async function (app) {
 
   app.get('/api/admin/banners', async req => {
     need(req);
-    return { banners: (await all(pool, 'SELECT * FROM banners ORDER BY created_at DESC')).map(full) };
+    return { banners: (await all(pool, 'SELECT * FROM banners WHERE club_id IS NULL ORDER BY created_at DESC')).map(full) };
   });
   app.post('/api/admin/banners', async (req, reply) => {
     const me = need(req), f = fields(req.body || {}, true);
@@ -84,3 +95,5 @@ module.exports = async function (app) {
     return { ok: true };
   });
 };
+
+module.exports.fields = fields;

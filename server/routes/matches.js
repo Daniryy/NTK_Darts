@@ -4,7 +4,7 @@ const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
 const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, activeVisits } = require('../darts');
 const Games = require('../../shared/games.js');
-const { TOUR_SQL, loadTours, readyPair, canScoreGame, isOwner, canClear, refreshTour } = require('../tour');
+const { TOUR_SQL, loadTours, readyPair, canScoreGame, isStaff, canClear, refreshTour } = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards, lineJSON } = require('../cards');
 const { version, forget } = require('../versions');
@@ -72,7 +72,7 @@ async function startQualMatch(c, req, me, b, id) {
   if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация закрыта');
   const pid = V.id(q.playerId, 'qual.playerId'), k = V.int(q.try, 'qual.try', 0, t.qual.tries - 1);
   if (!t.players.includes(pid)) throw E.bad('Игрок не участвует в турнире', 'qual.playerId');
-  if (pid !== me.id && !isOwner(t, me)) throw E.forbidden('Попытку сдаёт сам игрок или организатор');
+  if (pid !== me.id && !isStaff(t, me)) throw E.forbidden('Попытку сдаёт сам игрок или организатор');
   const busy = await one(c, 'SELECT id FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try = $3', [tid, pid, k]);
   if (busy) throw E.conflict('game_taken', 'Эта попытка уже идёт или сыграна', { matchId: busy.id });
   if ((t.qual.res[pid] || [])[k]) throw E.conflict('game_taken', 'Результат этой попытки уже внесён', { matchId: null });
@@ -215,7 +215,7 @@ module.exports = async function (app) {
       const m = await lockMatch(c, req.params.id);
       if (m.status !== 'live') throw E.conflict('bad_state', 'Матч уже завершён');
       const inMatch = m.players.some(p => p.id === me.id);
-      const ok = m.tournament_id ? inMatch || isOwner(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || can(me, 'any_tour');
+      const ok = m.tournament_id ? inMatch || isStaff(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || can(me, 'any_tour');
       if (!ok) throw E.forbidden('Забрать счёт может организатор или игрок этого матча');
       await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, version = version + 1 WHERE id = $1', [m.id, req.device, me.id, Date.now() + LOCK_MS]);
       forget('m', m.id);
@@ -247,7 +247,7 @@ module.exports = async function (app) {
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
       const t = m.tournament_id ? await tourOf(c, m.tournament_id, true) : null;
-      const owner = t ? isOwner(t, me) : m.created_by === me.id || can(me, 'any_tour');
+      const owner = t ? isStaff(t, me) : m.created_by === me.id || can(me, 'any_tour');
       if (m.status === 'live') {
         if (!owner && m.lock_device !== req.device) throw E.forbidden('Бросить матч может тот, кто ведёт счёт, или организатор');
         await c.query('DELETE FROM matches WHERE id = $1', [m.id]);
