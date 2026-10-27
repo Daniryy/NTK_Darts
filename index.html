@@ -2126,7 +2126,8 @@ function yourMatch(t, link) {
   // первый раз — вибрация и подсказка, чтобы не пропустить вызов к мишени
   if (!YM_SEEN.has(key) && !going) {
     YM_SEEN.add(key); lsSet('oche2.ym', [...YM_SEEN].slice(-30));
-    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
+    // вибрация разрешена только после касания страницы
+    try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([200, 100, 200]); } catch (e) {}
     setTimeout(() => toast('Ваш матч готов: против ' + opp + (b ? ', мишень ' + b : '')), 0);
   }
   const acts = gameActs(t, m.g, 'ready', true);
