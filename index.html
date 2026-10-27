@@ -497,7 +497,7 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 [data-pid].hp .pn { color: var(--brass); }
 .part-h { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 -4px; }
 .part-h b { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.stages { display: grid; gap: 7px; flex: 1; min-width: 220px; }
+.stages { display: grid; gap: 7px; flex: 1; min-width: min(100%, 290px); }
 .stg { display: grid; grid-template-columns: 100px minmax(60px, 1fr) 92px; gap: 10px; align-items: center; font-size: 13px; }
 .stg .meta { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
 .stg.done .bar i { background: color-mix(in srgb, var(--green) 55%, var(--surface3)); }
@@ -792,6 +792,21 @@ button.banner:hover { border-color: var(--line-bright); }
 .tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
 .note-box.ok { border-color: var(--green); }
 .treq { display: grid; gap: 8px; }
+.clogo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; display: inline-grid; place-items: center; vertical-align: middle; }
+.clogo.none { background: var(--surface2); border: 1px solid var(--line); font-weight: 700; color: var(--muted); font-size: 14px; }
+.clogo.lg { width: 96px; height: 96px; font-size: 28px; }
+.clogo.sm { width: 36px; height: 36px; font-size: 12px; }
+.chero { display: flex; gap: 16px; align-items: center; margin: 8px 0 12px; }
+.chero .h1 { margin: 0 0 4px; }
+.cabout { white-space: pre-line; color: var(--fg); max-width: 720px; }
+.cphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.cphotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; cursor: zoom-in; }
+.bthumb { width: 54px; height: 32px; object-fit: cover; border-radius: 6px; vertical-align: middle; }
+.pform.sm { height: 90px; }
+.trow.click { cursor: pointer; gap: 12px; }
+.trow.click:hover { border-color: var(--line-bright); }
+.tvh-t { display: flex; gap: 1.2vw; align-items: center; min-width: 0; }
+.tvlogo { width: 5.2vw; height: 5.2vw; min-width: 48px; min-height: 48px; border-radius: 50%; object-fit: cover; }
 .achs { display: flex; flex-wrap: wrap; gap: 6px; }
 .ach { font-size: 12.5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .ach.on { color: var(--fg); border-color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
@@ -1732,9 +1747,9 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans'].includes(h)) return true;
-  // на сервере турнир, игрок или матч загрузятся при показе
-  if (SRV) return /^(t|p|m|tv|desk|watch)\.[\w-]+$/.test(h);
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans', 'clubs'].includes(h)) return true;
+  // на сервере турнир, игрок, матч или клуб загрузятся при показе
+  if (SRV) return /^(t|p|m|tv|desk|watch|club)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
   if (h.startsWith('t.')) return !!TBY[h.slice(2)];
   if (h.startsWith('p.')) return !!P[h.slice(2)];
@@ -2186,10 +2201,11 @@ function tourView(id) {
   const t = TBY[id];
   if (!t) return '<div class="note-box">Турнир не найден.</div>';
   const st = tStatus(t), inQual = t.stage === 'qual';
-  const tabs = st === 'reg' ? [['people', 'Участники']]
+  const fees = SRV && canDo(t, 'fees') ? [['fees', 'Взносы']] : [];
+  const tabs = st === 'reg' ? [['people', 'Участники']].concat(fees)
     : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']]
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']] : [['table', 'Таблица'], ['games', 'Матчи']])
-      .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : []);
+      .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : [], fees);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -2200,7 +2216,7 @@ function tourView(id) {
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
-  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), t.org.name].filter(Boolean).map(esc).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
+  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
   h += '<div class="card tstat">';
@@ -2221,7 +2237,7 @@ function tourView(id) {
     if (ready && !(tab === 'games' && S.gf === 'ready')) h += '<button class="mini go" data-act="ready-games">Можно играть: ' + ready + '</button>';
     if (!inQual) h += boardsCtl(t);
   } else {
-    h += podium(t);
+    h += podium(t) + '<button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов для соцсетей</button>';
   }
   h += '</div>';
   if (tabs.length > 1) h += '<div class="seg2 ttabs" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (tab === v) + '" class="' + (tab === v ? 'on' : '') + '" data-act="ttab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -2236,11 +2252,12 @@ function tourView(id) {
   else if (tab === 'media') h += mediaView(t);
   else if (tab === 'stream') h += streamView(t);
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
+  else if (tab === 'fees') h += feesView(t);
   else if (st !== 'reg') h += numsView(t);
   else {
     h += '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
   }
-  return h + bannerHTML('tour');
+  return h + bannerHTML('tour', t.id);
 }
 function deleteTour(tid) {
   const t = TBY[tid];
@@ -2297,7 +2314,7 @@ function stagesView(t, rv) {
 
 /* Мишени: сколько их в зале; готовые матчи получают свободные по порядку номеров */
 function boardsCtl(t) {
-  if (!t.games.length || !canDo(t, 'org')) return '';
+  if (!t.games.length || !(canDo(t, 'org') || canDo(t, 'staff'))) return '';
   const n = t.boards ? t.boards.n : 0;
   return '<div class="boards"><span class="label">Мишеней</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button></div>';
 }
@@ -2381,7 +2398,7 @@ function qualView(t) {
       else if (open && (j === 0 || res[j - 1])) {
         const lq = SRV && t.live && t.live['q:' + id + ':' + j];
         const play = lq ? '<button class="mini go" data-act="mview" data-v="' + lq + '">' + I.clock + 'Идёт</button>' : canDo(t, 'score') && (id === ME || canDo(t, 'org')) ? '<button class="mini go" data-act="qplay" data-v="' + ref + '">Играть</button>' : '';
-        const enter = canDo(t, 'org') && !lq ? '<button class="mini" data-act="qenter" data-v="' + ref + '">Ввести</button>' : '';
+        const enter = (canDo(t, 'org') || canDo(t, 'staff')) && !lq ? '<button class="mini" data-act="qenter" data-v="' + ref + '">Ввести</button>' : '';
         cells += '<td>' + (play || enter ? '<div class="gacts" style="justify-content:flex-end">' + play + enter + '</div>' : '<span class="muted">—</span>') + '</td>';
       }
       else cells += '<td class="muted">—</td>';
@@ -2496,6 +2513,7 @@ function newTourView() {
     h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'A1–A2, B1–B2 — как на листе'], ['num', '№1, №2 — по порядку']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
   }
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
+  if (SRV && Api.perm('club_tools')) h += '<div class="field"><label class="label" for="nt-fee">Взнос за участие, ₽</label><input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Необязательно" style="max-width:200px"><span class="meta">Отметки «оплатил» и касса — во вкладке «Взносы» турнира.</span></div>';
   if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
   h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
@@ -2527,6 +2545,7 @@ function createTour() {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
     if (nt.fmt !== 'rr') { body.layout = nt.layout || 'ndl'; body.labels = nt.labels || (ndl ? 'ab' : 'num'); }
     if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
+    if (String(nt.fee || '').trim() && Api.perm('club_tools')) { const fee = +String(nt.fee).replace(/\D/g, ''); if (fee >= 0 && fee <= 100000) body.fee = fee; }
     if (ndl) { body.qual = { ex: exFrom(nt.qk), tries: nt.tries }; body.split = 8; }
     nt.err = '';
     return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
@@ -3286,7 +3305,7 @@ function canEditPlayer(p) {
   return SRV ? !!Api.admin : /^x/.test(p.id);
 }
 // виды обрезки: аватар — квадрат, итоги — 4:3
-const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 } };
+const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 }, club: { a: 1, out: [400, 400], demo: [200, 200], q: 0.9 } };
 let cropImg = null;
 function photoPick(kind, target) {
   const inp = document.createElement('input');
@@ -3343,8 +3362,8 @@ function cropZoom(z) {
 }
 function cropModal() {
   const c = S.crop, k = CROP[c.kind];
-  return '<div class="over" role="dialog" aria-modal="true" aria-label="Обрезка фото"><div class="ocard"><div class="ohead"><span class="label">' + (c.kind === 'avatar' ? 'Фото игрока' : 'Фото к итогам') + '</span><button class="icon-btn" data-act="crop-no" aria-label="Закрыть">✕</button></div>' +
-    '<div class="crop' + (c.kind === 'avatar' ? ' round' : '') + '" id="crop-box" style="aspect-ratio:' + k.a + '"><canvas></canvas></div>' +
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Обрезка фото"><div class="ocard"><div class="ohead"><span class="label">' + (c.kind === 'avatar' ? 'Фото игрока' : c.kind === 'club' ? 'Логотип клуба' : 'Фото к итогам') + '</span><button class="icon-btn" data-act="crop-no" aria-label="Закрыть">✕</button></div>' +
+    '<div class="crop' + (c.kind === 'avatar' || c.kind === 'club' ? ' round' : '') + '" id="crop-box" style="aspect-ratio:' + k.a + '"><canvas></canvas></div>' +
     '<input class="crop-zoom" id="crop-z" type="range" min="1" max="5" step="0.01" value="' + c.zoom + '" aria-label="Приближение">' +
     '<span class="meta">Перетащите фото и приблизьте ползунком — сохранится то, что в рамке.</span>' +
     '<button class="btn" data-act="crop-save"' + (c.busy ? ' disabled' : '') + '>' + (c.busy ? 'Сохраняем…' : 'Сохранить') + '</button></div></div>';
@@ -3368,12 +3387,13 @@ async function cropSave() {
   }
   c.busy = true; render();
   const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', k.q));
-  const q = c.kind === 'avatar' ? 'kind=avatar' + (c.target !== ME ? '&playerId=' + encodeURIComponent(c.target) : '') : 'kind=tour&tournamentId=' + encodeURIComponent(c.target);
+  const q = c.kind === 'avatar' ? 'kind=avatar' + (c.target !== ME ? '&playerId=' + encodeURIComponent(c.target) : '') : c.kind === 'club' ? 'kind=club&clubId=' + encodeURIComponent(c.target) : 'kind=tour&tournamentId=' + encodeURIComponent(c.target);
   try {
     const r = await Api.upload('/api/photos?' + q + '&w=' + OW + '&h=' + OH, blob);
     if (r.player) { svPlayer(r.player); if (r.player.id === ME) Api.me = Object.assign(Api.me || {}, { photo: r.player.photo }); svStale('player:'); }
+    else if (c.kind === 'club') { svStale('club:'); svStale('tour:'); }
     else svNow('tour:' + c.target);
-    S.crop = null; toast('Фото сохранено.');
+    S.crop = null; toast(c.kind === 'club' ? 'Логотип сохранён.' : 'Фото сохранено.');
   } catch (e) { c.busy = false; toast(e.net ? 'Нет связи с сервером — фото не загружено.' : e.message); }
   render();
 }
@@ -3660,7 +3680,7 @@ function clubCard() {
   if (!e.data) return '';
   const cl = e.data.clubs, act = cl.filter(c => c.status === 'active'), pend = cl.find(c => c.status === 'pending');
   let h = '<div class="card sec"><span class="label">Клуб</span>';
-  h += act.map(c => '<div class="lrow"><span><b>' + esc(c.name) + '</b><br><span class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ')) + ' · вы ведущий</span></span></div>').join('');
+  h += act.map(c => '<div class="lrow"><span><button class="lnk" data-act="go" data-v="club.' + esc(c.id) + '"><b>' + esc(c.name) + '</b></button><br><span class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ')) + ' · вы ведущий</span></span></div>').join('');
   if (pend) h += '<div class="note-box">Заявка на клуб <b>' + esc(pend.name) + '</b> на рассмотрении. Администратор свяжется с вами' + (pend.contact ? ': ' + esc(pend.contact) : '') + '.</div>';
   cl.filter(c => c.status === 'rejected' || c.status === 'closed').slice(0, 2).forEach(c => { h += '<p class="meta">«' + esc(c.name) + '»: ' + (c.status === 'rejected' ? 'заявка отклонена' : 'клуб закрыт') + (c.note ? ' — ' + esc(c.note) : '') + '</p>'; });
   if (!pend && !S.clubForm) h += '<p class="meta">' + (act.length ? 'Открываете ещё один клуб?' : 'Проводите игры в клубе или баре? Зарегистрируйте клуб: после подтверждения вы станете ведущим — турниры от имени клуба, трансляции, свои номера игроков и аккаунты для тех, кто не может войти сам.') + '</p><button class="mini" data-act="club-form">Зарегистрировать клуб</button>';
@@ -3864,6 +3884,125 @@ function h2hCard(id) {
     '<div class="list">' + d.matches.map(svMatch).map(m => { const i = m.pl.findIndex(l => l.id === ME), won = m.w === i; return '<div class="prw" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '"><span class="wl' + (won ? ' w' : '') + '">' + (won ? 'В' : 'П') + '</span><span class="num">' + [m.pl[i]].concat(m.pl.filter((x, j) => j !== i)).map(l => l.legs).join(':') + '</span><div style="display:grid;min-width:0"><span class="meta ell">' + esc(matchCtx(m) + ' · ' + fmtDate(m.t)) + '</span></div><span class="meta">' + (m.pl[i].darts ? 'ср. ' + lAvg(m.pl[i]) : '') + '</span></div>'; }).join('') + '</div></div>';
 }
 
+/* ===== Клубы: список, страница клуба; ведущему с тарифом «Ведущий» — логотип, спонсоры, помощники, статистика ===== */
+const clubLogo = (c, cls) => c.logo ? '<img class="clogo' + (cls ? ' ' + cls : '') + '" src="' + esc(c.logo) + '" alt="">' : '<span class="clogo none' + (cls ? ' ' + cls : '') + '">' + esc(initials(c.name.replace(/[«»"]/g, '').replace(/^Клуб\s+/i, ''))) + '</span>';
+function clubsView() {
+  let h = '<button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button><div class="narrow"><h1 class="h1">Клубы</h1>';
+  if (!SRV) return h + '<div class="note-box">Клубы работают с сервером.</div></div>';
+  const e = lz('clubs:all', () => Api.get('/api/clubs'), 120000), st = svState(e, 'клубов');
+  if (st) return h + st + '</div>';
+  const list = e.data.clubs;
+  h += list.length ? '<div class="list">' + list.map(c => '<div class="trow click" role="button" tabindex="0" data-act="go" data-v="club.' + esc(c.id) + '">' + clubLogo(c, 'sm') + '<div style="display:grid;min-width:0;flex:1"><b>' + esc(c.name) + '</b><span class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ')) + '</span></div></div>').join('') + '</div>' : '<div class="note-box">Клубов пока нет.</div>';
+  return h + (ME ? '<p class="meta">Проводите турниры в своём клубе или баре? Подайте заявку в <button class="lnk" data-act="go" data-v="p.me">профиле</button>.</p>' : '') + '</div>';
+}
+function clubView(id) {
+  let h = '<button class="back" data-act="go" data-v="clubs">' + I.back + 'Клубы</button>';
+  if (!SRV) return h + '<div class="note-box">Клубы работают с сервером.</div>';
+  const e = lz('club:' + id, () => Api.get('/api/clubs/' + encodeURIComponent(id)), 60000), st = svState(e, 'клуба');
+  if (st) return h + st;
+  const d = e.data, c = d.club;
+  d.players.forEach(svPlayer);
+  h += '<div class="chero">' + clubLogo(c, 'lg') + '<div style="min-width:0"><h1 class="h1">' + esc(c.name) + '</h1><div class="meta">' + esc([c.city, c.address].filter(Boolean).join(' · ')) + '</div>' + (c.contact ? '<div class="meta">' + esc(c.contact) + '</div>' : '') + (c.hosts.length ? '<div class="meta">Ведущие: ' + c.hosts.map(x => '<button class="lnk" data-act="go" data-v="p.' + esc(x.id) + '">' + esc(x.name) + '</button>').join(', ') + '</div>' : '') + '</div></div>';
+  if (S.clubEdit === c.id) h += '<div class="panel"><span class="h2">О клубе</span><textarea class="inp" id="ce-about" rows="3" maxlength="500" aria-label="О клубе">' + esc(c.about) + '</textarea><div class="nrow"><input class="inp" id="ce-address" maxlength="120" value="' + esc(c.address) + '" placeholder="Адрес" aria-label="Адрес"><input class="inp" id="ce-contact" maxlength="120" value="' + esc(c.contact) + '" placeholder="Телефон или ссылка" aria-label="Контакт"></div><div class="gacts"><button class="btn sm" data-act="club-save" data-v="' + esc(c.id) + '">Сохранить</button><button class="ghost sm" data-act="club-edit" data-v="">Отмена</button></div></div>';
+  else if (c.about) h += '<p class="cabout">' + esc(c.about) + '</p>';
+  if (d.manage && S.clubEdit !== c.id) h += '<button class="mini" data-act="club-edit" data-v="' + esc(c.id) + '">Изменить описание</button>';
+  const trows = list => '<div class="tgrid">' + list.map(tourCardS).join('') + '</div>';
+  h += '<div class="sec"><span class="label">Расписание</span>' + (d.upcoming.length ? trows(d.upcoming) : '<div class="note-box">Ближайших турниров пока нет.</div>') + '</div>';
+  if (d.past.length) h += '<div class="sec"><span class="label">Прошедшие турниры</span>' + trows(d.past) + '</div>';
+  if (d.players.length) h += '<div class="sec"><span class="label">Игроки клуба · за полгода</span><div class="card" style="padding:4px 14px">' + d.players.map(p => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(p.id) + '<div style="min-width:0;display:grid">' + pid(p.id) + '<span class="meta">' + p.visits + ' ' + pl(p.visits, 'турнир', 'турнира', 'турниров') + '</span></div><span class="meta">' + (p.n ? 'рейтинг ' + p.r : '') + '</span></div>').join('') + '</div></div>';
+  if (d.photos.length) h += '<div class="sec"><span class="label">Фото с турниров</span><div class="cphotos">' + d.photos.map(p => '<img src="' + esc(p.url) + '" alt="Фото с турнира" loading="lazy" data-act="lbox" data-v="' + esc(p.url) + '">').join('') + '</div></div>';
+  if (d.manage) h += d.tools ? clubTools(d) : '<div class="card sec procard"><div class="tstat"><span class="label">Инструменты клуба</span><span class="rolechip r-host">ведущий</span></div><ul class="plan-f"><li>Логотип клуба на табло и в турнирах</li><li>Свои спонсоры на табло вместо рекламы Oche</li><li>Помощники: ведут счёт и ставят мишени</li><li>Взносы и касса турнира</li><li>Статистика: кто ходит, кто пропал</li></ul><button class="btn sm" data-act="go" data-v="plans">Тариф «Ведущий»</button></div>';
+  return h;
+}
+function clubTools(d) {
+  const c = d.club, s = d.stats;
+  let h = '<div class="card sec procard"><span class="label">Инструменты клуба</span>';
+  h += '<div class="lrow"><span>' + clubLogo(c, 'sm') + ' <b>Логотип</b><br><span class="meta">На табло и в турнирах клуба</span></span><button class="mini" data-act="photo-pick" data-v="club|' + esc(c.id) + '">' + (c.logo ? 'Сменить' : 'Загрузить') + '</button></div>';
+  // помощники
+  h += '<span class="label">Помощники · ' + d.helpers.length + ' из 5</span><span class="meta">Ведут счёт, ставят мишени, вносят квалификацию и отмечают взносы в турнирах клуба. Управлять турниром не могут.</span>';
+  h += d.helpers.map(p => { svPlayer(p); return '<div class="lrow"><span>' + pid(p.id) + ' <span class="meta">' + esc(p.code) + '</span></span><button class="mini dng" data-act="helper-rm" data-v="' + esc(c.id) + '|' + esc(p.id) + '">Убрать</button></div>'; }).join('');
+  if (d.helpers.length < 5) h += '<div class="nrow"><input class="inp" id="helper-id" placeholder="ID игрока, например OCH-1005" aria-label="ID помощника"><button class="mini go" data-act="helper-add" data-v="' + esc(c.id) + '">Добавить</button></div>';
+  // спонсоры
+  h += '<span class="label">Спонсоры клуба</span><span class="meta">Показываются на табло и странице турниров клуба вместо рекламы Oche.</span>';
+  h += d.banners.map(b => '<div class="lrow"><span>' + (b.image ? '<img class="bthumb" src="' + esc(b.image) + '" alt=""> ' : '') + '<b>' + esc(b.title || 'Без заголовка') + '</b><br><span class="meta">' + (b.place === 'tv' ? 'табло' : 'страница турнира') + (b.active ? '' : ' · выключен') + ' · переходов ' + b.clicks + '</span></span><span class="gacts"><button class="mini" data-act="cbn-tg" data-v="' + esc(c.id) + '|' + esc(b.id) + '|' + (b.active ? 0 : 1) + '">' + (b.active ? 'Выключить' : 'Включить') + '</button><button class="mini dng" data-act="cbn-del" data-v="' + esc(c.id) + '|' + esc(b.id) + '">Удалить</button></span></div>').join('');
+  const f = S.cbn || {};
+  h += '<div class="field"><div class="chips">' + [['tv', 'На табло'], ['tour', 'На странице турнира']].map(([v, l]) => '<button class="chip txt' + ((f.place || 'tv') === v ? ' on' : '') + '" data-act="cbn-place" data-v="' + v + '">' + l + '</button>').join('') + '</div><input class="inp" id="cbn-title" maxlength="80" placeholder="Заголовок: «Пиво Дротик — партнёр турнира»" aria-label="Заголовок"><input class="inp" id="cbn-body" maxlength="200" placeholder="Текст (необязательно)" aria-label="Текст"><input class="inp" id="cbn-link" maxlength="500" placeholder="Ссылка https://… (необязательно)" aria-label="Ссылка">' +
+    '<div class="row">' + (f.image ? '<img class="bthumb" src="' + esc(f.image) + '" alt=""> ' : '') + '<label class="mini">' + (f.image ? 'Другая картинка' : 'Картинка') + '<input type="file" accept="image/jpeg,image/png,image/webp" hidden data-cbn-img="' + esc(c.id) + '"></label><button class="mini go" data-act="cbn-add" data-v="' + esc(c.id) + '">Добавить спонсора</button></div></div>';
+  // статистика
+  const mx = Math.max(1, ...s.months.map(m => m.players));
+  h += '<span class="label">Статистика клуба</span><div class="tiles"><div class="tile"><span class="label">Новых за месяц</span><span class="v">' + s.newMonth + '</span></div><div class="tile"><span class="label">Касса за 30 дней</span><span class="v">' + rub(s.cash30) + '</span><span class="s">по отметкам «оплатил»</span></div></div>';
+  h += '<span class="meta">Игроков на турнирах клуба по месяцам</span><div class="pform sm">' + s.months.map(m => '<div class="pf-c" title="' + m.visits + ' участий"><span class="pf-v">' + m.players + '</span><i style="height:' + Math.max(4, Math.round(m.players / mx * 100)) + '%"></i><span class="pf-d">' + new Date(m.t).toLocaleDateString('ru-RU', { month: 'short' }) + '</span></div>').join('') + '</div>';
+  if (s.regulars.length) h += '<span class="meta">Постоянные (3+ турнира за 2 месяца): ' + s.regulars.map(x => '<button class="lnk" data-act="go" data-v="p.' + esc(x.id) + '">' + esc(x.name) + '</button> (' + x.n + ')').join(', ') + '</span>';
+  if (s.lapsed.length) h += '<div class="note-box warn">Давно не приходили: ' + s.lapsed.map(x => '<button class="lnk" data-act="go" data-v="p.' + esc(x.id) + '">' + esc(x.name) + '</button> <span class="meta">(' + fmtDate(x.last) + ')</span>').join(', ') + '. Позовите их на следующий турнир.</div>';
+  return h + '</div>';
+}
+async function clubBannerImg(cid, file) {
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) return toast('Картинка больше 3 МБ — уменьшите её.');
+  try {
+    const bm = await createImageBitmap(file);
+    const r = await Api.upload('/api/photos?kind=banner&clubId=' + encodeURIComponent(cid) + '&w=' + bm.width + '&h=' + bm.height, file);
+    S.cbn = Object.assign(S.cbn || {}, { image: r.photo.url }); toast('Картинка загружена.');
+  } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message || 'Не удалось прочитать картинку.'); }
+  render();
+}
+
+/* ===== Взносы турнира (тариф «Ведущий»): сумма, отметки «оплатил», касса ===== */
+function feesView(t) {
+  const f = t.fees || { fee: null, paid: [] }, fee = f.fee || 0, n = f.paid.length;
+  let h = '<div class="card sec"><div class="tstat"><span class="label">Взносы</span><span class="meta">видят организатор и помощники</span></div>';
+  h += '<div class="nrow"><input class="inp" id="fee-v" inputmode="numeric" value="' + (f.fee != null ? f.fee : '') + '" placeholder="Взнос, ₽" aria-label="Взнос, рублей" style="max-width:160px"' + (canDo(t, 'org') ? '' : ' disabled') + '>' + (canDo(t, 'org') ? '<button class="mini" data-act="fee-save" data-v="' + t.id + '">Сохранить</button>' : '') + '</div>';
+  h += '<div class="tiles"><div class="tile"><span class="label">Оплатили</span><span class="v">' + n + ' из ' + t.players.length + '</span></div><div class="tile"><span class="label">Касса</span><span class="v">' + rub(n * fee) + '</span><span class="s">' + (fee ? 'ждём ещё ' + rub((t.players.length - n) * fee) : 'укажите взнос') + '</span></div></div>';
+  h += '<div class="list">' + t.players.slice().sort((a, b) => (f.paid.includes(a) - f.paid.includes(b)) || ((P[a] || {}).name || '').localeCompare((P[b] || {}).name || '', 'ru')).map(id => { const on = f.paid.includes(id); return '<div class="trow"><span>' + noBadge(t, id) + pid(id) + '</span><button class="mini' + (on ? ' go' : '') + '" data-act="paid" data-v="' + t.id + '|' + id + '|' + (on ? 0 : 1) + '" aria-pressed="' + on + '">' + (on ? '✓ оплатил' : 'не оплатил') + '</button></div>'; }).join('') + '</div>';
+  return h + '</div>';
+}
+
+/* ===== Картинка итогов для VK и Telegram: 1080×1350 PNG ===== */
+async function resultsImage(tid) {
+  const t = TBY[tid];
+  if (!t) return;
+  const top = (isBracket(t) ? bracketStandings(t) : standings(t).map((s, i) => ({ id: s.id, lo: i + 1, hi: i + 1 }))).filter(s => s.lo <= 4).slice(0, 8);
+  const W = 1080, H = 1350, cv = document.createElement('canvas'), x = cv.getContext('2d');
+  cv.width = W; cv.height = H;
+  const cs = getComputedStyle(document.documentElement), acc = (cs.getPropertyValue('--green') || '#f5a524').trim() || '#f5a524';
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#16181f'); g.addColorStop(1, '#0b0c10');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  await document.fonts.ready.catch(() => {});
+  const disp = cs.getPropertyValue('--display').trim() || 'sans-serif', body = cs.getPropertyValue('--body').trim() || 'sans-serif';
+  const fit = (txt, size, font, max) => { let s = size; do { x.font = font.replace('$', s); s -= 2; } while (x.measureText(txt).width > max && s > 20); return txt; };
+  // логотип клуба (если есть)
+  let y = 90;
+  if (t.org && t.org.logo) {
+    try { const im = new Image(); im.src = t.org.logo; await im.decode(); x.save(); x.beginPath(); x.arc(W / 2, 150, 70, 0, 7); x.clip(); x.drawImage(im, W / 2 - 70, 80, 140, 140); x.restore(); y = 260; } catch (e) { /* без логотипа */ }
+  }
+  x.textAlign = 'center'; x.fillStyle = acc; x.font = '600 34px ' + body; x.fillText('ИТОГИ ТУРНИРА', W / 2, y + 20);
+  x.fillStyle = '#f4f1ea'; fit(t.name.toUpperCase(), 96, '700 $px ' + disp, W - 120); x.fillText(t.name.toUpperCase(), W / 2, y + 120);
+  x.fillStyle = '#9aa0ad'; x.font = '400 34px ' + body; x.fillText([fmtDate(t.start), t.city, t.org && t.org.name].filter(Boolean).join(' · '), W / 2, y + 175);
+  y += 240;
+  const medal = ['#f7c948', '#c9d1db', '#d99566', '#5b6170'];
+  // список посередине между заголовком и подписью
+  const listH = top.reduce((a, s, k) => a + (k === 0 ? 170 : 110), 0) + 70;
+  y += Math.max(0, (H - 150 - y - listH) / 2);
+  top.forEach((s, k) => {
+    const big = k === 0, rowH = big ? 170 : 110, nm = (P[s.id] && P[s.id].name) || '—';
+    x.fillStyle = big ? 'rgba(247,201,72,.12)' : 'rgba(255,255,255,.04)';
+    x.beginPath(); x.roundRect(80, y, W - 160, rowH - 18, 24); x.fill();
+    x.fillStyle = medal[Math.min(3, s.lo - 1)]; x.textAlign = 'center'; x.font = '700 ' + (big ? 92 : 60) + 'px ' + disp;
+    x.fillText(s.lo === s.hi ? String(s.lo) : s.lo + '–' + s.hi, 170, y + (big ? 112 : 72));
+    x.textAlign = 'left'; x.fillStyle = '#f4f1ea'; fit(nm, big ? 64 : 46, '600 $px ' + body, W - 360); x.fillText(nm, 260, y + (big ? 100 : 66));
+    y += rowH;
+  });
+  x.textAlign = 'center'; x.fillStyle = '#9aa0ad'; x.font = '400 32px ' + body;
+  x.fillText(t.players.length + ' ' + pl(t.players.length, 'участник', 'участника', 'участников') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwTxt(t.ltw), W / 2, y + 40);
+  x.textAlign = 'center'; x.fillStyle = '#6b7180'; x.font = '400 30px ' + body; x.fillText('Сетка, статистика и рейтинг — в Oche', W / 2, H - 60);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  const file = new File([blob], 'itogi-' + t.id + '.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: t.name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Картинка итогов сохранена.');
+}
+
 // есть ли у меня хоть что-то в панели управления
 const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners', 'titles', 'plans'].some(k => Api.perm(k));
 function adminView() {
@@ -3910,7 +4049,7 @@ const ACT_NAME = {
   'login.password': 'вошёл по паролю', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
   'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
-  'club.host_add': 'назначил ведущим', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
+  'club.host_add': 'назначил ведущим', 'club.helper_add': 'добавил помощника клуба', 'club.helper_rm': 'убрал помощника клуба', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
   'title.submit': 'подал заявку на звание', 'title.approved': 'подтвердил звание', 'title.rejected': 'отклонил звание', 'title.revoke': 'снял звание',
   'plan.request': 'оставил заявку на тариф', 'plan.grant': 'подключил тариф', 'plan.extend': 'продлил тариф', 'plan.reject': 'отклонил заявку на тариф', 'plan.end': 'завершил тариф',
   'plan.create': 'добавил тариф', 'plan.edit': 'изменил тариф', discounts: 'изменил скидки за звание', 'role.create': 'добавил роль', 'role.rename': 'переименовал роль', 'role.delete': 'удалил роль',
@@ -4073,9 +4212,10 @@ function bannerBox(b, preview) {
   const tag = b.link && !preview ? 'button' : 'div';
   return '<' + tag + ' class="banner"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span><span class="bn-ad">реклама</span></' + tag + '>';
 }
-function bannerHTML(place) {
+// tid — турнир: у клуба с тарифом «Ведущий» там его спонсоры
+function bannerHTML(place, tid) {
   if (!SRV) return '';
-  const e = lz('banners:' + place, () => Api.get('/api/banners?place=' + place), 300000), list = e.data && e.data.banners;
+  const e = lz('banners:' + place + (tid ? ':' + tid : ''), () => Api.get('/api/banners?place=' + place + (tid ? '&tid=' + encodeURIComponent(tid) : '')), 300000), list = e.data && e.data.banners;
   if (!list || !list.length) return '';
   return bannerBox(list[Math.floor(Date.now() / 60000) % list.length]);
 }
@@ -4189,7 +4329,7 @@ function tvView(id) {
   const O = tvo();
   if (!tvClock) tvClock = setInterval(() => { if (R.startsWith('tv.')) { const el = $('tv-clock'); if (el) el.textContent = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); } else { clearInterval(tvClock); tvClock = 0; } }, 10000);
   const live = liveOf(t, O.delay || 0).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
-  let h = '<div class="tvh"><div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div><div class="tvx">' + (O.clock ? '<span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<button class="mini" data-act="tvo-show">Настроить</button><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
+  let h = '<div class="tvh"><div class="tvh-t">' + (t.org && t.org.logo ? '<img class="tvlogo" src="' + esc(t.org.logo) + '" alt="">' : '') + '<div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div></div><div class="tvx">' + (O.clock ? '<span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<button class="mini" data-act="tvo-show">Настроить</button><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
   if (S.tvoOpen) h += tvoPanel();
   h += live.length ? '<div class="tvg">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<div class="tvbox"><h2>Сейчас матчей нет</h2><p class="meta">Как только маркер начнёт матч, счёт появится здесь.' + (SRV ? '' : ' В демо табло показывает игру, которую ведут в соседней вкладке этого браузера.') + '</p></div>';
   if (O.cams && streamsOf(t).length) h += '<div class="tvcams">' + streamsOf(t).slice(0, 2).map((s, k) => camHTML(s, 'tv' + k, { bare: true })).join('') + '</div>';
@@ -4200,7 +4340,7 @@ function tvView(id) {
   } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
   if (O.stages) h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div>';
   if (O.qr) h += '<div class="tvbox tvqr"><h2>Сетка и счёт на телефоне</h2>' + qrHTML(tourUrl(t.id)) + '<span class="meta">Наведите камеру телефона</span></div>';
-  h += bannerHTML('tv');
+  h += bannerHTML('tv', t.id);
   h += '</div>';
   return h;
 }
@@ -4629,7 +4769,7 @@ function sideViewS() {
 }
 function toursViewS() {
   const L = { live: listE('live'), reg: listE('reg'), done: listE('done') }, cur = L[S.tf];
-  let h = '<div class="phead"><h1 class="h1">Турниры</h1>' + (ME ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>') + '</div>';
+  let h = '<div class="phead"><h1 class="h1">Турниры</h1>' + '<button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (ME ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>') + '</div>';
   h += '<div class="seg2" role="group" aria-label="Статус">' + [['live', 'Идут'], ['reg', 'Регистрация'], ['done', 'Завершены']].map(([v, l]) => '<button class="' + (S.tf === v ? 'on' : '') + '" data-act="tf" data-v="' + v + '">' + l + ' <span class="muted">' + (L[v].data ? L[v].data.total : '…') + '</span></button>').join('') + '</div>';
   const st = svState(cur, 'турниров');
   if (st) return h + st;
@@ -4710,6 +4850,8 @@ function render() {
     : R === 'staff' ? staffView()
     : R === 'title' ? titleView()
     : R === 'plans' ? plansView()
+    : R === 'clubs' ? clubsView()
+    : R.startsWith('club.') ? clubView(R.slice(5))
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
     : feedView();
@@ -4861,6 +5003,42 @@ document.addEventListener('click', e => {
       break;
     }
     case 'pro-p': S.proP = v; render(); break;
+    case 'res-img': resultsImage(v).catch(() => toast('Не удалось сделать картинку.')); break;
+    case 'club-edit': S.clubEdit = v || null; render(); break;
+    case 'club-save': {
+      const g = k => { const el = $('ce-' + k); return el ? el.value.trim() : ''; };
+      svDo(Api.patch('/api/clubs/' + encodeURIComponent(v), { about: g('about'), address: g('address'), contact: g('contact') }), () => { S.clubEdit = null; svStale('club:'); toast('Описание сохранено.'); });
+      break;
+    }
+    case 'helper-add': {
+      const q = (($('helper-id') || {}).value || '').trim();
+      if (!q) { toast('Введите ID игрока.'); break; }
+      const job = Api.get('/api/players?limit=5&q=' + encodeURIComponent(q)).then(r => {
+        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(x => x.code.toLowerCase() === k || 'och-' + k === x.code.toLowerCase() || x.id === k);
+        const pp = hit.length === 1 ? hit[0] : r.players.length === 1 ? r.players[0] : null;
+        if (!pp) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (OCH-…)');
+        return Api.post('/api/clubs/' + encodeURIComponent(v) + '/helpers', { playerId: pp.id });
+      });
+      svDo(job, () => { svStale('club:'); svStale('tour:'); toast('Помощник добавлен.'); });
+      break;
+    }
+    case 'helper-rm': { const [cid, pid2] = v.split('|'); if (confirm('Убрать помощника?')) svDo(Api.del('/api/clubs/' + encodeURIComponent(cid) + '/helpers/' + encodeURIComponent(pid2)), () => { svStale('club:'); svStale('tour:'); toast('Помощник убран.'); }); break; }
+    case 'cbn-place': S.cbn = Object.assign(S.cbn || {}, { place: v }); render(); break;
+    case 'cbn-add': {
+      const g = k => (($('cbn-' + k) || {}).value || '').trim(), f = S.cbn || {};
+      const body = { place: f.place || 'tv', title: g('title'), body: g('body'), link: g('link') || null, image: f.image || null };
+      if (!body.title && !body.image) { toast('Нужен заголовок или картинка.'); break; }
+      svDo(Api.post('/api/clubs/' + encodeURIComponent(v) + '/banners', body), () => { S.cbn = null; svStale('club:'); svStale('banners:'); toast('Спонсор добавлен.'); });
+      break;
+    }
+    case 'cbn-tg': { const [cid, bid, on] = v.split('|'); svDo(Api.patch('/api/clubs/' + encodeURIComponent(cid) + '/banners/' + encodeURIComponent(bid), { active: on === '1' }), () => { svStale('club:'); svStale('banners:'); }); break; }
+    case 'cbn-del': { const [cid, bid] = v.split('|'); if (confirm('Удалить спонсора?')) svDo(Api.del('/api/clubs/' + encodeURIComponent(cid) + '/banners/' + encodeURIComponent(bid)), () => { svStale('club:'); svStale('banners:'); toast('Спонсор удалён.'); }); break; }
+    case 'fee-save': {
+      const raw = (($('fee-v') || {}).value || '').replace(/\D/g, '');
+      svDo(Api.patch('/api/tournaments/' + v, { fee: raw === '' ? null : +raw }), r => { svTourSet(r); toast('Взнос сохранён.'); });
+      break;
+    }
+    case 'paid': { const [tid, pid2, on] = v.split('|'); svDo(Api.patch('/api/tournaments/' + tid + '/paid', { playerId: pid2, paid: on === '1' }), svTourSet); break; }
     case 'plan-req': svDo(Api.post('/api/plans/' + v + '/request'), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф.'); }); break;
     case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
     case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
@@ -5248,6 +5426,7 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
+  if (t.dataset && t.dataset.cbnImg) { clubBannerImg(t.dataset.cbnImg, t.files && t.files[0]); return; }
   if (t.id === 'tf-file') { titleUpload([...(t.files || [])]); t.value = ''; return; }
   if (t.dataset && t.dataset.perm && S.permEd) {
     const [k, r] = t.dataset.perm.split('|'), cur = S.permEd[k] || [];

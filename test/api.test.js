@@ -94,7 +94,7 @@ test('создание турнира и права', async () => {
   assert.equal(t0.status, 'live');
   assert.equal(t0.slots.length, 8);
   assert.equal(t0.games.length, 12);
-  assert.deepEqual(t0.can, { org: true, stream: true, edit: false, delete: true, launch: false, score: true, join: false });
+  assert.deepEqual(t0.can, { org: true, stream: true, edit: false, delete: true, launch: false, score: true, join: false, staff: true, fees: true });
   assert.deepEqual(t0.players.map(id => t0.roster[id].r), t0.players.map(id => t0.roster[id].r).sort((a, b) => b - a)); // посев по рейтингу
   err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'rr', mode: 501, ltw: 1, players: ['p1', 'p2'] }), 400);
   err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'pl', mode: 500, ltw: 1, players: ['p1', 'p2', 'p3'] }), 400);
@@ -250,7 +250,7 @@ test('быстрый счёт, снятие результата, весь ту�
 test('регистрация и запуск', async () => {
   const t = ok(await call(A, 'POST', '/api/tournaments', { name: 'Рег', format: 'rr', mode: 501, ltw: 2, reg: true, cap: 4 }), 201).tournament;
   assert.equal(t.status, 'reg');
-  assert.deepEqual(t.can, { org: true, stream: true, edit: true, delete: true, launch: true, score: false, join: true });
+  assert.deepEqual(t.can, { org: true, stream: true, edit: true, delete: true, launch: true, score: false, join: true, staff: true, fees: true });
   const U = await login('p5');
   ok(await call(U, 'POST', `/api/tournaments/${t.id}/entries`));
   assert.equal(err(await call(U, 'POST', `/api/tournaments/${t.id}/entries`), 409).reason, 'already');

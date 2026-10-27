@@ -20,6 +20,8 @@ async function getTour(c, id, lock) {
 }
 const tourResp = async (c, id, me) => ({ tournament: T.tourJSON(await getTour(c, id, false), me) });
 const needOwner = (t, me) => { if (!T.isOwner(t, me)) throw E.forbidden('Это может только организатор'); };
+// организатор или помощник клуба
+const needStaff = (t, me) => { if (!T.isStaff(t, me)) throw E.forbidden('Это может организатор или помощник'); };
 const bump = async (c, id) => { await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [id]); forget('t', id); };
 
 function shuffle(a) {
@@ -85,6 +87,11 @@ function tourFields(b, full, me) {
   if (b.labels != null) o.labels = V.oneOf(b.labels, 'labels', ['ab', 'num']);
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
+  // взнос за участие, ₽ — в тарифе «Ведущий»
+  if (b.fee !== undefined) {
+    if (b.fee !== null && !can(me, 'club_tools')) throw E.forbidden('Взносы — в тарифе «Ведущий»');
+    o.fee = b.fee === null ? null : V.int(b.fee, 'fee', 0, 100000);
+  }
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
     if (!can(me, 'official')) throw E.forbidden('Официальный статус задаёт администратор');
     if (b.official !== undefined) o.official = V.bool(b.official, 'official');
@@ -160,6 +167,7 @@ module.exports = async function (app) {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
         f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now()]);
+      if (f.fee != null) await c.query('UPDATE tournaments SET fee = $2 WHERE id = $1', [row.id, f.fee]);
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
       // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
       else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
@@ -174,8 +182,8 @@ module.exports = async function (app) {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
       const b = req.body || {};
-      // подписи матчей — только вид, их можно менять и после старта
-      if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => k === 'labels'))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
+      // подписи матчей и взнос можно менять и после старта
+      if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => k === 'labels' || k === 'fee'))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
       // с учётом того, что уже стоит у турнира: смена формата не должна оставить квалификацию у ko или rr
@@ -333,7 +341,7 @@ module.exports = async function (app) {
     const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
-      needOwner(t, me);
+      needStaff(t, me);
       const { pid, k } = qualSlot(t, req.params);
       const max = qualMax(t.qual.ex), v = V.int(b.v, 'v', 0, max);
       const old = await one(c, 'SELECT match_id FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k]);
@@ -384,12 +392,26 @@ module.exports = async function (app) {
     });
   });
 
-  // мишени (организатор): { n } — сколько их, { r, i, board } — поставить игре мишень
+  // взносы (команда турнира с тарифом «Ведущий»): { playerId, paid }
+  app.patch('/api/tournaments/:id/paid', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    const pid = V.id(b.playerId, 'playerId'), paid = V.bool(b.paid, 'paid');
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      if (!T.feesOn(t, me)) throw E.forbidden('Взносы отмечает организатор или помощник клуба с тарифом «Ведущий»');
+      if (!t.players.includes(pid)) throw E.notFound('Игрок не участвует');
+      await c.query('UPDATE entries SET paid = $3 WHERE tournament_id = $1 AND player_id = $2', [t.id, pid, paid]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
+  // мишени (организатор или помощник): { n } — сколько их, { r, i, board } — поставить игре мишень
   app.patch('/api/tournaments/:id/boards', async req => {
     const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
-      needOwner(t, me);
+      needStaff(t, me);
       if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени — после старта');
       let bd = t.boards ? { n: t.boards.n, at: Object.assign({}, t.boards.at) } : { n: 0, at: {} };
       if (b.n !== undefined) bd.n = V.int(b.n, 'n', 0, 64);
