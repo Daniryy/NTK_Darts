@@ -792,6 +792,14 @@ button.banner:hover { border-color: var(--line-bright); }
 .tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
 .note-box.ok { border-color: var(--green); }
 .treq { display: grid; gap: 8px; }
+.tcover { width: 100%; max-width: 720px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; cursor: zoom-in; display: block; }
+.rcard { display: grid; gap: 8px; }
+.rc-cover { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; cursor: pointer; }
+.rc-t { font-family: var(--display); font-size: 20px; text-align: left; text-transform: uppercase; letter-spacing: .02em; }
+.rc-pod { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
+.invites .tgrid { margin-bottom: 6px; }
+figure .pcov { position: absolute; left: 8px; bottom: 8px; font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 0; background: rgba(0, 0, 0, .65); color: #fff; cursor: pointer; }
+figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cursor: default; }
 .clogo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; display: inline-grid; place-items: center; vertical-align: middle; }
 .clogo.none { background: var(--surface2); border: 1px solid var(--line); font-weight: 700; color: var(--muted); font-size: 14px; }
 .clogo.lg { width: 96px; height: 96px; font-size: 28px; }
@@ -1803,8 +1811,7 @@ function matchCard(m) {
   return h + '</article>';
 }
 function tourEvent(t, c) {
-  const fg = finalGame(t), fin = fg && fg.res;
-  return '<article class="card mc"><div class="mc-h"><span class="muted">Турнир завершён</span><time>' + ago(lastGameTime(t)) + '</time></div><div class="ev-b"><span class="trophy">' + I.trophy + '</span><div><div class="label">Победитель</div><div style="font-size:17px">' + pid(c) + '</div><div class="meta"><button class="lnk" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + '</button> · ' + t.players.length + ' ' + pl(t.players.length, 'участник', 'участника', 'участников') + (fin ? ' · финал ' + Math.max(fin.la, fin.lb) + ':' + Math.min(fin.la, fin.lb) : '') + '</div></div></div></article>';
+  return resultCard({ id: t.id, name: t.name, at: lastGameTime(t), cover: coverOf(t), count: t.players.length, podium: placesList(t).filter(s => s.lo <= 3).slice(0, 4).map(s => ({ id: s.id, name: P[s.id] ? P[s.id].name : '—', lo: s.lo, hi: s.hi })) });
 }
 function tourCard(t) {
   const st = tStatus(t), n = st === 'reg' ? t.players.length : t.players.length;
@@ -1944,6 +1951,7 @@ function feedItems() {
   db.matches.forEach(m => {
     if (!m.pl.some(l => l.id) || m.q) return;
     if (f === 'my' && !m.pl.some(l => l.id === ME)) return;
+    if (f === 'res') return;
     items.push({ t: m.t, m });
   });
   db.tournaments.forEach(t => {
@@ -1960,8 +1968,9 @@ function feedView() {
   const items = feedItems();
   let h = '<div class="phead"><h1 class="h1">Лента</h1></div>';
   h += '<div class="fgrid"><div class="sec">';
-  if (live.length) h += '<div class="sec"><span class="label">Сейчас идут</span><div class="tgrid">' + live.map(tourCard).join('') + '</div></div>';
-  h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['my', 'Мои матчи']].map(([v, l]) => '<button class="fchip' + (S.feedF === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  if (live.length) h += liveBlock(live, tourCard);
+  h += invitesHTML(db.tournaments.filter(t => tStatus(t) === 'reg').sort((a, b) => a.start - b.start));
+  h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['res', 'Итоги турниров'], ['my', 'Мои матчи']].map(([v, l]) => '<button class="fchip' + (S.feedF === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   h += '<div class="list">' + (items.length ? items.slice(0, S.feedN).map(x => x.m ? matchCard(x.m) : tourEvent(x.t0, x.c)).join('') : '<div class="note-box">Здесь пока пусто. Сыграйте матч во вкладке «Играть».</div>') + '</div>';
   if (items.length > S.feedN) h += '<button class="ghost more" data-act="more">Показать ещё</button>';
   h += '</div></div><aside class="side">' + sideView() + '</aside></div>';
@@ -2216,7 +2225,7 @@ function tourView(id) {
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
-  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
+  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
   h += '<div class="card tstat">';
@@ -2237,7 +2246,7 @@ function tourView(id) {
     if (ready && !(tab === 'games' && S.gf === 'ready')) h += '<button class="mini go" data-act="ready-games">Можно играть: ' + ready + '</button>';
     if (!inQual) h += boardsCtl(t);
   } else {
-    h += podium(t) + '<button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов для соцсетей</button>';
+    h += coverBlock(t) + podium(t) + resBtns(t);
   }
   h += '</div>';
   if (tabs.length > 1) h += '<div class="seg2 ttabs" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (tab === v) + '" class="' + (tab === v ? 'on' : '') + '" data-act="ttab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -2513,7 +2522,8 @@ function newTourView() {
     h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'A1–A2, B1–B2 — как на листе'], ['num', '№1, №2 — по порядку']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
   }
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
-  if (SRV && Api.perm('club_tools')) h += '<div class="field"><label class="label" for="nt-fee">Взнос за участие, ₽</label><input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Необязательно" style="max-width:200px"><span class="meta">Отметки «оплатил» и касса — во вкладке «Взносы» турнира.</span></div>';
+  h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
+    (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
   if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
   h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
@@ -2534,6 +2544,8 @@ function newTourView() {
   h += '<button class="btn" data-act="nt-create"' + (!sm.ok ? ' disabled' : '') + '>Создать турнир</button></div></div></div>';
   return h;
 }
+// взнос из формы нового турнира: сумма или null («без взноса»)
+const ntFee = nt => { if (!nt.feeOn) return null; const v = +String(nt.fee || '').replace(/\D/g, ''); return v > 0 && v <= 100000 ? v : null; };
 function createTour() {
   const nt = S.nt;
   if (!nt) return;
@@ -2545,13 +2557,15 @@ function createTour() {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
     if (nt.fmt !== 'rr') { body.layout = nt.layout || 'ndl'; body.labels = nt.labels || (ndl ? 'ab' : 'num'); }
     if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
-    if (String(nt.fee || '').trim() && Api.perm('club_tools')) { const fee = +String(nt.fee).replace(/\D/g, ''); if (fee >= 0 && fee <= 100000) body.fee = fee; }
+    const fee = ntFee(nt);
+    if (fee) body.fee = fee;
     if (ndl) { body.qual = { ex: exFrom(nt.qk), tries: nt.tries }; body.split = 8; }
     nt.err = '';
     return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
   }
   const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: meP().name, ver: false }, city: (nt.city || meP().city || '').trim() || '—', venue: (nt.venue || '').trim(), start: Date.now(), dbl: true, mode: ex.k === 'x01' ? ex.mode : 501, ltw: nt.ltw, status: null, cap: ids.length, format: ndl ? 'pl' : nt.fmt, players: [], games: [] };
   if (!(ex.k === 'x01' && !ex.lim)) t.ex = ex;
+  if (ntFee(nt)) t.fee = ntFee(nt);
   if (nt.fmt !== 'rr') { t.layout = nt.layout || 'ndl'; t.labels = nt.labels || (ndl ? 'ab' : 'num'); }
   const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
   if (ndl) { t.players = ids.slice(); t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; t.split = 8; t.stage = 'qual'; }
@@ -3305,7 +3319,7 @@ function canEditPlayer(p) {
   return SRV ? !!Api.admin : /^x/.test(p.id);
 }
 // виды обрезки: аватар — квадрат, итоги — 4:3
-const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 }, club: { a: 1, out: [400, 400], demo: [200, 200], q: 0.9 } };
+const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 }, club: { a: 1, out: [400, 400], demo: [200, 200], q: 0.9 }, cover: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 } };
 let cropImg = null;
 function photoPick(kind, target) {
   const inp = document.createElement('input');
@@ -3362,7 +3376,7 @@ function cropZoom(z) {
 }
 function cropModal() {
   const c = S.crop, k = CROP[c.kind];
-  return '<div class="over" role="dialog" aria-modal="true" aria-label="Обрезка фото"><div class="ocard"><div class="ohead"><span class="label">' + (c.kind === 'avatar' ? 'Фото игрока' : c.kind === 'club' ? 'Логотип клуба' : 'Фото к итогам') + '</span><button class="icon-btn" data-act="crop-no" aria-label="Закрыть">✕</button></div>' +
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Обрезка фото"><div class="ocard"><div class="ohead"><span class="label">' + (c.kind === 'avatar' ? 'Фото игрока' : c.kind === 'club' ? 'Логотип клуба' : c.kind === 'cover' ? 'Общее фото игроков' : 'Фото к итогам') + '</span><button class="icon-btn" data-act="crop-no" aria-label="Закрыть">✕</button></div>' +
     '<div class="crop' + (c.kind === 'avatar' || c.kind === 'club' ? ' round' : '') + '" id="crop-box" style="aspect-ratio:' + k.a + '"><canvas></canvas></div>' +
     '<input class="crop-zoom" id="crop-z" type="range" min="1" max="5" step="0.01" value="' + c.zoom + '" aria-label="Приближение">' +
     '<span class="meta">Перетащите фото и приблизьте ползунком — сохранится то, что в рамке.</span>' +
@@ -3382,12 +3396,12 @@ async function cropSave() {
   if (!SRV) {
     const url = cv.toDataURL('image/jpeg', k.q - 0.08);
     if (c.kind === 'avatar') { const p = P[c.target]; if (p) p.photo = url; }
-    else { const t = TBY[c.target]; if (t) (t.photos = t.photos || []).push({ id: 'f' + uid(), url, w: OW, h: OH }); }
+    else { const t = TBY[c.target], id = 'f' + uid(); if (t) { (t.photos = t.photos || []).push({ id, url, w: OW, h: OH }); if (c.kind === 'cover') t.cover = id; } }
     S.crop = null; saveDb(); toast('Фото сохранено.'); return render();
   }
   c.busy = true; render();
   const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', k.q));
-  const q = c.kind === 'avatar' ? 'kind=avatar' + (c.target !== ME ? '&playerId=' + encodeURIComponent(c.target) : '') : c.kind === 'club' ? 'kind=club&clubId=' + encodeURIComponent(c.target) : 'kind=tour&tournamentId=' + encodeURIComponent(c.target);
+  const q = c.kind === 'avatar' ? 'kind=avatar' + (c.target !== ME ? '&playerId=' + encodeURIComponent(c.target) : '') : c.kind === 'club' ? 'kind=club&clubId=' + encodeURIComponent(c.target) : 'kind=tour&tournamentId=' + encodeURIComponent(c.target) + (c.kind === 'cover' ? '&cover=1' : '');
   try {
     const r = await Api.upload('/api/photos?' + q + '&w=' + OW + '&h=' + OH, blob);
     if (r.player) { svPlayer(r.player); if (r.player.id === ME) Api.me = Object.assign(Api.me || {}, { photo: r.player.photo }); svStale('player:'); }
@@ -3411,7 +3425,7 @@ async function photoDelete(kind, target, id) {
 function mediaView(t) {
   const org = canDo(t, 'org'), ph = t.photos || [], ln = t.links || [];
   let h = '<div class="tstat"><span class="label">Фото · ' + ph.length + '</span>' + (org ? '<button class="mini go" data-act="photo-pick" data-v="tour|' + t.id + '">+ Добавить фото</button>' : '') + '</div>';
-  h += ph.length ? '<div class="gal">' + ph.map(p => '<figure><img src="' + esc(p.url) + '" alt="Фото турнира" loading="lazy" data-act="lbox" data-v="' + esc(p.url) + '">' + (org ? '<button class="x" data-act="photo-del-t" data-v="' + esc(t.id + '|' + p.id) + '" aria-label="Убрать фото">✕</button>' : '') + '</figure>').join('') + '</div>' : '<div class="note-box">' + (org ? 'Добавьте фото с турнира — они обрежутся ровно, 4:3.' : 'Фото пока нет.') + '</div>';
+  h += ph.length ? '<div class="gal">' + ph.map(p => '<figure><img src="' + esc(p.url) + '" alt="Фото турнира" loading="lazy" data-act="lbox" data-v="' + esc(p.url) + '">' + (org ? '<button class="x" data-act="photo-del-t" data-v="' + esc(t.id + '|' + p.id) + '" aria-label="Убрать фото">✕</button>' : '') + (coverOf(t) && coverOf(t).id === p.id ? '<span class="pcov on">★ общее фото</span>' : org && tStatus(t) === 'done' ? '<button class="pcov" data-act="cover-set" data-v="' + esc(t.id + '|' + p.id) + '">Сделать общим</button>' : '') + '</figure>').join('') + '</div>' : '<div class="note-box">' + (org ? 'Добавьте фото с турнира — они обрежутся ровно, 4:3.' : 'Фото пока нет.') + '</div>';
   h += '<div class="tstat"><span class="label">Ссылки · ' + ln.length + '</span></div><div class="links">';
   h += ln.map((l, k) => '<div class="trow"><a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.title) + '</a>' + (org ? '<button class="ghost sm dng" data-act="link-del" data-v="' + esc(t.id + '|' + k) + '">Убрать</button>' : '<span class="meta">' + esc(hostOf(l.url)) + '</span>') + '</div>').join('');
   if (!ln.length && !org) h += '<p class="meta">Ссылок пока нет.</p>';
@@ -4001,6 +4015,111 @@ async function resultsImage(tid) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast('Картинка итогов сохранена.');
+}
+
+/* ===== Итоги турнира: общее фото, призёры, текст для поста, документ Word ===== */
+// общее фото: на сервере — объект, в демо — id одного из фото турнира
+// «Сейчас идут» в ленте: до 4 турниров, остальные — в «Турнирах»
+const liveBlock = (list, card) => '<div class="sec"><div class="tstat"><span class="label">Сейчас идут · ' + list.length + '</span>' + (list.length > 4 ? '<button class="lnk meta" data-act="go" data-v="tours">Все турниры</button>' : '') + '</div><div class="tgrid">' + list.slice(0, 4).map(card).join('') + '</div></div>';
+const coverOf = t => t.cover && typeof t.cover === 'object' ? t.cover : (t.photos || []).find(p => p.id === t.cover) || null;
+const feeTxt = fee => fee ? 'взнос ' + rub(fee) : '';
+function coverBlock(t) {
+  const c = coverOf(t), org = canDo(t, 'org');
+  let h = c ? '<img class="tcover" src="' + esc(c.url) + '" alt="Общее фото игроков" data-act="lbox" data-v="' + esc(c.url) + '">' : '';
+  if (org) h += '<div class="row">' + (c ? '<button class="mini" data-act="photo-pick" data-v="cover|' + t.id + '">Сменить общее фото</button><button class="mini dng" data-act="cover-rm" data-v="' + t.id + '">Убрать из итогов</button>' : '<button class="mini go" data-act="photo-pick" data-v="cover|' + t.id + '">+ Общее фото игроков</button><span class="meta">Покажется в итогах и в ленте</span>') + '</div>';
+  return h;
+}
+const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button></div>';
+// места: [{ id, lo, hi }]
+const placesList = t => isBracket(t) ? bracketStandings(t) : standings(t).map((s, i) => ({ id: s.id, lo: i + 1, hi: i + 1, w: s.w, lf: s.lf, la: s.la }));
+// лучшее в турнире: на сервере приходит в best, в демо — из матчей
+function bestOf(t) {
+  if (t.best) return t.best;
+  let avg = null, hco = null;
+  const c = {};
+  db.matches.filter(m => m.tid === t.id && !m.q && isPlainX01(m)).forEach(m => m.pl.forEach(l => {
+    if (!l.id) return;
+    if (l.darts >= 9) { const v = Math.round(l.pts / l.darts * 30) / 10; if (!avg || v > avg.v) avg = { id: l.id, v }; }
+    if (l.hco && (!hco || l.hco > hco.v)) hco = { id: l.id, v: l.hco };
+    if (l.c180) c[l.id] = (c[l.id] || 0) + l.c180;
+  }));
+  const top = Object.keys(c).sort((a, b) => c[b] - c[a])[0];
+  return { avg, hco, c180: { total: Object.values(c).reduce((a, n) => a + n, 0), top: top ? { id: top, n: c[top] } : null } };
+}
+// данные итогов для поста и документа
+function resData(t) {
+  const nm = id => P[id] ? P[id].name : '—', b = bestOf(t), fg = finalGame(t), fs = fg && fg.res ? gameState(t, fg) : null;
+  return {
+    title: t.name, meta: [fmtDate(t.start), t.city, venueOf(t), t.org && t.org.name].filter(Boolean).join(' · '), line: fmtLine(t),
+    places: placesList(t).map(s => ({ place: s.lo === s.hi ? String(s.lo) : s.lo + '–' + s.hi, lo: s.lo, name: nm(s.id), city: P[s.id] ? P[s.id].city || '' : '' })),
+    final: fs ? nm(fs.a) + ' ' + fg.res.la + ':' + fg.res.lb + ' ' + nm(fs.b) : '',
+    best: [b.avg ? 'Лучшее среднее: ' + nm(b.avg.id) + ' — ' + b.avg.v.toFixed(1) : '', b.hco ? 'Макс. закрытие: ' + nm(b.hco.id) + ' — ' + b.hco.v : '', b.c180.total ? '180: всего ' + b.c180.total + (b.c180.top ? ' (больше всех — ' + nm(b.c180.top.id) + ', ' + b.c180.top.n + ')' : '') : ''].filter(Boolean),
+    url: SRV ? tourUrl(t.id) : ''
+  };
+}
+function resultsPost(t) {
+  const d = resData(t), medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  const top = d.places.filter(p => p.lo <= 8).map(p => (medal[p.lo] || '▫️') + ' ' + p.place + '. ' + p.name).join('\n');
+  return '🏆 Итоги турнира «' + d.title + '»\n📅 ' + d.meta + '\n🎯 ' + d.line + '\n\n' + top + (d.final ? '\n\nФинал: ' + d.final : '') + (d.best.length ? '\n\n' + d.best.map(x => '⭐ ' + x).join('\n') : '') + (d.url ? '\n\nСетка и статистика: ' + d.url : '') + '\n\n#дартс #Oche';
+}
+// документ Word (.docx): ZIP без сжатия с минимальным набором частей
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function zipStore(files) {
+  const enc = new TextEncoder(), parts = [], dir = [];
+  let off = 0;
+  files.forEach(([name, text]) => {
+    const n = enc.encode(name), d = enc.encode(text), crc = crc32(d), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint32(14, crc, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, n.length, true);
+    parts.push(new Uint8Array(h.buffer), n, d);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint32(16, crc, true); c.setUint32(20, d.length, true); c.setUint32(24, d.length, true); c.setUint16(28, n.length, true); c.setUint32(42, off, true);
+    dir.push(new Uint8Array(c.buffer), n);
+    off += 30 + n.length + d.length;
+  });
+  const size = dir.reduce((a, x) => a + x.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob(parts.concat(dir, [new Uint8Array(e.buffer)]), { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+function resultsDocx(t) {
+  const d = resData(t), x = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const p = (text, o) => { o = o || {}; return '<w:p>' + (o.center ? '<w:pPr><w:jc w:val="center"/></w:pPr>' : '') + '<w:r><w:rPr>' + (o.b ? '<w:b/>' : '') + (o.sz ? '<w:sz w:val="' + o.sz + '"/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + '</w:rPr><w:t xml:space="preserve">' + x(text) + '</w:t></w:r></w:p>'; };
+  const cell = (text, w, b) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr><w:p><w:r>' + (b ? '<w:rPr><w:b/></w:rPr>' : '') + '<w:t xml:space="preserve">' + x(text) + '</w:t></w:r></w:p></w:tc>';
+  const border = '<w:tblBorders>' + ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(k => '<w:' + k + ' w:val="single" w:sz="4" w:color="BBBBBB"/>').join('') + '</w:tblBorders>';
+  const table = '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/>' + border + '</w:tblPr><w:tblGrid><w:gridCol w:w="1300"/><w:gridCol w:w="4900"/><w:gridCol w:w="2800"/></w:tblGrid>' +
+    '<w:tr>' + cell('Место', 1300, true) + cell('Игрок', 4900, true) + cell('Город', 2800, true) + '</w:tr>' + d.places.map(r => '<w:tr>' + cell(r.place, 1300, r.lo <= 3) + cell(r.name, 4900, r.lo <= 3) + cell(r.city, 2800) + '</w:tr>').join('') + '</w:tbl>';
+  const body = p('Итоги турнира', { center: true, color: 'C77700', b: true }) + p(d.title, { center: true, b: true, sz: 40 }) + p(d.meta, { center: true, color: '666666' }) + p(d.line, { center: true, color: '666666' }) + p('') +
+    table + p('') + (d.final ? p('Финал: ' + d.final, { b: true }) : '') + d.best.map(s => p(s)).join('') + (d.url ? p('Сетка и статистика: ' + d.url, { color: '666666' }) : '') + p('Oche — турниры, сетка и рейтинг по дартсу', { color: '999999', sz: 18 });
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  return zipStore([
+    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ['word/document.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="' + W + '"><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>']
+  ]);
+}
+// имя файла латиницей: не все браузеры принимают кириллицу в имени скачиваемого файла
+const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+const latin = s => String(s).toLowerCase().split('').map(c => c in TR ? TR[c] : c).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+function saveBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+// карточка итогов в ленте: общее фото и призёры. r — { id, name, at, cover, podium: [{ id, name, lo, hi }], count }
+function resultCard(r) {
+  const medal = lo => lo === 1 ? '🥇' : lo === 2 ? '🥈' : '🥉';
+  return '<article class="card mc rcard"><div class="mc-h"><span class="muted">Итоги турнира</span><time>' + ago(r.at) + '</time></div>' +
+    (r.cover ? '<img class="rc-cover" src="' + esc(r.cover.url) + '" alt="Общее фото игроков" loading="lazy" data-act="go" data-v="t.' + esc(r.id) + '">' : '') +
+    '<button class="lnk rc-t" data-act="go" data-v="t.' + esc(r.id) + '">' + esc(r.name) + '</button>' +
+    '<div class="rc-pod">' + r.podium.map(x => '<span>' + medal(x.lo) + ' <button class="pn" data-act="go" data-v="p.' + esc(x.id) + '">' + esc(x.name) + '</button></span>').join('') + '</div>' +
+    '<div class="meta">' + r.count + ' ' + pl(r.count, 'участник', 'участника', 'участников') + '</div></article>';
+}
+// приглашения: официальные турниры отовсюду и турниры в моём городе с открытой записью
+function invitesHTML(list) {
+  const city = ME && P[ME] ? (P[ME].city || '').trim().toLowerCase() : '';
+  const glob = list.filter(c => c.official), loc = list.filter(c => !c.official && city && (c.city || '').trim().toLowerCase() === city);
+  if (!glob.length && !loc.length) return '';
+  const row = (l, xs) => xs.length ? '<span class="meta">' + l + '</span><div class="tgrid">' + xs.slice(0, 4).map(SRV ? tourCardS : tourCard).join('') + '</div>' : '';
+  return '<div class="sec invites"><span class="label">Приглашения · открыта запись</span>' + row('Официальные турниры', glob) + row('В вашем городе' + (city ? ' — ' + esc(P[ME].city) : ''), loc) + '</div>';
 }
 
 // есть ли у меня хоть что-то в панели управления
@@ -4728,7 +4847,7 @@ function liveRender(m) {
 function tourCardS(c) {
   const st = c.status;
   const pill = st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">до ' + fmtDate(c.regUntil || c.start) + '</span>' : '<span class="pill">' + fmtDate(c.start) + '</span>';
-  let h = '<div class="card tc" role="button" tabindex="0" data-act="go" data-v="t.' + c.id + '"><div class="tc-h"><h3>' + esc(c.name) + '</h3>' + pill + '</div><div class="meta">' + esc(c.city) + ' · ' + fmtDate(c.start) + ' · ' + fmtName(c).toLowerCase() + '</div>';
+  let h = '<div class="card tc" role="button" tabindex="0" data-act="go" data-v="t.' + c.id + '"><div class="tc-h"><h3>' + esc(c.name) + '</h3>' + pill + '</div><div class="meta">' + esc(c.city) + ' · ' + fmtDate(c.start) + ' · ' + fmtName(c).toLowerCase() + (c.fee ? ' · ' + feeTxt(c.fee) : '') + '</div>';
   const bar = (a, b, txt) => '<div class="tc-p"><div class="bar"><i style="width:' + Math.round(a / Math.max(1, b) * 100) + '%"></i></div><span class="meta">' + txt + '</span></div>';
   if (st === 'live') h += bar(c.progress.done, c.progress.total, c.stage === 'qual' ? 'квалификация ' + c.progress.done + '/' + c.progress.total : c.progress.done + '/' + c.progress.total + ' матчей');
   else if (st === 'reg') h += bar(c.count, c.cap, 'записались ' + c.count + '/' + c.cap + (c.joined ? ' · вы в списке' : ''));
@@ -4736,19 +4855,20 @@ function tourCardS(c) {
   return h + '</div>';
 }
 function tourEventS(c, at) {
-  return '<article class="card mc"><div class="mc-h"><span class="muted">Турнир завершён</span><time>' + ago(at) + '</time></div><div class="ev-b"><span class="trophy">' + I.trophy + '</span><div><div class="label">Победитель</div><div style="font-size:17px">' + (c.champion ? pname({ id: c.champion.id, n: c.champion.name }) : '—') + '</div><div class="meta"><button class="lnk" data-act="go" data-v="t.' + c.id + '">' + esc(c.name) + '</button> · ' + c.count + ' ' + pl(c.count, 'участник', 'участника', 'участников') + '</div></div></div></article>';
+  return resultCard({ id: c.id, name: c.name, at, cover: c.cover || null, count: c.count, podium: c.podium || (c.champion ? [{ id: c.champion.id, name: c.champion.name, lo: 1, hi: 1 }] : []) });
 }
 const listE = st => lz('list:' + st, () => Api.get('/api/tournaments?status=' + st + '&limit=30'));
 function feedViewS() {
-  const lv = listE('live'), f = S.feedF === 'my' && ME ? 'my' : 'all';
+  const lv = listE('live'), rg = listE('reg'), f = S.feedF === 'my' && ME ? 'my' : 'all', only = S.feedF === 'res';
   const fd = lz('feed:' + f, () => Api.get('/api/feed?limit=50' + (f === 'my' ? '&scope=my' : '')));
   let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">' + bannerHTML('feed');
-  if (lv.data && lv.data.tournaments.length) h += '<div class="sec"><span class="label">Сейчас идут</span><div class="tgrid">' + lv.data.tournaments.map(tourCardS).join('') + '</div></div>';
-  h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все']].concat(ME ? [['my', 'Мои матчи']] : []).map(([v, l]) => '<button class="fchip' + (f === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  if (lv.data && lv.data.tournaments.length) h += liveBlock(lv.data.tournaments, tourCardS);
+  if (rg.data) h += invitesHTML(rg.data.tournaments.slice().sort((a, b) => a.start - b.start));
+  h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['res', 'Итоги турниров']].concat(ME ? [['my', 'Мои матчи']] : []).map(([v, l]) => '<button class="fchip' + ((only ? 'res' : f) === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const st = svState(fd, 'ленты');
   if (st) h += st;
   else {
-    const items = fd.data.items;
+    const items = only ? fd.data.items.filter(x => x.type === 'tournament') : fd.data.items;
     h += '<div class="list">' + (items.length ? items.slice(0, S.feedN).map(x => x.type === 'match' ? matchCard(svMatch(x.match)) : tourEventS(x.tournament, x.t)).join('') : '<div class="note-box">Здесь пока пусто. Сыграйте матч во вкладке «Играть».</div>') + '</div>';
     if (items.length > S.feedN) h += '<button class="ghost more" data-act="more">Показать ещё</button>';
   }
@@ -5004,6 +5124,14 @@ document.addEventListener('click', e => {
     }
     case 'pro-p': S.proP = v; render(); break;
     case 'res-img': resultsImage(v).catch(() => toast('Не удалось сделать картинку.')); break;
+    case 'res-post': if (TBY[v]) copyText(resultsPost(TBY[v]), 'Текст для поста скопирован — вставьте в VK или Telegram.'); break;
+    case 'res-doc': if (TBY[v]) { saveBlob(resultsDocx(TBY[v]), 'Itogi-' + (latin(TBY[v].name) || TBY[v].id) + '.docx'); toast('Документ сохранён — откроется в Word.'); } break;
+    case 'cover-set': case 'cover-rm': {
+      const [tid, ph] = a === 'cover-set' ? v.split('|') : [v, null];
+      if (!SRV) { const t = TBY[tid]; if (t) { t.cover = ph; saveDb(); toast(ph ? 'Это фото — общее.' : 'Общее фото убрано из итогов.'); render(); } break; }
+      svDo(Api.patch('/api/tournaments/' + tid + '/cover', { photoId: ph }), r => { svTourSet(r); toast(ph ? 'Это фото — общее.' : 'Общее фото убрано из итогов.'); });
+      break;
+    }
     case 'club-edit': S.clubEdit = v || null; render(); break;
     case 'club-save': {
       const g = k => { const el = $('ce-' + k); return el ? el.value.trim() : ''; };
@@ -5181,6 +5309,7 @@ document.addEventListener('click', e => {
     case 'bnr-del': svDo(Api.del('/api/admin/banners/' + v), () => { svStale('abanners'); svStale('banners:'); toast('Баннер удалён.'); }); break;
     case 'banner': { const b = BANNERS[v]; if (b && b.link) { Api.post('/api/banners/' + v + '/click').catch(() => {}); window.open(b.link, '_blank', 'noopener'); } break; }
     case 'nt-club': if (S.nt) { S.nt.club = v; render(); } break;
+    case 'nt-feeon': if (S.nt) { S.nt.feeOn = v === '1'; render(); } break;
     case 't-labels': {
       const [tid, lab] = v.split('|'), t = TBY[tid];
       if (!t) break;
