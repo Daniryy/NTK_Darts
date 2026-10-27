@@ -4,7 +4,7 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPerm } = require('../auth');
-const { can, ROLES } = require('../roles');
+const { can, ROLES, RANK } = require('../roles');
 // роли, у которых есть право (тех. администратору доступно всё)
 const rolesWith = k => ROLES.filter(r => can({ role: r }, k));
 const { audit } = require('../audit');
@@ -39,8 +39,8 @@ module.exports = async function (app) {
   // GET /api/banners?place=feed[&tid=турнир] — действующие сейчас
   app.get('/api/banners', async req => {
     const place = V.oneOf(req.query.place, 'place', PLACES), now = Date.now();
-    // Pro — без рекламы; табло в зале смотрят все, там баннеры остаются
-    if (place !== 'tv' && can(req.player, 'pro')) return { banners: [] };
+    // Pro — без рекламы (администраторы видят баннеры, чтобы проверять их); табло в зале смотрят все
+    if (place !== 'tv' && can(req.player, 'pro') && (RANK[req.player.role] || 0) < RANK.admin) return { banners: [] };
     const live = `active AND (starts IS NULL OR starts <= $2) AND (ends IS NULL OR ends > $2)`;
     // турнир клуба с тарифом «Ведущий»: только его спонсоры (или ничего), без баннеров Oche
     if (req.query.tid && place !== 'feed') {

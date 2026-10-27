@@ -792,6 +792,47 @@ button.banner:hover { border-color: var(--line-bright); }
 .tdoc .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; border: 0; }
 .note-box.ok { border-color: var(--green); }
 .treq { display: grid; gap: 8px; }
+/* ===== свои элементы форм ===== */
+html { scrollbar-gutter: stable; scrollbar-color: var(--line-bright) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-bright); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+.csel-native { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; border: 0 !important; margin: 0 !important; opacity: 0 !important; pointer-events: none !important; overflow: hidden; clip-path: inset(50%); }
+.csel { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 46px; padding: 0 12px 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); font: inherit; font-size: 15px; text-align: left; cursor: pointer; transition: border-color .15s; }
+.csel.sm { min-height: 36px; font-size: 13px; padding: 0 8px 0 10px; border-radius: 9px; width: auto; }
+.csel:hover { border-color: var(--line-bright); }
+.csel:focus-visible, .csel[aria-expanded="true"] { border-color: var(--green); outline: none; }
+.csel:disabled { opacity: .5; cursor: default; }
+.csel-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.csel svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.csel[aria-expanded="true"] svg { transform: rotate(180deg); }
+.csel-pop { position: fixed; z-index: 1000; display: grid; padding: 6px; overflow-y: auto; max-width: min(420px, calc(100vw - 16px)); border-radius: 14px; border: 1px solid var(--line-bright); background: var(--surface); box-shadow: 0 18px 40px rgba(0, 0, 0, .45); animation: cselIn .12s ease-out; }
+@keyframes cselIn { from { opacity: 0; transform: translateY(-4px); } }
+.csel-o { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--fg); font: inherit; font-size: 14px; text-align: left; cursor: pointer; white-space: nowrap; }
+.csel-o:hover, .csel-o:focus { background: var(--surface2); outline: none; }
+.csel-o.on { color: var(--green); font-weight: 600; }
+.csel-o.on::after { content: '✓'; float: right; margin-left: 16px; }
+.csel-o:disabled { opacity: .4; cursor: default; }
+.dsel { display: grid; grid-template-columns: minmax(86px, .8fr) minmax(110px, 1.5fr) minmax(92px, 1fr); gap: 8px; }
+.dsel .csel { padding: 0 8px 0 12px; }
+/* дата из трёх списков — всегда на всю строку формы */
+.nrow:has(.dsel) { flex-wrap: wrap; }
+.nrow .field:has(.dsel) { flex: 1 1 100% !important; }
+input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin: 0; flex: 0 0 auto; border-radius: 6px; border: 1.5px solid var(--line-bright); background: var(--surface2); display: inline-grid; place-content: center; cursor: pointer; vertical-align: middle; transition: background .12s, border-color .12s; }
+input[type="checkbox"]::before { content: ''; width: 11px; height: 11px; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); background: #1a1205; transform: scale(0); transition: transform .12s; }
+input[type="checkbox"]:checked { background: var(--green); border-color: var(--green); }
+input[type="checkbox"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:hover:not(:disabled) { border-color: var(--green); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
+input[type="checkbox"]:disabled:checked { background: var(--line-bright); border-color: var(--line-bright); }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 6px; background: var(--surface2); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--green); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--green); cursor: pointer; }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--green); border: 3px solid var(--surface); cursor: pointer; }
+.bn-desk { display: none; }
+@media (min-width: 960px) { .bn-desk { display: block; } .bn-mob { display: none; } }
 .tcover { width: 100%; max-width: 720px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; cursor: zoom-in; display: block; }
 .rcard { display: grid; gap: 8px; }
 .rc-cover { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; cursor: pointer; }
@@ -3746,7 +3787,7 @@ function titleView() {
   h += '<div class="panel">' + titleSteps({ status: 'draft' });
   h += '<div class="field"><label class="label" for="tf-fullName">ФИО — как в документе</label><input class="inp" id="tf-fullName" data-tf="fullName" maxlength="100" value="' + esc(F.fullName) + '" placeholder="Фамилия Имя Отчество"></div>';
   h += '<div class="field"><span class="label">Звание или разряд</span><div class="chips">' + kinds.map(x => '<button class="chip txt' + (F.title === x.k ? ' on' : '') + '" data-act="tf-kind" data-v="' + x.k + '" title="' + esc(x.full) + '">' + esc(x.short) + '</button>').join('') + '</div>' + (kd ? '<span class="meta">' + esc(kd.full) + '. Присваивает: ' + esc(kd.issuer) + '.</span>' : '') + '</div>';
-  h += '<div class="nrow"><div class="field" style="flex:1"><label class="label" for="tf-orderNo">Номер приказа</label><input class="inp" id="tf-orderNo" data-tf="orderNo" maxlength="40" value="' + esc(F.orderNo) + '" placeholder="например, 45 нг"></div><div class="field" style="flex:1"><label class="label" for="tf-orderDate">Дата приказа</label><input class="inp" id="tf-orderDate" data-tf="orderDate" type="date" value="' + esc(F.orderDate) + '"></div></div>';
+  h += '<div class="nrow"><div class="field" style="flex:1"><label class="label" for="tf-orderNo">Номер приказа</label><input class="inp" id="tf-orderNo" data-tf="orderNo" maxlength="40" value="' + esc(F.orderNo) + '" placeholder="например, 45 нг"></div><div class="field" style="flex:1"><label class="label" for="tf-orderDate">Дата приказа</label>' + dateSel('tf', F.orderDate) + '</div></div>';
   h += '<div class="field"><label class="label" for="tf-issuer">Кто присвоил</label><input class="inp" id="tf-issuer" data-tf="issuer" maxlength="120" list="tf-issuers" value="' + esc(F.issuer) + '" placeholder="' + esc(kd ? kd.issuer : 'Минспорт России, министерство спорта региона…') + '"><datalist id="tf-issuers"><option value="Минспорт России"><option value="Министерство спорта Свердловской области"><option value="Федерация дартса России"></datalist></div>';
   h += '<div class="field"><span class="label">Документ: удостоверение, зачётная книжка или выписка из приказа</span>' + docThumbs(F.docs, true) + '<label class="ghost addp" style="cursor:pointer;display:inline-flex">+ Фото или PDF<input type="file" id="tf-file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden></label><span class="meta">До 5 файлов, каждый до 8 МБ. На фото должны читаться ФИО, звание и номер приказа.</span></div>';
   h += '<div class="field"><label class="label" for="tf-comment">Комментарий (необязательно)</label><textarea class="inp" id="tf-comment" data-tf="comment" maxlength="500" rows="2">' + esc(F.comment) + '</textarea></div>';
@@ -4121,6 +4162,101 @@ function invitesHTML(list) {
   const row = (l, xs) => xs.length ? '<span class="meta">' + l + '</span><div class="tgrid">' + xs.slice(0, 4).map(SRV ? tourCardS : tourCard).join('') + '</div>' : '';
   return '<div class="sec invites"><span class="label">Приглашения · открыта запись</span>' + row('Официальные турниры', glob) + row('В вашем городе' + (city ? ' — ' + esc(P[ME].city) : ''), loc) + '</div>';
 }
+
+/* ===== Свои выпадающие списки вместо браузерных. <select> остаётся в разметке (значение и событие change —
+   как раньше), рядом — кнопка, по ней открывается свой список. После перерисовки открытый список не закрывается. ===== */
+let CSEL = null; // открытый: { key, sel, btn, pop, i }
+const CHEV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+// по чему найти тот же <select> после перерисовки: id или data-атрибуты
+const cselKey = sel => sel.id ? '#' + CSS.escape(sel.id) : 'select' + [...sel.attributes].filter(a => a.name.startsWith('data-') && a.name !== 'data-csel').map(a => '[' + a.name + '="' + CSS.escape(a.value) + '"]').join('');
+const cselText = sel => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; };
+function enhanceSelects(root) {
+  root.querySelectorAll('select:not([data-csel])').forEach(sel => {
+    sel.dataset.csel = '1';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'csel' + (sel.classList.contains('sm') ? ' sm' : '');
+    b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false');
+    const lab = sel.getAttribute('aria-label') || (sel.id && (root.querySelector('label[for="' + CSS.escape(sel.id) + '"]') || {}).textContent) || '';
+    if (lab) b.setAttribute('aria-label', lab + ': ' + cselText(sel));
+    b.disabled = sel.disabled;
+    b.innerHTML = '<span class="csel-v">' + esc(cselText(sel)) + '</span>' + CHEV;
+    if (sel.style.cssText) b.style.cssText = sel.style.cssText;
+    sel.classList.add('csel-native'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+    sel.after(b);
+    b.addEventListener('click', e => { e.stopPropagation(); CSEL && CSEL.sel === sel ? cselClose(true) : cselOpen(sel, b); });
+    b.addEventListener('keydown', e => { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); cselOpen(sel, b); } });
+  });
+  // открытый список переживает перерисовку: тот же <select> по id или data-атрибутам
+  if (CSEL && !document.body.contains(CSEL.btn)) {
+    const sel = document.querySelector(CSEL.key);
+    if (sel && sel.nextElementSibling && sel.nextElementSibling.classList.contains('csel')) { CSEL.sel = sel; CSEL.btn = sel.nextElementSibling; CSEL.btn.setAttribute('aria-expanded', 'true'); cselPlace(); }
+    else cselClose(false);
+  }
+}
+// дата своими списками: день, месяц, год; значение — YYYY-MM-DD в data-атрибуте поля формы
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+function dateSel(pre, v) {
+  const [y, m, d] = String(v || '').split('-').map(Number), now = new Date().getFullYear(), opt = (val, txt, on) => '<option value="' + val + '"' + (on ? ' selected' : '') + '>' + txt + '</option>';
+  return '<div class="dsel">' +
+    '<select class="inp" data-dsel="' + pre + '|d" aria-label="День">' + opt('', 'день', !d) + Array.from({ length: 31 }, (_, k) => opt(k + 1, k + 1, d === k + 1)).join('') + '</select>' +
+    '<select class="inp" data-dsel="' + pre + '|m" aria-label="Месяц">' + opt('', 'месяц', !m) + MONTHS.map((x, k) => opt(k + 1, x, m === k + 1)).join('') + '</select>' +
+    '<select class="inp" data-dsel="' + pre + '|y" aria-label="Год">' + opt('', 'год', !y) + Array.from({ length: 60 }, (_, k) => now - k).map(x => opt(x, x, y === x)).join('') + '</select></div>';
+}
+function cselOpen(sel, btn) {
+  cselClose(false);
+  const pop = document.createElement('div');
+  pop.className = 'csel-pop'; pop.setAttribute('role', 'listbox');
+  pop.innerHTML = [...sel.options].map((o, k) => '<button type="button" role="option" class="csel-o' + (k === sel.selectedIndex ? ' on' : '') + '" aria-selected="' + (k === sel.selectedIndex) + '" data-k="' + k + '"' + (o.disabled ? ' disabled' : '') + '>' + esc(o.textContent) + '</button>').join('');
+  document.body.appendChild(pop);
+  CSEL = { key: cselKey(sel), sel, btn, pop, i: Math.max(0, sel.selectedIndex) };
+  btn.setAttribute('aria-expanded', 'true');
+  pop.addEventListener('click', e => { const o = e.target.closest('.csel-o'); if (o && !o.disabled) cselPick(+o.dataset.k); });
+  pop.addEventListener('keydown', cselKeys);
+  cselPlace();
+  cselFocus();
+}
+function cselPlace() {
+  if (!CSEL) return;
+  const r = CSEL.btn.getBoundingClientRect(), p = CSEL.pop, gap = 6, H = window.innerHeight;
+  p.style.minWidth = r.width + 'px';
+  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, p.offsetWidth) - 8)) + 'px';
+  const below = H - r.bottom - gap - 8, above = r.top - gap - 8, h = Math.min(p.scrollHeight, 300);
+  const up = below < Math.min(h, 200) && above > below;
+  p.style.maxHeight = Math.max(120, Math.min(300, up ? above : below)) + 'px';
+  p.style.top = (up ? r.top - gap - Math.min(h, Math.max(120, above)) : r.bottom + gap) + 'px';
+}
+function cselFocus() {
+  const o = CSEL && CSEL.pop.querySelectorAll('.csel-o')[CSEL.i];
+  if (o) { o.focus({ preventScroll: true }); o.scrollIntoView({ block: 'nearest' }); }
+}
+function cselKeys(e) {
+  const n = CSEL.sel.options.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); CSEL.i = Math.min(n - 1, CSEL.i + 1); cselFocus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); CSEL.i = Math.max(0, CSEL.i - 1); cselFocus(); }
+  else if (e.key === 'Home') { e.preventDefault(); CSEL.i = 0; cselFocus(); }
+  else if (e.key === 'End') { e.preventDefault(); CSEL.i = n - 1; cselFocus(); }
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const o = document.activeElement; if (o && o.dataset.k != null) cselPick(+o.dataset.k); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cselClose(true); }
+  else if (e.key === 'Tab') cselClose(false);
+}
+function cselPick(k) {
+  const { sel, btn } = CSEL;
+  cselClose(true);
+  if (sel.selectedIndex === k) return;
+  sel.selectedIndex = k;
+  btn.querySelector('.csel-v').textContent = cselText(sel);
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function cselClose(focus) {
+  if (!CSEL) return;
+  const c = CSEL; CSEL = null;
+  c.pop.remove(); c.btn.setAttribute('aria-expanded', 'false');
+  if (focus && document.body.contains(c.btn)) c.btn.focus({ preventScroll: true });
+}
+document.addEventListener('pointerdown', e => { if (CSEL && !CSEL.pop.contains(e.target) && !CSEL.btn.contains(e.target)) cselClose(false); }, true);
+window.addEventListener('resize', () => cselPlace());
+window.addEventListener('scroll', e => { if (CSEL && !CSEL.pop.contains(e.target)) cselPlace(); }, true);
 
 // есть ли у меня хоть что-то в панели управления
 const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'clubs', 'stats', 'audit', 'banners', 'titles', 'plans'].some(k => Api.perm(k));
@@ -4861,7 +4997,9 @@ const listE = st => lz('list:' + st, () => Api.get('/api/tournaments?status=' + 
 function feedViewS() {
   const lv = listE('live'), rg = listE('reg'), f = S.feedF === 'my' && ME ? 'my' : 'all', only = S.feedF === 'res';
   const fd = lz('feed:' + f, () => Api.get('/api/feed?limit=50' + (f === 'my' ? '&scope=my' : '')));
-  let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">' + bannerHTML('feed');
+  // баннер: на ПК — в боковой колонке, на телефоне — в ленте после третьей записи
+  const bn = bannerHTML('feed');
+  let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">';
   if (lv.data && lv.data.tournaments.length) h += liveBlock(lv.data.tournaments, tourCardS);
   if (rg.data) h += invitesHTML(rg.data.tournaments.slice().sort((a, b) => a.start - b.start));
   h += '<div class="sec"><div class="fchips" role="group" aria-label="Фильтр ленты">' + [['all', 'Все'], ['res', 'Итоги турниров']].concat(ME ? [['my', 'Мои матчи']] : []).map(([v, l]) => '<button class="fchip' + ((only ? 'res' : f) === v ? ' on' : '') + '" data-act="feedf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -4869,10 +5007,10 @@ function feedViewS() {
   if (st) h += st;
   else {
     const items = only ? fd.data.items.filter(x => x.type === 'tournament') : fd.data.items;
-    h += '<div class="list">' + (items.length ? items.slice(0, S.feedN).map(x => x.type === 'match' ? matchCard(svMatch(x.match)) : tourEventS(x.tournament, x.t)).join('') : '<div class="note-box">Здесь пока пусто. Сыграйте матч во вкладке «Играть».</div>') + '</div>';
+    h += '<div class="list">' + (items.length ? items.slice(0, S.feedN).map((x, k) => (k === 3 && bn ? '<div class="bn-mob">' + bn + '</div>' : '') + (x.type === 'match' ? matchCard(svMatch(x.match)) : tourEventS(x.tournament, x.t))).join('') : '<div class="note-box">Здесь пока пусто. Сыграйте матч во вкладке «Играть».</div>') + '</div>';
     if (items.length > S.feedN) h += '<button class="ghost more" data-act="more">Показать ещё</button>';
   }
-  return h + '</div></div><aside class="side">' + sideViewS() + '</aside></div>';
+  return h + '</div></div><aside class="side">' + (bn ? '<div class="bn-desk">' + bn + '</div>' : '') + sideViewS() + '</aside></div>';
 }
 function sideViewS() {
   const top = lz('rating:top', () => Api.get('/api/rating?limit=5')), reg = listE('reg');
@@ -4981,6 +5119,7 @@ function render() {
   camsPlace();
   // картинки и шрифты догружаются — рамки камер сдвигаются
   clearTimeout(render.camT); render.camT = setTimeout(camsPlace, 400);
+  enhanceSelects(document);
 }
 // свежие данные на открытом экране: раз в 30 с, только в видимой вкладке
 setInterval(() => { if (SRV && document.visibilityState === 'visible' && !anyModal() && !(R === 'play' && S.inGame)) render(); }, 30000);
@@ -5555,6 +5694,12 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.id === 'bnr-file') { bannerUpload(t.files && t.files[0]); return; }
+  if (t.dataset && t.dataset.dsel) {
+    const [pre] = t.dataset.dsel.split('|'), box = t.closest('.dsel'), g = k => (box.querySelector('[data-dsel="' + pre + '|' + k + '"]') || {}).value || '';
+    const y = g('y'), m = g('m'), d = g('d');
+    if (pre === 'tf' && S.tForm) S.tForm.orderDate = y && m && d ? y + '-' + String(m).padStart(2, '0') + '-' + String(Math.min(+d, new Date(+y, +m, 0).getDate())).padStart(2, '0') : '';
+    return;
+  }
   if (t.dataset && t.dataset.cbnImg) { clubBannerImg(t.dataset.cbnImg, t.files && t.files[0]); return; }
   if (t.id === 'tf-file') { titleUpload([...(t.files || [])]); t.value = ''; return; }
   if (t.dataset && t.dataset.perm && S.permEd) {

@@ -95,5 +95,6 @@ test('Pro: выходная музыка в составе турнира, зн�
   const tv = n => ok(n).banners.length;
   assert.equal(tv(await call(MS, 'GET', '/api/banners?place=tv')), tv(await call(PL, 'GET', '/api/banners?place=tv')), 'табло — для всех');
   assert.ok(tv(await call(PL, 'GET', '/api/banners?place=feed')) >= 1);
+  assert.ok(tv(await call(TECH, 'GET', '/api/banners?place=feed')) >= 1, 'администратор видит рекламу, чтобы её проверять');
   assert.equal(typeof ok(await call(null, 'GET', '/api/players/p3')).bestAvg, 'number');
 });
