@@ -64,6 +64,9 @@
 `{ "email", "purpose": "reg" | "link" | "reset", "code": "123456", "password"? }`. `reg` — создать аккаунт и войти; `link` — почта подтверждена (код должен быть запрошен этим же аккаунтом); `reset` — `password` становится новым паролем, остальные сеансы закрываются, блокировка после неверных паролей снимается, вход. Ответ — как у `GET /api/me` и `created`. Код живёт 30 минут, 5 попыток.
 - `409 bad_code` — неверный код; `409 code_expired` — устарел, использован или попытки кончились.
 
+### `PUT /api/me/email` — почта без писем
+Только когда письма на сервере не настроены (иначе `409 need_code` — через код): `{ "email", "password"? }` — почта привязывается сразу, неподтверждённой (`emailOk: false`); `password` (от 8 символов) нужен, если пароля ещё нет. Ответ — как у `GET /api/me`; `409 email_taken` — почта у другого аккаунта.
+
 ### `POST /api/auth/email/login` — вход по почте и паролю
 `{ "email", "password" }` → сеанс (полгода; администраторам — 30 дней). `409 bad_login` — неверная почта или пароль (одинаково); `429 too_many` — 5 неверных паролей подряд (вход закрыт на 15 минут) или больше 10 попыток с IP за 10 минут.
 
@@ -103,7 +106,7 @@
 Если вход не выполнен, приходит `{ "player": null, "admin": false, "role": null, "clubs": [] }`, а не ошибка.
 
 ### `PATCH /api/me`
-Тело `{ "name"?, "city"?, "club"?, "walkon"? }`. Ограничения: `name` 2–32 символа, `city`, `club` до 40. `walkon` — выходная музыка (до 60 символов), только с правом `pro`, иначе `403`. Звание так не меняется (`400`) — только заявкой. Ответ — как у `GET /api/me`.
+Тело `{ "name"?, "city"?, "club"?, "walkon"? }`. Ограничения: `name` 2–32 символа, `city` до 40; `club` — название открытого клуба из `GET /api/clubs` или пусто (`400`, если такого клуба нет; прежнее значение можно прислать без изменений). `walkon` — выходная музыка (до 60 символов), только с правом `pro`, иначе `403`. Звание так не меняется (`400`) — только заявкой. Ответ — как у `GET /api/me`.
 
 ### `POST /api/me/claim`
 Привязать аккаунт, созданный администратором: `{ "code": "K7MQ2XRA" }` (регистр, пробелы и дефисы не важны). Сессия переходит к тому аккаунту, VK — тоже; свой пустой аккаунт удаляется.
@@ -194,7 +197,7 @@
 | `banners` | тех. администратор | баннеры |
 
 ### `GET /api/admin/audit?limit=50&before=время&target=id` — право `audit`
-Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `login.email`, `email.link`, `password.change`, `password.reset`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `club.helper_add|helper_rm`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
+Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `login.email`, `email.link`, `email.set`, `password.change`, `password.reset`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `club.helper_add|helper_rm`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
 
 ## Звания
 
@@ -415,11 +418,15 @@
 
 ## Рейтинг и лента
 
-### `GET /api/rating?sort=r|avg&city=Москва&q=текст&limit=50&offset=0`
+### `GET /api/rating?sort=r|avg&region=Свердловская%20область&q=текст&limit=100&offset=0`
 ```json
-{ "total": 312, "cities": ["Москва", "Казань"],
-  "rows": [{ "rank": 1, "id": "p1", "name": "Артём Волков", "city": "Москва", "club": "…", "r": 1704, "avg": 87.9, "n": 52 }] }
+{ "total": 312, "cities": ["Екатеринбург", "Москва"], "regions": [{ "name": "Свердловская область", "n": 40 }],
+  "rows": [{ "rank": 1, "id": "p1", "name": "Артём Волков", "city": "Москва", "region": "Москва", "club": "…", "r": 1704, "avg": 87.9, "n": 52 }] }
 ```
+`region` — только игроки из городов этой области; `q` — имя, ник, ID, город или область (от 3 букв: «свердл», «свердловская обл»). `regions` — области, где есть игроки в рейтинге, по убыванию числа игроков. `region` у строки — `null`, если города нет в справочнике (такие игроки находятся поиском по городу). `rank` продолжается на следующих страницах (`offset`). `city=` — старый фильтр по точному названию города.
+
+### `GET /api/regions`
+Справочник «область → города» (`server/regions.js`): `{ "regions": [["Свердловская область", ["Екатеринбург", "Новоуральск", …]], …] }`. Страница берёт его для подсказок города в профиле и фильтра в демо.
 Рейтинг Эло только по турнирным матчам: старт 1500, коэффициент 32, как в `recalc()`. Игроки без турнирных матчей в таблицу не попадают.
 
 ### `GET /api/feed?scope=all|my&before=время&limit=30`
