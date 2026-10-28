@@ -216,7 +216,8 @@ async function seed(c) {
   // роли: тестовый игрок — тех. администратор (проверять всё), p4 — администратор, p1 и p2 — ведущие клубов
   const ROLE = { [ME]: 'tech', p4: 'admin', p1: 'host', p2: 'host' };
   for (const [id, name, handle, code, city, club, , ver] of ALL_PLAYERS) {
-    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, role, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [id, name, handle, code, city, club, !!ver, ROLE[id] || 'player', now]);
+    // ведущим роль выдана вручную (base_role): клуб её не даёт
+    await c.query('INSERT INTO players (id, name, handle, code, city, club, ver, role, base_role, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', [id, name, handle, code, city, club, !!ver, ROLE[id] || 'player', ROLE[id] === 'host' ? 'host' : 'player', now]);
   }
   await c.query(`SELECT setval('player_seq', $1)`, [ALL_PLAYERS.length]);
   // клубы: два подтверждённых с ведущими и одна заявка на рассмотрении

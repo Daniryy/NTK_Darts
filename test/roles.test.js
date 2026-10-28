@@ -173,7 +173,7 @@ test('роли: администратор выдаёт ведущего, тех
   assert.equal(st.roles.tech, 1);
 });
 
-test('клуб: заявка, подтверждение — подавший становится ведущим, турнир от клуба, камеры, закрытие', async () => {
+test('клуб: заявка, подтверждение; роль ведущего — только по тарифу; турнир от клуба, камеры, закрытие', async () => {
   const U = await login('p10');
   const c = ok(await call(U, 'POST', '/api/clubs', { name: 'Казанский дротик', city: 'Казань', contact: '+7 843 000-00-00' }), 201).club;
   assert.equal(c.status, 'pending');
@@ -190,10 +190,20 @@ test('клуб: заявка, подтверждение — подавший с
   // подтверждение
   const a = ok(await call(ADMIN, 'PATCH', '/api/admin/clubs/' + c.id, { status: 'active' })).club;
   assert.deepEqual(a.hosts.map(h => h.id), ['p10']);
-  const me = ok(await call(U, 'GET', '/api/me'));
-  assert.equal(me.role, 'host');
+  let me = ok(await call(U, 'GET', '/api/me'));
+  assert.equal(me.role, 'player', 'клуб сам роль не даёт');
   assert.deepEqual(me.clubs.map(x => x.id), [c.id]);
   assert.ok(ok(await call(null, 'GET', '/api/clubs')).clubs.some(x => x.id === c.id));
+  // без тарифа: турнира от клуба нет, инструменты клуба закрыты
+  err(await call(U, 'POST', '/api/tournaments', { name: 'От клуба', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p10', 'p3', 'p5'] }), 403);
+  const page = ok(await call(U, 'GET', '/api/clubs/' + c.id));
+  assert.equal(page.manage, true); assert.equal(page.tools, false);
+  // тариф «Ведущий» — роль ведущего
+  const hostPlan = ok(await call(null, 'GET', '/api/plans')).plans.find(p => p.role === 'host');
+  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p10', planId: hostPlan.id }));
+  me = ok(await call(U, 'GET', '/api/me'));
+  assert.equal(me.role, 'host');
+  assert.equal(ok(await call(U, 'GET', '/api/clubs/' + c.id)).tools, true);
   const t = ok(await call(U, 'POST', '/api/tournaments', { name: 'От клуба', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p10', 'p3', 'p5'] }), 201).tournament;
   assert.equal(t.official, true);
   assert.deepEqual(t.org, { id: 'p10', name: 'Казанский дротик', ver: true, club: c.id, logo: null });
@@ -201,13 +211,13 @@ test('клуб: заявка, подтверждение — подавший с
   ok(await call(U, 'PATCH', '/api/tournaments/' + t.id + '/streams', { streams: [{ url: 'https://vk.com/video-1_2' }] }));
   // чужой клуб в турнир не подставить
   err(await call(HOST, 'POST', '/api/tournaments', { name: 'Чужой', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p1', 'p3', 'p5'] }), 403);
-  // второй ведущий, затем закрытие клуба — роль снимается
+  // второй ведущий клуба без тарифа роли не получает
   ok(await call(ADMIN, 'POST', '/api/admin/clubs/' + c.id + '/hosts', { playerId: 'p14' }));
-  assert.equal(ok(await call(null, 'GET', '/api/players/p14')).player.role, 'host');
-  ok(await call(ADMIN, 'DELETE', '/api/admin/clubs/' + c.id + '/hosts/p14'));
   assert.equal(ok(await call(null, 'GET', '/api/players/p14')).player.role, 'player');
+  ok(await call(ADMIN, 'DELETE', '/api/admin/clubs/' + c.id + '/hosts/p14'));
+  // закрытие клуба тариф не трогает
   ok(await call(ADMIN, 'PATCH', '/api/admin/clubs/' + c.id, { status: 'closed', note: 'Клуб закрылся' }));
-  assert.equal(ok(await call(U, 'GET', '/api/me')).role, 'player');
+  assert.equal(ok(await call(U, 'GET', '/api/me')).role, 'host');
   // отказ в заявке
   const P9 = await login('p9');
   ok(await call(ADMIN, 'PATCH', '/api/admin/clubs/c3', { status: 'rejected', note: 'Нет адреса' }));
