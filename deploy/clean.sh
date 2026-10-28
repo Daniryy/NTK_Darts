@@ -15,4 +15,5 @@ echo "== очистка"
 cd "$APP"
 sudo -u oche bash -c "set -a; . /etc/oche.env; set +a; node tools/clean.js --yes"
 systemctl restart oche
+for _ in $(seq 1 15); do curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 && break; sleep 1; done
 echo "Готово. Вернуть как было: pg_restore из /var/backups/oche (см. deploy/backup.sh)."

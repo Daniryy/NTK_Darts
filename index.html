@@ -343,6 +343,9 @@ h1, h2, h3, p { margin: 0; }
 body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)); }
 
 .phead { display: flex; align-items: end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.phead-a { display: flex; gap: 8px; flex-wrap: wrap; }
+.warn-a { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.warn-a .btn { width: auto; }
 .h1 { font-family: var(--display); font-size: clamp(26px, 6vw, 42px); line-height: 1.04; text-transform: uppercase; font-weight: 700; letter-spacing: .02em; text-wrap: balance; }
 .h2 { font-family: var(--display); font-size: 20px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
 .sec { display: grid; gap: 12px; min-width: 0; }
@@ -4098,7 +4101,7 @@ function meCard() {
   h += '</div>';
   if (me.email && !me.emailOk && !c.email) h += '<p class="meta">Подтвердить почту можно будет, когда на сервере включат отправку писем. Входить по почте и паролю можно уже сейчас.</p>';
   if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
-  if (anyAdm() && (!c.vk || !c.email)) h += '<p class="meta">' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(' и ') + ' пока не настроены на сервере — см. docs/server.md.</p>';
+  if (anyAdm() && (!c.vk || !c.email)) { const t = [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(' и '); h += '<p class="meta">' + t[0].toUpperCase() + t.slice(1) + ' пока не настроены на сервере — см. docs/server.md.</p>'; }
   h += '</div>';
   return '<div class="acc-grid">' + h + titleCard() + planCard() + clubCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
 }
@@ -4654,7 +4657,7 @@ function adminView() {
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   // администратору нужен подтверждённый контакт: по нему восстанавливается доступ
-  if (Api.can('admin') && !(Api.me.emailOk || Api.me.phone || Api.me.vk)) h += '<div class="note-box warn"><b>Подтвердите почту или телефон.</b> Если забудете пароль, доступ восстановится только через подтверждённый контакт.<div class="row2" style="margin-top:8px">' + ((Api.config || {}).email ? '<button class="btn sm" data-act="link-email">Подтвердить почту</button>' : '') + ((Api.config || {}).phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div>' + (!(Api.config || {}).email && !(Api.config || {}).phone ? '<p class="meta">Письма и SMS на сервере ещё не настроены — см. docs/server.md, раздел «Почта».</p>' : '') + '</div>';
+  if (Api.can('admin') && !(Api.me.emailOk || Api.me.phone || Api.me.vk)) h += '<div class="note-box warn"><b>Подтвердите почту или телефон.</b> Если забудете пароль, доступ восстановится только через подтверждённый контакт.<div class="warn-a">' + ((Api.config || {}).email ? '<button class="btn sm" data-act="link-email">Подтвердить почту</button>' : '') + ((Api.config || {}).phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div>' + (!(Api.config || {}).email && !(Api.config || {}).phone ? '<p class="meta">Письма и SMS на сервере ещё не настроены — см. docs/server.md, раздел «Почта».</p>' : '') + '</div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
   h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
@@ -5431,7 +5434,7 @@ function sideViewS() {
 }
 function toursViewS() {
   const L = { live: listE('live'), reg: listE('reg'), done: listE('done') }, cur = L[S.tf];
-  let h = '<div class="phead"><h1 class="h1">Турниры</h1>' + '<button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (ME ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>') + '</div>';
+  let h = '<div class="phead"><h1 class="h1">Турниры</h1><div class="phead-a"><button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (ME ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>') + '</div></div>';
   h += '<div class="seg2" role="group" aria-label="Статус">' + [['live', 'Идут'], ['reg', 'Регистрация'], ['done', 'Завершены']].map(([v, l]) => '<button class="' + (S.tf === v ? 'on' : '') + '" data-act="tf" data-v="' + v + '">' + l + ' <span class="muted">' + (L[v].data ? L[v].data.total : '…') + '</span></button>').join('') + '</div>';
   const st = svState(cur, 'турниров');
   if (st) return h + st;
