@@ -76,11 +76,11 @@ test('заявка → подключение по заявке → роль т�
   assert.ok(['plan.request', 'plan.grant', 'plan.extend', 'plan.end'].every(a => log.includes(a)));
 });
 
-test('окончание по сроку: роль снимается сама; ведущий клуба остаётся ведущим', async () => {
+test('окончание по сроку: роль снимается сама; роль, выданная вручную, остаётся', async () => {
   const host = plans.find(p => p.role === 'host'), plus = plans.find(p => p.role === 'plus');
   ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p6', planId: host.id }));
   assert.equal(await role('p6'), 'host');
-  // ведущий клуба c1 с «Игрок+» остаётся ведущим
+  // ведущий (роль выдана вручную) с «Игрок+» остаётся ведущим
   ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p1', planId: plus.id }));
   assert.equal(await role('p1'), 'host');
   await pool.query(`UPDATE player_plans SET ends = $1 WHERE status = 'active'`, [Date.now() - 1000]);

@@ -1,5 +1,5 @@
 // Тарифы: скидка за подтверждённое звание и роль, которую даёт действующий тариф.
-// Роль игрока — из роли, выданной вручную, клуба и действующего тарифа (syncPlanRole).
+// Роль игрока — из роли, выданной вручную, и действующего тарифа (syncPlanRole).
 // Администраторов это не касается: их роль меняет только тех. администратор.
 const { all, one } = require('./db');
 const { KINDS } = require('./titles');
@@ -23,17 +23,15 @@ function discountFor(title) {
 }
 const priceWith = (price, pct) => Math.round(price * (100 - pct) / 100);
 
-// выставить роль игрока по тарифам и клубам (кроме администраторов).
-// Основа — роль, выданная вручную (base_role), при открытом клубе — не ниже ведущего; тариф её повышает,
+// выставить роль игрока по тарифам (кроме администраторов). Клуб роль не даёт: инструменты ведущего — по тарифу.
+// Основа — роль, выданная вручную (base_role); тариф её повышает,
 // а роль того же ранга (например «Игрок+» у ведущего) не заменяет: ведущий остаётся ведущим.
 async function syncPlanRole(c, pid) {
   const p = await one(c, 'SELECT id, role, base_role FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p || (RANK[p.role] || 0) >= RANK.admin) return p && p.role;
   const act = await one(c, `SELECT pl.role FROM player_plans pp JOIN plans pl ON pl.id = pp.plan_id
     WHERE pp.player_id = $1 AND pp.status = 'active' AND pp.ends > $2 ORDER BY pp.ends DESC LIMIT 1`, [pid, Date.now()]);
-  const club = await one(c, `SELECT 1 FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 AND c.status = 'active'`, [pid]);
-  let base = p.base_role && (RANK[p.base_role] || 0) < RANK.admin ? p.base_role : 'player';
-  if (club && (RANK[base] || 0) <= RANK.host) base = 'host';
+  const base = p.base_role && (RANK[p.base_role] || 0) < RANK.admin ? p.base_role : 'player';
   const want = act && ((RANK[act.role] || 0) > (RANK[base] || 0) || base === 'player') ? act.role : base;
   if (want !== p.role) await c.query('UPDATE players SET role = $2 WHERE id = $1', [pid, want]);
   return want;
