@@ -146,6 +146,26 @@ module.exports = function routes(app) {
     return Object.assign(await A.meResp(pool, p), { created });
   });
 
+  // письма на сервере не настроены: почта привязывается сразу, неподтверждённой; { email, password? } —
+  // пароль нужен, если его ещё нет (вход по почте и паролю). Когда письма заработают — подтверждается кодом.
+  app.put('/api/me/email', async req => {
+    const me = A.needPlayer(req), b = req.body || {}, email = normEmail(b.email);
+    if (mailOn()) throw E.conflict('need_code', 'Подтвердите почту кодом из письма');
+    A.ipLimit(req, 'mail', 30, 36e5);
+    const pass = b.password ? await hashPassword(needPass(b.password)) : null;
+    const p = await tx(async c => {
+      const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
+      const owner = await one(c, 'SELECT id FROM players WHERE email = $1', [email]);
+      if (owner && owner.id !== me.id) throw taken();
+      if (!cur.pass_hash && !pass) throw E.bad('Задайте пароль — по почте и паролю будете входить', 'password');
+      const out = await one(c, 'UPDATE players SET email = $2, email_ok = false, pass_hash = coalesce(pass_hash, $3) WHERE id = $1 RETURNING *', [me.id, email, pass]);
+      await audit(c, me, 'email.set', me, { email });
+      return out;
+    });
+    A.clearCache();
+    return A.meResp(pool, p);
+  });
+
   // вход по почте и паролю: { email, password }. 5 неверных паролей — вход закрыт на 15 минут
   app.post('/api/auth/email/login', async (req, reply) => {
     const b = req.body || {}, pw = typeof b.password === 'string' ? b.password : '';

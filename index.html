@@ -238,6 +238,9 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+/* выделяется и копируется только нужное: поля ввода, ID, коды входа, контакты в карточке игрока, текст справки */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable], .sel, .code, .idchip b, .ac-grid, .hlp p, .tvqr .meta { -webkit-user-select: text; user-select: text; }
 body {
   margin: 0;
   background-color: var(--bg);
@@ -432,6 +435,31 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .reg-cta { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 .room { display: grid; gap: 12px; }
 .room .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* рейтинг на телефоне: №, игрок и выбранный показатель — без горизонтальной прокрутки */
+@media (max-width: 560px) {
+  .rtbl th:nth-child(5), .rtbl td:nth-child(5), .rtbl.k-r th:nth-child(4), .rtbl.k-r td:nth-child(4), .rtbl.k-avg th:nth-child(3), .rtbl.k-avg td:nth-child(3) { display: none; }
+  .rtbl td:nth-child(2) { white-space: normal; }
+  .rtbl th:last-child, .rtbl td:last-child { text-align: right; }
+}
+/* аккаунт под профилем: карточки сеткой, кнопки по ширине текста */
+.acc-grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 820px) { .acc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.acc-grid .card.sec > .mini, .acc-grid .card.sec > div > .mini { justify-self: start; }
+.acc-grid .acc-adm { grid-column: 1 / -1; }
+.lrow-a { display: flex; gap: 6px; align-items: center; flex: none; }
+.lrow .ok { color: var(--green); }
+.pedit { display: grid; gap: 8px; max-width: 520px; }
+.pedit .nrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.pedit .field { gap: 6px; }
+.pedit .row { display: flex; gap: 8px; margin-top: 4px; }
+.walk-ed { display: grid; gap: 6px; }
+.walk-ed .nrow { display: flex; gap: 8px; }
+.pager { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; justify-content: center; }
+.pager .pg-n { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pager .mini { min-width: 38px; justify-content: center; padding: 8px 12px; font-size: 13.5px; }
+.pager .mini:disabled { opacity: .4; }
+.pager .pg-t { flex-basis: 100%; text-align: center; }
+.rsearch #r-region { max-width: 280px; }
 .hint { display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .hint .row { display: flex; gap: 8px; align-items: center; }
 .hlp { padding: 2px 16px; }
@@ -1817,7 +1845,7 @@ function pStats(pid, tourOnly) {
 const app = $('app');
 let R = 'feed';
 const S = {
-  feedF: 'all', feedN: 15, tf: 'live', ttab: null, rtab: 'r', rcity: 'all', rsearch: '', pf: 'all',
+  feedF: 'all', feedN: 15, tf: 'live', ttab: null, rtab: 'r', rregion: '', rpage: 0, rsearch: '', pf: 'all',
   pMore: false, editName: false, confirmReset: false, confirmDrop: false, confirmDelT: null, confirmLaunch: null, tdef: null, inGame: false, setupNote: '',
   nt: null, setup: null,
   theme: lsGet('oche2.theme') === 'light' ? 'light' : 'dark',
@@ -2758,35 +2786,78 @@ function createTour() {
   go('t.' + t.id);
 }
 
+/* ===== Рейтинг: область, поиск по игроку, городу или области, по 100 игроков на страницу ===== */
+const R_PAGE = 100;
+// справочник «город → область» — с сервера, тот же, что у рейтинга; грузится один раз за открытие страницы
+let REG = null;
+const normCity = c => String(c == null ? '' : c).trim().toLowerCase().replace(/ё/g, 'е').replace(/^г\.\s*/, '').replace(/\s+/g, ' ');
+function regionsLoad() {
+  if (REG || regionsLoad.busy) return;
+  regionsLoad.busy = true;
+  fetch((Api.base || '') + '/api/regions').then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    REG = { list: d.regions, by: new Map() };
+    d.regions.forEach(([r, cs]) => cs.forEach(c => { if (!REG.by.has(normCity(c))) REG.by.set(normCity(c), r); }));
+    render();
+  }).catch(() => {}).finally(() => { regionsLoad.busy = false; });
+}
+const regionOf = city => REG ? REG.by.get(normCity(city)) || null : null;
+const regShort = r => String(r || '').replace(' область', ' обл.').replace('Республика ', 'Респ. ');
+// город и область одной строкой: «Новоуральск, Свердловская обл.»
+const placeTxt = (city, region) => [city, region && region !== city ? regShort(region) : ''].filter(Boolean).join(', ');
+// поиск по области: от 3 букв, слова «область», «республика» не мешают
+function regionsLike(q) {
+  const STOP = ['область', 'обл', 'обл.', 'республика', 'респ', 'респ.'];
+  const w = normCity(q).split(' ').filter(x => !STOP.includes(x)).join(' ');
+  return !REG || w.length < 3 ? [] : REG.list.filter(([r]) => normCity(r).includes(w)).map(x => x[0]);
+}
+// страницы: ‹ 1 2 … 7 ›
+function pagerHTML(page, total, per, act) {
+  const n = Math.ceil(total / per);
+  if (n <= 1) return '';
+  const nums = [...new Set([0, page - 1, page, page + 1, n - 1].filter(k => k >= 0 && k < n))].sort((a, b) => a - b);
+  let h = '<nav class="pager" aria-label="Страницы"><button class="mini" data-act="' + act + '" data-v="' + (page - 1) + '"' + (page ? '' : ' disabled') + ' aria-label="Предыдущая страница">‹ Назад</button><span class="pg-n">';
+  nums.forEach((k, i) => { if (i && k - nums[i - 1] > 1) h += '<span class="meta">…</span>'; h += '<button class="mini' + (k === page ? ' go' : '') + '" data-act="' + act + '" data-v="' + k + '"' + (k === page ? ' aria-current="page"' : '') + '>' + (k + 1) + '</button>'; });
+  return h + '</span><button class="mini" data-act="' + act + '" data-v="' + (page + 1) + '"' + (page < n - 1 ? '' : ' disabled') + ' aria-label="Следующая страница">Вперёд ›</button><span class="meta pg-t">' + (page * per + 1) + '–' + Math.min(total, (page + 1) * per) + ' из ' + total + '</span></nav>';
+}
+// общий вид страницы рейтинга; d: { rows: [{ id, rank, city, region, r, avg, n }], total, regions: [{ name, n }] } или null, пока грузится
+function ratingHTML(d, wait) {
+  const key = S.rtab === 'a' ? 'avg' : 'r', reg = S.rregion || '';
+  let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по турнирным матчам: старт 1500, до ±32 за матч</p></div></div>';
+  h += '<div class="search-row rsearch"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее']].map(([v, l]) => '<button class="' + (key === (v === 'a' ? 'avg' : 'r') ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  const regs = (d && d.regions) || S.rregs || [];
+  if (d) S.rregs = d.regions;
+  h += '<select class="inp" id="r-region" data-rregion="1" aria-label="Область"><option value="">Все регионы</option>' + regs.map(x => '<option value="' + esc(x.name) + '"' + (x.name === reg ? ' selected' : '') + '>' + esc(x.name) + ' · ' + x.n + '</option>').join('') + (reg && !regs.some(x => x.name === reg) ? '<option value="' + esc(reg) + '" selected>' + esc(reg) + '</option>' : '') + '</select>';
+  h += '<input class="inp" id="r-search" data-rsearch="1" placeholder="Игрок, город или область" value="' + esc(S.rsearch) + '" aria-label="Поиск: игрок, город или область"></div>';
+  if (wait) return h + wait;
+  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl rtbl k-' + key + '"><thead><tr><th>№</th><th>Игрок</th><th>Рейтинг</th><th>Ср.</th><th>Матчей</th></tr></thead><tbody>';
+  if (!d.rows.length) h += '<tr><td colspan="5" class="meta" style="text-align:center;padding:18px">Игроки не найдены' + (S.rsearch || reg ? ' — попробуйте другой город или область' : '') + '.</td></tr>';
+  d.rows.forEach(x => {
+    h += '<tr class="' + (x.id === ME ? 'me' : '') + '"><td>' + (x.rank <= 3 ? plcBadge(x.rank, x.rank, true) : '<span class="num muted">' + x.rank + '</span>') + '</td><td><div class="who">' + avatar(x.id) + '<div>' + pid(x.id) + '<span class="meta">' + esc(placeTxt(x.city, x.region)) + '</span></div></div></td><td class="num" style="font-size:18px' + (key === 'r' ? ';font-weight:600' : '') + '">' + x.r + '</td><td class="num"' + (key === 'avg' ? ' style="font-weight:600"' : '') + '>' + (x.avg ? x.avg.toFixed(1) : '—') + '</td><td>' + x.n + '</td></tr>';
+  });
+  h += '</tbody></table></div>' + pagerHTML(S.rpage || 0, d.total, R_PAGE, 'rpage');
+  if (ME && !(RATING[ME] && RATING[ME].n) && !SRV) h += '<p class="meta">Сыграйте турнир, чтобы попасть в рейтинг.</p>';
+  return h;
+}
 function ratingView() {
   if (SRV) return ratingViewS();
-  const cities = [...new Set(db.players.map(p => p.city).filter(Boolean))];
-  const sq = (S.rsearch || '').trim().toLowerCase();
-  const rows = db.players.filter(p => {
-    if (RATING[p.id].n <= 0) return false;
-    if (S.rcity !== 'all' && p.city !== S.rcity) return false;
+  regionsLoad();
+  const sq = (S.rsearch || '').trim().toLowerCase(), cq = normCity(sq), regs = regionsLike(sq), reg = S.rregion || '';
+  const all = db.players.filter(p => RATING[p.id].n > 0);
+  const rows = all.filter(p => {
+    if (reg && regionOf(p.city) !== reg) return false;
     if (!sq) return true;
-    return p.name.toLowerCase().includes(sq) ||
-      (p.handle && p.handle.toLowerCase().includes(sq.replace(/^@/, ''))) ||
-      (p.code && p.code.toLowerCase().includes(sq.replace(/^#/, '')));
-  }).map(p => {
-    const s = pStats(p.id, true);
-    return { p, r: RATING[p.id].r, avg: s.avg || 0, n: RATING[p.id].n };
-  });
+    return p.name.toLowerCase().includes(sq) || (p.handle && p.handle.toLowerCase().includes(sq.replace(/^@/, ''))) ||
+      (p.code && p.code.toLowerCase().includes(sq.replace(/^#/, ''))) || normCity(p.city).includes(cq) || regs.includes(regionOf(p.city));
+  }).map(p => ({ id: p.id, city: p.city, region: regionOf(p.city), r: RATING[p.id].r, avg: pStats(p.id, true).avg || 0, n: RATING[p.id].n }));
   const key = S.rtab === 'a' ? 'avg' : 'r';
   rows.sort((a, b) => b[key] - a[key] || b.r - a.r);
-  let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по турнирным матчам: старт 1500, до ±32 за матч</p></div></div>';
-  h += '<div class="search-row"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее']].map(([v, l]) => '<button class="' + (key === (v === 'a' ? 'avg' : 'r') ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  h += '<input class="inp" id="r-search" data-rsearch="1" placeholder="Поиск игрока" value="' + esc(S.rsearch) + '" aria-label="Поиск игрока"></div>';
-  if (cities.length > 1) h += '<div class="fchips">' + [['all', 'Все города']].concat(cities.map(c => [c, c])).map(([v, l]) => '<button class="fchip' + (S.rcity === v ? ' on' : '') + '" data-act="rcity" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>';
-  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl rtbl"><thead><tr><th>№</th><th>Игрок</th><th>Рейтинг</th><th>Ср.</th><th>Матчей</th></tr></thead><tbody>';
-  if (!rows.length) h += '<tr><td colspan="5" class="meta" style="text-align:center;padding:18px">Игроки не найдены.</td></tr>';
-  rows.forEach((x, i) => {
-    h += '<tr class="' + (x.p.id === ME ? 'me' : '') + '"><td>' + (i < 3 ? plcBadge(i + 1, i + 1, true) : '<span class="num muted">' + (i + 1) + '</span>') + '</td><td><div class="who">' + avatar(x.p.id) + '<div>' + pid(x.p.id) + '<span class="meta">' + esc(x.p.city) + '</span></div></div></td><td class="num" style="font-size:18px' + (key === 'r' ? ';font-weight:600' : '') + '">' + x.r + '</td><td class="num"' + (key === 'avg' ? ' style="font-weight:600"' : '') + '>' + (x.avg ? x.avg.toFixed(1) : '—') + '</td><td>' + x.n + '</td></tr>';
-  });
-  h += '</tbody></table></div>';
-  if (ME && !(RATING[ME] && RATING[ME].n)) h += '<p class="meta">Сыграйте турнир, чтобы попасть в рейтинг.</p>';
-  return h;
+  rows.forEach((x, i) => { x.rank = i + 1; });
+  const cnt = new Map();
+  all.forEach(p => { const r = regionOf(p.city); if (r) cnt.set(r, (cnt.get(r) || 0) + 1); });
+  const page = Math.min(S.rpage || 0, Math.max(0, Math.ceil(rows.length / R_PAGE) - 1));
+  S.rpage = page;
+  return ratingHTML({ rows: rows.slice(page * R_PAGE, (page + 1) * R_PAGE), total: rows.length, regions: [...cnt].sort((a, b) => b[1] - a[1]).map(([name, n]) => ({ name, n })) });
 }
 
 let CHART = null;
@@ -2807,19 +2878,37 @@ function profileView(id) {
 }
 // p — игрок, s — статистика выбранных матчей (с ms — матчами), all — по всем, tours — [{ id, name, start, badge }]
 // ax — { best, wins } для достижений
+// правка своего профиля: имя, город (подсказки городов), клуб — из зарегистрированных клубов
+function profileForm(p) {
+  regionsLoad();
+  const cities = REG ? REG.list.flatMap(r => r[1]).sort((a, b) => a.localeCompare(b, 'ru')) : [];
+  let club = '<input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб">';
+  if (SRV) {
+    const e = lz('clubs:all', () => Api.get('/api/clubs'), 120000), list = e.data ? e.data.clubs : [];
+    club = '<select class="inp" id="me-club" aria-label="Клуб"><option value="">Без клуба</option>' + list.map(c => '<option value="' + esc(c.name) + '"' + (c.name === p.club ? ' selected' : '') + '>' + esc(c.name) + (c.city ? ' · ' + esc(c.city) : '') + '</option>').join('') +
+      (p.club && !list.some(c => c.name === p.club) ? '<option value="' + esc(p.club) + '" selected>' + esc(p.club) + '</option>' : '') + '</select>';
+  }
+  let h = '<div class="pedit"><label class="label" for="me-name">Имя и фамилия</label><input class="inp" id="me-name" maxlength="32" value="' + esc(p.name) + '" placeholder="Имя и фамилия" autocomplete="name">';
+  h += '<div class="nrow"><div class="field"><label class="label" for="me-city">Город</label><input class="inp" id="me-city" maxlength="40" list="city-list" value="' + esc(p.city || '') + '" placeholder="Например, Новоуральск" autocomplete="address-level2"></div>';
+  h += '<div class="field"><label class="label" for="me-club">Клуб</label>' + club + '</div></div><datalist id="city-list">' + cities.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
+  if (SRV) h += '<span class="meta">Клуб — из зарегистрированных в Oche. Нет вашего — его ведущий регистрирует клуб в профиле. Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button>.</span>';
+  return h + '<div class="row"><button class="btn sm" data-act="savename">Сохранить</button><button class="ghost sm" data-act="cancelname">Отмена</button></div></div>';
+}
 function profileHTML(p, s, all, tours, ax) {
   const id = p.id, isMe = id === ME, canPhoto = canEditPlayer(p);
   let h = '<div class="phero"><div style="display:grid;gap:6px;justify-items:center">' + avatar(id, 'lg') + (canPhoto ? '<button class="ghost sm" data-act="photo-pick" data-v="avatar|' + id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button>' + (p.photo ? '<button class="ghost sm dng" data-act="photo-del-av" data-v="' + id + '">Убрать</button>' : '') : '') + '</div><div style="min-width:0">';
-  if (isMe && S.editName) {
-    h += '<div style="display:grid;gap:8px;max-width:420px"><input class="inp" id="me-name" maxlength="24" value="' + esc(p.name) + '" placeholder="Имя и фамилия" aria-label="Ваше имя"><div class="nrow"><input class="inp" id="me-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="me-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (SRV ? (Api.perm('pro') ? '<input class="inp" id="me-walkon" maxlength="60" value="' + esc(p.walkon || '') + '" placeholder="Выходная музыка: исполнитель — трек" aria-label="Выходная музыка">' : '<span class="meta">Выходная музыка на табло — в <button class="lnk" data-act="go" data-v="plans">тарифе Pro</button></span>') : '') + (SRV ? '<span class="meta">Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button></span>' : '') + '<div style="display:flex;gap:8px"><button class="mini go" data-act="savename">Сохранить профиль</button><button class="mini" data-act="cancelname">Отмена</button></div></div>';
-  } else {
+  if (isMe && S.editName) h += profileForm(p);
+  else {
     h += '<h1>' + esc(p.name) + '</h1>';
+    const where = placeTxt(p.city, regionOf(p.city));
+    if (where || p.club) h += '<div class="meta">' + [where, p.club ? (/клуб/i.test(p.club) ? p.club : 'клуб ' + p.club) : ''].filter(Boolean).map(esc).join(' · ') + '</div>';
+    if (p.title) h += '<div class="ptitle" title="Звание подтверждено по документу">' + esc(TITLE_FULL[p.title] || p.title) + ' <span class="tchip">✓ подтверждено</span></div>';
+    if (p.walkon) h += '<div class="meta walkon" title="Выходная музыка — играет на табло, когда игрок выходит на матч">♪ ' + esc(p.walkon) + '</div>';
+    if (p.code) h += '<div class="row"><button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b class="sel">' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
+    const rated = RATING[id] && RATING[id].n;
+    h += '<div class="prate">' + (rated ? '<b>' + RATING[id].r + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге · ' : '') : '<span class="meta">В рейтинге — после первого турнирного матча · ') + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
+    if (isMe) h += '<div class="row"><button class="mini" data-act="editname">Изменить профиль</button></div>';
   }
-  if (!(isMe && S.editName) && p.walkon) h += '<div class="meta walkon" title="Выходная музыка — играет на табло, когда игрок выходит на матч">♪ ' + esc(p.walkon) + '</div>';
-  if (!(isMe && S.editName) && p.title) h += '<div class="ptitle" title="Звание подтверждено по документу">' + esc(TITLE_FULL[p.title] || p.title) + ' <span class="tchip">✓ подтверждено</span></div>';
-  if (!(isMe && S.editName)) h += '<div class="row meta"><span>' + esc(p.city) + (p.club ? ' · ' + esc(p.club) : '') + '</span>' + (isMe ? '<button class="mini" data-act="editname">Изменить профиль</button>' : '') + '</div>';
-  if (!(isMe && S.editName) && p.code) h += '<div class="row">' + '<button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b>' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
-  if (!(isMe && S.editName)) h += '<div class="prate"><b>' + (RATING[id] && RATING[id].n ? RATING[id].r : '—') + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге Oche' : 'нет в рейтинге') + ' · ' + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
   h += '</div></div>';
   if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
   h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -2837,18 +2926,20 @@ function profileHTML(p, s, all, tours, ax) {
   if (ax && all.n) h += achHTML(Object.assign({ n: all.n, w: all.w, c180: all.c180 || 0, hco: all.hco || 0, bl: all.bl || 0 }, ax));
   if (SRV && isMe) h += proCard();
   else if (SRV && ME && Api.me) h += h2hCard(id);
-  h += '<div class="pgrid"><div class="sec"><span class="label">Последние матчи</span><div class="list">';
+  // пустой профиль: без двух пустых списков подряд
+  const empty = !s.ms.length && !tours.length;
+  if (!empty) h += '<div class="pgrid"><div class="sec"><span class="label">Последние матчи</span><div class="list">';
   const shown = S.pMore ? s.ms : s.ms.slice(0, 6);
   const mrow = m => {
     const i = m.pl.findIndex(l => l.id === id), me = m.pl[i], opp = m.pl.filter((x, j) => j !== i), won = m.w === i;
     const ctx = matchCtx(m) + ' · ' + fmtDate(m.t);
     return '<div class="prw" role="button" tabindex="0" data-act="minfo" data-v="' + m.id + '"><span class="wl' + (won ? ' w' : '') + '">' + (won ? 'В' : 'П') + '</span><span class="num">' + [me].concat(opp).map(l => l.legs).join(':') + '</span><div style="display:grid;min-width:0"><span class="ell">' + esc(opp.map(nameOf).join(', ')) + '</span><span class="meta ell">' + esc(ctx) + '</span></div><span class="meta">' + (me.darts ? 'ср. ' + lAvg(me) : '') + '</span></div>';
   };
-  h += shown.length ? shown.map(mrow).join('') : '<div class="note-box">Нет матчей.</div>';
-  h += '</div>' + (!S.pMore && s.ms.length > 6 ? '<button class="ghost more" data-act="pmore">Показать все ' + s.ms.length + '</button>' : '') + '</div>';
-  h += '<div class="sec"><span class="label">Турниры</span>' + (tours.length ? '<div class="list">' + tours.map(t => '<div class="trow"><div style="display:grid;min-width:0"><button class="lnk" data-act="go" data-v="t.' + t.id + '" style="text-align:left">' + esc(t.name) + '</button><span class="meta">' + fmtDate(t.start) + '</span></div>' + t.badge + '</div>').join('') + '</div>' : '<div class="note-box">Турниров пока нет.</div>');
+  if (!empty) h += shown.length ? shown.map(mrow).join('') : '<div class="note-box">Нет матчей.</div>';
+  if (!empty) h += '</div>' + (!S.pMore && s.ms.length > 6 ? '<button class="ghost more" data-act="pmore">Показать все ' + s.ms.length + '</button>' : '') + '</div>';
+  if (!empty) h += '<div class="sec"><span class="label">Турниры</span>' + (tours.length ? '<div class="list">' + tours.map(t => '<div class="trow"><div style="display:grid;min-width:0"><button class="lnk" data-act="go" data-v="t.' + t.id + '" style="text-align:left">' + esc(t.name) + '</button><span class="meta">' + fmtDate(t.start) + '</span></div>' + t.badge + '</div>').join('') + '</div>' : '<div class="note-box">Турниров пока нет.</div>');
+  if (!empty) h += '</div></div>';
   if (isMe && SRV) h += meCard();
-  h += '</div></div>';
   return h;
 }
 function drawChart() {
@@ -3905,6 +3996,7 @@ function mailForm(L, c, dis) {
     h += '<div class="row2"><button class="ghost sm" data-act="mail-back">Другая почта</button><button class="ghost sm" data-act="mail-resend"' + dis + '>Прислать код ещё раз</button></div>';
     return h;
   }
+  if (L.link === 'email' && !c.email) return h + '<p class="meta">Почта и пароль — вход на любом устройстве. Подтвердить почту кодом можно будет, когда на сервере включат письма.</p>' + mailInp + (Api.me && Api.me.pass ? '' : inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"')) + '<button class="btn" data-act="mail-set"' + dis + '>Сохранить почту</button>';
   if (L.link === 'email') return h + '<p class="meta">Пришлём код на почту. Подтверждённая почта — вход по паролю и восстановление пароля, если забудете.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>';
   if (L.mode === 'reg') {
     h += inp('mail-name', 'name', 'text', 'Имя и фамилия', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
@@ -3931,6 +4023,11 @@ function mailAct(a) {
     L.name = val('mail-name'); L.city = val('mail-city'); L.email = val('mail-email'); L.regPass = pass();
     if (!L.name || !L.email) { L.err = 'Введите имя и почту.'; return render(); }
     return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: pass() }), r => r.player ? loggedIn('Аккаунт создан. Добро пожаловать!') : toCode(r));
+  }
+  if (a === 'set') {
+    L.email = val('mail-email');
+    if (!L.email) { L.err = 'Введите почту.'; return render(); }
+    return loginDo(Api.put('/api/me/email', { email: L.email, password: pass() || undefined }), r => { Api.setMe(r); svPlayer(r.player); closeModals(); toast('Почта сохранена — входите по почте и паролю.'); });
   }
   if (a === 'send' || a === 'resend') {
     if (a === 'send') L.email = val('mail-email');
@@ -3986,19 +4083,24 @@ function loginAct(a) {
 function meCard() {
   const me = Api.me, c = Api.config || {};
   if (!me) return '';
-  const row = (name, val, act) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + act + '</div>';
-  let h = '<div class="card sec"><span class="label">Вход в аккаунт</span><div>';
-  h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? (me.vk ? '<button class="ghost sm" data-act="unlink" data-v="phone">Отвязать</button>' : '') : c.phone ? '<button class="mini" data-act="link-phone">Привязать</button>' : '');
-  h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone || (me.email && me.pass) ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
+  const row = (name, val, act) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + (act ? '<span class="lrow-a">' + act + '</span>' : '') + '</div>';
   const ways = n => [me.phone, me.vk, me.email && me.pass, me.login].filter(Boolean).length > n;
-  h += row('Почта', me.email ? esc(me.email) + (me.emailOk ? ' · подтверждена' : ' · не подтверждена') : 'не привязана',
-    (me.email && !me.emailOk && c.email ? '<button class="mini" data-act="link-email">Подтвердить</button>' : !me.email && c.email ? '<button class="mini" data-act="link-email">Привязать</button>' : '') + (me.email && ways(1) ? '<button class="ghost sm" data-act="unlink" data-v="email">Отвязать</button>' : ''));
+  const off = (k, v) => ways(1) ? '<button class="ghost sm" data-act="unlink" data-v="' + k + '">Отвязать</button>' : '';
+  let h = '<div class="card sec acc-c"><span class="label">Вход в аккаунт</span><div>';
+  // почта — всегда: без писем на сервере привязывается сразу, подтверждается кодом, когда письма заработают
+  h += row('Почта', me.email ? esc(me.email) + (me.emailOk ? ' · <span class="ok">подтверждена</span>' : ' · не подтверждена') : 'не привязана',
+    (!me.email ? '<button class="mini go" data-act="link-email">Привязать</button>' : !me.emailOk && c.email ? '<button class="mini go" data-act="link-email">Подтвердить</button>' : '') + (me.email ? off('email') : ''));
   if (me.email && !me.login) h += row('Пароль', me.pass ? 'задан — вход по почте и паролю' : 'не задан', '<button class="mini" data-act="pass-ed">' + (me.pass ? 'Сменить' : 'Задать') + '</button>');
   if (S.passEd && me.email && !me.login) h += '<div class="panel">' + (me.pass ? '<input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль">' : '') + '<input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль"><input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="pass-set">Сохранить пароль</button></div>';
-  h += '</div>' + (!ways(0) ? '<p class="meta">Привяжите почту, телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
-  h += titleCard() + planCard() + clubCard();
-  if (anyAdm()) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
-  return h;
+  // телефон и VK — только если настроены на сервере или уже привязаны
+  if (c.phone || me.phone) h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? off('phone') : '<button class="mini" data-act="link-phone">Привязать</button>');
+  if (c.vk || me.vk) h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? off('vk') : '<button class="mini" data-act="link-vk">Привязать</button>');
+  h += '</div>';
+  if (me.email && !me.emailOk && !c.email) h += '<p class="meta">Подтвердить почту можно будет, когда на сервере включат отправку писем. Входить по почте и паролю можно уже сейчас.</p>';
+  if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
+  if (anyAdm() && (!c.vk || !c.email)) h += '<p class="meta">' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(' и ') + ' пока не настроены на сервере — см. docs/server.md.</p>';
+  h += '</div>';
+  return '<div class="acc-grid">' + h + titleCard() + planCard() + clubCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
 }
 function clubCard() {
   const e = lz('clubs:mine', () => Api.get('/api/clubs/mine'), 60000);
@@ -4178,6 +4280,8 @@ function proCard() {
   }
   const per = S.proP || '90', e = lz('pro:' + per, () => Api.get('/api/me/pro?period=' + per), 60000);
   let h = '<div class="card sec procard"><div class="tstat"><span class="label">Статистика Pro</span><a class="mini" href="' + esc(Api.base) + '/api/me/export.csv" download>Выгрузить в Excel</a></div>';
+  // выходная музыка — играет на табло, когда игрок выходит на матч
+  h += '<div class="walk-ed"><label class="label" for="me-walkon">Выходная музыка на табло</label><div class="nrow"><input class="inp" id="me-walkon" maxlength="60" value="' + esc((Api.me && Api.me.walkon) || '') + '" placeholder="Исполнитель — трек"><button class="mini" data-act="walkon-save">Сохранить</button></div></div>';
   h += '<div class="seg2">' + [['30', '30 дней'], ['90', '90 дней'], ['365', 'Год'], ['all', 'Всё время']].map(([v, l]) => '<button class="' + (per === v ? 'on' : '') + '" data-act="pro-p" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const st = svState(e, 'статистики');
   if (st) return h + st + '</div>';
@@ -4582,7 +4686,7 @@ function admRow(p) {
 }
 // карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
 const ACT_NAME = {
-  'login.password': 'вошёл по паролю', 'login.email': 'вошёл по почте и паролю', 'email.link': 'подтвердил почту', 'password.reset': 'задал новый пароль по письму', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
+  'login.password': 'вошёл по паролю', 'login.email': 'вошёл по почте и паролю', 'email.link': 'подтвердил почту', 'email.set': 'привязал почту (без подтверждения)', 'password.reset': 'задал новый пароль по письму', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
   'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
   'club.host_add': 'назначил ведущим', 'club.helper_add': 'добавил помощника клуба', 'club.helper_rm': 'убрал помощника клуба', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
@@ -5335,23 +5439,12 @@ function toursViewS() {
   return h + (list.length ? '<div class="tgrid">' + list.map(tourCardS).join('') + '</div>' : '<div class="note-box">Турниров нет.</div>');
 }
 function ratingViewS() {
-  const key = S.rtab === 'a' ? 'avg' : 'r', q = (S.rq || '').trim(), city = S.rcity !== 'all' ? S.rcity : '';
-  const e = lz('rating:' + key + '|' + city + '|' + q, () => Api.get('/api/rating?limit=200&sort=' + key + (city ? '&city=' + encodeURIComponent(city) : '') + (q ? '&q=' + encodeURIComponent(q) : '')));
-  let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по турнирным матчам: старт 1500, до ±32 за матч</p></div></div>';
-  h += '<div class="search-row"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее']].map(([v, l]) => '<button class="' + (key === (v === 'a' ? 'avg' : 'r') ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  h += '<input class="inp" id="r-search" data-rsearch="1" placeholder="Поиск игрока" value="' + esc(S.rsearch) + '" aria-label="Поиск игрока"></div>';
-  const cities = e.data ? e.data.cities : SV.cities || [];
-  if (e.data) SV.cities = e.data.cities;
-  if (cities.length > 1) h += '<div class="fchips">' + [['all', 'Все города']].concat(cities.map(c => [c, c])).map(([v, l]) => '<button class="fchip' + (S.rcity === v ? ' on' : '') + '" data-act="rcity" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>';
+  const key = S.rtab === 'a' ? 'avg' : 'r', q = (S.rq || '').trim(), reg = S.rregion || '', page = S.rpage || 0;
+  const e = lz('rating:' + key + '|' + reg + '|' + q + '|' + page, () => Api.get('/api/rating?limit=' + R_PAGE + '&offset=' + page * R_PAGE + '&sort=' + key + (reg ? '&region=' + encodeURIComponent(reg) : '') + (q ? '&q=' + encodeURIComponent(q) : '')));
   const st = svState(e, 'рейтинга');
-  if (st) return h + st;
-  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl rtbl"><thead><tr><th>№</th><th>Игрок</th><th>Рейтинг</th><th>Ср.</th><th>Матчей</th></tr></thead><tbody>';
-  if (!e.data.rows.length) h += '<tr><td colspan="5" class="meta" style="text-align:center;padding:18px">Игроки не найдены.</td></tr>';
-  e.data.rows.forEach((x, i) => {
-    svPlayer({ id: x.id, name: x.name, city: x.city, club: x.club, r: x.r, n: x.n });
-    h += '<tr class="' + (x.id === ME ? 'me' : '') + '"><td>' + (i < 3 ? plcBadge(i + 1, i + 1, true) : '<span class="num muted">' + (i + 1) + '</span>') + '</td><td><div class="who">' + avatar(x.id) + '<div>' + pid(x.id) + '<span class="meta">' + esc(x.city) + '</span></div></div></td><td class="num" style="font-size:18px' + (key === 'r' ? ';font-weight:600' : '') + '">' + x.r + '</td><td class="num"' + (key === 'avg' ? ' style="font-weight:600"' : '') + '>' + (x.avg ? x.avg.toFixed(1) : '—') + '</td><td>' + x.n + '</td></tr>';
-  });
-  return h + '</tbody></table></div>';
+  if (st) return ratingHTML(null, st);
+  e.data.rows.forEach(x => svPlayer({ id: x.id, name: x.name, city: x.city, club: x.club, r: x.r, n: x.n }));
+  return ratingHTML(e.data);
 }
 // профиль игрока с сервера: статистика готовая, матчи — карточки
 function profileViewS(id) {
@@ -5539,6 +5632,7 @@ document.addEventListener('click', e => {
     case 'mail-login': mailAct('login'); break;
     case 'mail-reg': mailAct('reg'); break;
     case 'mail-send': mailAct('send'); break;
+    case 'mail-set': mailAct('set'); break;
     case 'mail-resend': mailAct('resend'); break;
     case 'mail-verify': mailAct('verify'); break;
     case 'mail-back': if (S.login) { Object.assign(S.login, { step: '', err: '', otp: '', dev: '' }); render(); } break;
@@ -5828,18 +5922,19 @@ document.addEventListener('click', e => {
     case 'nt-clear': S.nt.sel = []; S.nt.err = ''; render(); break;
     case 'nt-addp': addNtPlayer(); break;
     case 'nt-create': createTour(); break;
-    case 'rtab': S.rtab = v; render(); break;
-    case 'rcity': S.rcity = v; render(); break;
+    case 'rtab': S.rtab = v; S.rpage = 0; render(); break;
+    case 'rpage': S.rpage = Math.max(0, +v || 0); render(); toTop(); break;
     case 'pf': S.pf = v; S.pMore = false; render(); break;
     case 'pmore': S.pMore = true; render(); break;
     case 'editname': S.editName = true; render(); { const el = $('me-name'); if (el) el.focus(); } break;
     case 'cancelname': S.editName = false; render(); break;
+    case 'walkon-save': { const el = $('me-walkon'); svDo(Api.patch('/api/me', { walkon: el ? el.value.trim() : '' }), r => { Api.setMe(r); svPlayer(r.player); svStale('player:'); toast('Выходная музыка сохранена.'); }); break; }
     case 'savename': {
       const val = k => { const el = $('me-' + k); return el ? el.value.trim() : null; };
-      const nv = val('name'), city = val('city'), club = val('club'), walkon = val('walkon');
+      const nv = val('name'), city = val('city'), club = val('club');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', Object.assign({ name: nv, city: city || '', club: club || '' }, walkon != null ? { walkon } : {})), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;
@@ -5995,11 +6090,11 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
     S.rsearch = t.value;
-    clearTimeout(S.rqT); S.rqT = setTimeout(() => { S.rq = S.rsearch; render(); }, 300);
+    clearTimeout(S.rqT); S.rqT = setTimeout(() => { S.rq = S.rsearch; S.rpage = 0; render(); }, 300);
     return;
   }
   if (t.dataset && t.dataset.rsearch) {
-    S.rsearch = t.value;
+    S.rsearch = t.value; S.rpage = 0;
     const pos = t.selectionStart;
     render();
     const el = $('r-search');
@@ -6008,6 +6103,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset && t.dataset.rregion) { S.rregion = t.value; S.rpage = 0; render(); return; }
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
     svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + roleName(role) + '.'); });

@@ -111,10 +111,8 @@ cd "$APP"
 sudo -u oche npm ci --omit=dev --no-audit --no-fund
 sudo -u oche bash -c "set -a; . $ENV_FILE; set +a; node db/migrate.js"
 
+# демо-данные на сервер — только по DEMO=1: посмотреть демо можно в самом приложении (Настройки → «Демо в браузере»)
 DEMO="${DEMO:-}"
-if [[ -z $DEMO && -n $TTY && -z $DOMAIN ]]; then
-  [[ $(ask "Заполнить демо-данными: игроки, турниры, матчи — чтобы было что посмотреть? [y/N] ") =~ ^[yYдД] ]] && DEMO=1
-fi
 if [[ $DEMO == 1 ]]; then
   sudo -u oche bash -c "set -a; . $ENV_FILE; set +a; node db/seed.js"
 fi
@@ -191,5 +189,6 @@ if [[ -z $DOMAIN ]]; then
   echo "Когда будет домен: DOMAIN=ваш.домен EMAIL=почта bash $0"
 fi
 [[ $has != 0 ]] || echo "Администратор: cd $APP && sudo -u oche bash -c 'set -a; . $ENV_FILE; set +a; node tools/admin.js new \"Имя Фамилия\" --login логин'"
+echo "Автообновление с GitHub: bash $APP/deploy/autoupdate.sh on"
 grep -q '^SMTP_HOST=.\+' "$ENV_FILE" || echo "Почта для кодов регистрации: bash $APP/deploy/set.sh SMTP_HOST=smtp.yandex.ru SMTP_USER=ящик@yandex.ru SMTP_PASS=пароль_приложения"
 echo "Обновить код: bash $APP/deploy/deploy.sh"

@@ -104,7 +104,11 @@ function routes(app) {
     const me = needPlayer(req), b = req.body || {}, set = {};
     if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
     if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
-    if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
+    // клуб — только из зарегистрированных (открытых); прежнее значение можно оставить как есть
+    if (b.club !== undefined && b.club !== (me.club || '')) {
+      set.club = V.optStr(b.club, 'club', 40);
+      if (set.club && !await one(pool, `SELECT 1 FROM clubs WHERE status = 'active' AND name = $1`, [set.club])) throw E.bad('Клуб выбирается из зарегистрированных в Oche', 'club');
+    }
     // выходная музыка на табло — в тарифе Pro
     if (b.walkon !== undefined && b.walkon !== (me.walkon || '')) {
       if (!can(me, 'pro')) throw E.forbidden('Выходная музыка — в тарифе Pro');

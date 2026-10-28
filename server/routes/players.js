@@ -8,6 +8,7 @@ const { matchCards } = require('../cards');
 const { TOUR_SQL, loadTours, tourCard } = require('../tour');
 
 const lim = (v, def, max) => Math.min(max, Math.max(1, +v || def));
+const R = require('../regions');
 const before = v => v == null ? Number.MAX_SAFE_INTEGER : Math.max(0, +v || 0);
 // поиск как на странице: имя, @handle, код OCH-1003 или #1003
 function searchSql(q, arg, alias) {
@@ -65,23 +66,34 @@ module.exports = async function (app) {
     return { matches: await playerMatches(pool, req.params.id, scope, before(req.query.before), lim(req.query.limit, 50, 100)) };
   });
 
+  // справочник «город → область»: фильтр рейтинга и подсказки городов в профиле
+  app.get('/api/regions', async (req, reply) => { reply.header('Cache-Control', 'public, max-age=86400'); return { regions: R.REGIONS }; });
+
   app.get('/api/rating', async req => {
     const q = req.query, args = [], arg = v => { args.push(v); return '$' + args.length; };
     const sort = q.sort == null ? 'r' : V.oneOf(q.sort, 'sort', ['r', 'avg']);
-    const where = ['p.rated > 0'];
+    const where = ['p.rated > 0'], city = R.citySql('p.city');
     if (q.city) where.push('p.city = ' + arg(String(q.city)));
+    // область: её города; поиск — по имени, ID, городу или области («свердл», «екатеринбург»)
+    if (q.region) where.push(city + ' = ANY(' + arg(R.citiesOf(String(q.region))) + ')');
     const s = searchSql(q.q || '', arg, 'p');
-    if (s) where.push(s);
+    if (s) {
+      const qs = R.norm(q.q), regs = R.findRegions(q.q).flatMap(R.citiesOf);
+      where.push('(' + s + ' OR position(' + arg(qs) + ' in ' + city + ') > 0' + (regs.length ? ' OR ' + city + ' = ANY(' + arg(regs) + ')' : '') + ')');
+    }
     const limit = lim(q.limit, 50, 200), offset = Math.max(0, +q.offset || 0);
     const avg = 'CASE WHEN s.darts > 0 THEN s.pts::float8 / s.darts * 3 ELSE 0 END';
     const from = ` FROM players p LEFT JOIN player_stats s ON s.player_id = p.id AND s.scope = 'tour' WHERE ${where.join(' AND ')}`;
     const total = (await one(pool, 'SELECT count(*) AS n' + from, args)).n;
     const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.photo, p.rating, p.rated, ${avg} AS avg` + from +
       ` ORDER BY ${sort === 'avg' ? avg + ' DESC, p.rating DESC' : 'p.rating DESC'}, p.id LIMIT ${limit} OFFSET ${offset}`, args);
-    const cities = (await all(pool, `SELECT DISTINCT city FROM players WHERE rated > 0 AND city <> '' ORDER BY city`)).map(x => x.city);
+    const cityRows = await all(pool, `SELECT city, count(*)::int AS n FROM players WHERE rated > 0 AND city <> '' GROUP BY city ORDER BY city`);
+    // области, где есть игроки в рейтинге, — для фильтра; по убыванию числа игроков
+    const regs = new Map();
+    cityRows.forEach(x => { const r = R.regionOf(x.city); if (r) regs.set(r, (regs.get(r) || 0) + x.n); });
     return {
-      total, cities,
-      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, club: x.club, photo: x.photo || null, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
+      total, cities: cityRows.map(x => x.city), regions: [...regs].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([name, n]) => ({ name, n })),
+      rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, region: R.regionOf(x.city), club: x.club, photo: x.photo || null, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
     };
   });
 

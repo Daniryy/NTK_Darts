@@ -152,7 +152,18 @@ test('почта на сервере не настроена: регистрац
     assert.equal(ok(await call(u, 'GET', '/api/me')).player.name, 'Без Письма');
     ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'nomail@mail.ru', password: 'darts-2026' }));
     err(await call(anon(), 'POST', '/api/auth/email/send', { email: 'nomail@mail.ru', purpose: 'reset' }), 404);
+    // привязать почту к аккаунту без писем: сразу, неподтверждённой; без пароля — нужно задать
+    const P = await login('p12');
+    err(await call(P, 'PUT', '/api/me/email', { email: 'p12@mail.ru' }), 400);
+    err(await call(P, 'PUT', '/api/me/email', { email: 'nomail@mail.ru', password: 'darts-2026' }), 409, 'email_taken');
+    const me = ok(await call(P, 'PUT', '/api/me/email', { email: 'P12@mail.ru', password: 'p12-darts-26' }));
+    assert.equal(me.player.email, 'p12@mail.ru'); assert.equal(me.player.emailOk, false); assert.equal(me.player.pass, true);
+    ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'p12@mail.ru', password: 'p12-darts-26' }));
+    // пароль уже есть — второй раз не нужен
+    ok(await call(P, 'PUT', '/api/me/email', { email: 'p12.new@mail.ru' }));
   } finally { config.mail.provider = was; }
+  // письма настроены — только через код
+  err(await call(await login('p13'), 'PUT', '/api/me/email', { email: 'p13@mail.ru', password: 'darts-2026' }), 409, 'need_code');
 });
 
 test('код от ведущего: аккаунт с почтой забирает её в аккаунт ведущего', async () => {

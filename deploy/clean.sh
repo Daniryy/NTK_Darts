@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Убрать демо-данные с сервера (от root): bash /srv/oche/app/deploy/clean.sh
+# Удаляются все турниры, матчи, клубы, баннеры и игроки, которые не могут войти сами.
+# Остаются аккаунты с логином, почтой, телефоном или VK. Сначала делается копия базы.
+set -euo pipefail
+APP=/srv/oche/app
+[[ $EUID -eq 0 ]] || { echo "Запустите от root: sudo bash $0"; exit 1; }
+echo "Будут удалены ВСЕ турниры и матчи, клубы, баннеры и игроки без входа (демо-данные)."
+echo "Останутся аккаунты с логином, почтой, телефоном или VK; их рейтинг обнулится."
+read -r -p "Продолжить? Введите ДА: " yes
+[[ $yes == "ДА" || $yes == "да" ]] || { echo "Отменено."; exit 1; }
+echo "== копия базы"
+sudo -u oche "$APP/deploy/backup.sh"
+echo "== очистка"
+cd "$APP"
+sudo -u oche bash -c "set -a; . /etc/oche.env; set +a; node tools/clean.js --yes"
+systemctl restart oche
+echo "Готово. Вернуть как было: pg_restore из /var/backups/oche (см. deploy/backup.sh)."
