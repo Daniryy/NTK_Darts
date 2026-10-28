@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
-# Ежедневная копия базы (cron из setup.sh). Хранятся 14 дней.
-# Восстановление: pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/oche/oche-ДАТА.dump
+# Резервные копии (cron из setup.sh, каждую ночь в 3:30):
+#   база (игроки, рейтинг, матчи, тарифы, журнал) — каждую ночь, хранятся 14 дней (весит килобайты);
+#   фото и документы заявок на звания — раз в неделю (в воскресенье), хранятся 3 последние.
+#   backup.sh --full — сразу всё: база, фото и документы (перед очисткой сервера).
+# Восстановление базы: pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/oche/oche-ДАТА.dump
+# Фото: tar -xzf /var/backups/oche/uploads-ДАТА.tgz -C /srv/oche
 set -euo pipefail
-set -a; . /etc/oche.env; set +a
-DIR=/var/backups/oche
-FILE="$DIR/oche-$(date +%Y%m%d-%H%M).dump"
+set -a; . "${OCHE_ENV:-/etc/oche.env}"; set +a
+DIR=${BACKUP_DIR:-/var/backups/oche}
+NOW=$(date +%Y%m%d-%H%M)
+FILE="$DIR/oche-$NOW.dump"
+FULL=0
+[[ ${1:-} == --full || $(date +%u) == 7 ]] && FULL=1
+# оставить только N последних файлов по маске
+keep() { ls -1t "$DIR"/$1 2>/dev/null | tail -n +$(($2 + 1)) | xargs -r rm -f; }
 
 if pg_dump -Fc -f "$FILE" "$DATABASE_URL"; then
-  # фото — рядом с копией базы
-  UP=${UPLOAD_DIR:-/srv/oche/uploads}
-  if [[ -d $UP ]]; then tar -czf "$DIR/uploads-$(date +%Y%m%d-%H%M).tgz" -C "$(dirname "$UP")" "$(basename "$UP")"; fi
-  # документы заявок на звания
-  PR=${PRIVATE_DIR:-/srv/oche/private}
-  if [[ -d $PR ]]; then tar -czf "$DIR/private-$(date +%Y%m%d-%H%M).tgz" -C "$(dirname "$PR")" "$(basename "$PR")"; fi
-  find "$DIR" \( -name 'oche-*.dump' -o -name 'uploads-*.tgz' -o -name 'private-*.tgz' \) -mtime +14 -delete
-  echo "$(date '+%F %T') ok $FILE $(du -h "$FILE" | cut -f1)"
+  find "$DIR" -name 'oche-*.dump' -mtime +14 -delete
+  if [[ $FULL == 1 ]]; then
+    UP=${UPLOAD_DIR:-/srv/oche/uploads}
+    [[ -d $UP ]] && tar -czf "$DIR/uploads-$NOW.tgz" -C "$(dirname "$UP")" "$(basename "$UP")"
+    PR=${PRIVATE_DIR:-/srv/oche/private}
+    [[ -d $PR ]] && tar -czf "$DIR/private-$NOW.tgz" -C "$(dirname "$PR")" "$(basename "$PR")"
+    keep 'uploads-*.tgz' 3
+    keep 'private-*.tgz' 3
+  fi
+  echo "$(date '+%F %T') ok $FILE $(du -h "$FILE" | cut -f1)$([[ $FULL == 1 ]] && echo ' + фото и документы')"
 else
   rm -f "$FILE"
   "$(dirname "$0")/notify.sh" "Oche: резервная копия базы не создана"

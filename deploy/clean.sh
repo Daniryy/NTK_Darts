@@ -12,7 +12,7 @@ echo "Останутся аккаунты с логином, почтой, те�
 read -r -p "Продолжить? Введите yes (или ДА): " yes
 [[ ${yes,,} == "yes" || ${yes,,} == "y" || $yes == "ДА" || $yes == "да" ]] || { echo "Отменено."; exit 1; }
 echo "== копия базы"
-sudo -u oche "$APP/deploy/backup.sh"
+sudo -u oche "$APP/deploy/backup.sh" --full
 echo "== очистка"
 cd "$APP"
 sudo -u oche bash -c "set -a; . /etc/oche.env; set +a; node tools/clean.js --yes"

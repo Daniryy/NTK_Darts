@@ -169,7 +169,7 @@ location = /api.js { add_header Cache-Control "no-cache"; }
 ### Обслуживание
 - **Журнал:** `journalctl -u oche -f`.
 - **Состояние:** `systemctl status oche`, `curl localhost:3000/api/health`.
-- **Копии базы и фото:** `/var/backups/oche/`, каждую ночь в 3:30, хранятся 14 дней. Отчёт в `/var/log/oche-backup.log`.
+- **Копии:** `/var/backups/oche/`, в 3:30. База (игроки, рейтинг, матчи, тарифы, журнал) — каждую ночь, хранится 14 дней; фото и документы званий — по воскресеньям, хранятся 3 последние. Перед очисткой сервера — всё сразу (`backup.sh --full`). Отчёт в `/var/log/oche-backup.log`.
 - **Восстановление:**
   ```
   set -a; . /etc/oche.env; set +a
