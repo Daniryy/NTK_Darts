@@ -139,16 +139,17 @@ module.exports = async function (app) {
     return { subs: (await all(pool, SUB_SQL + ' WHERE pp.player_id = $1 ORDER BY pp.created_at DESC LIMIT 20', [req.params.id])).map(subJSON) };
   });
 
-  // тех. администратор: тарифы и скидки
+  // тарифы и скидки — право plans_edit (по умолчанию тех. администратор)
+  const needEdit = req => needPerm(req, 'plans_edit', 'Цены и состав тарифов меняет тех. администратор');
   app.post('/api/admin/plans', async (req, reply) => {
-    const me = needTech(req), f = planFields(req.body || {}, true);
+    const me = needEdit(req), f = planFields(req.body || {}, true);
     const row = await one(pool, 'INSERT INTO plans (name, price, days, role, about, active, sort, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
       [f.name, f.price, f.days, f.role, f.about, f.active !== false, f.sort || 0, Date.now()]);
     await audit(pool, me, 'plan.create', { id: row.id, name: row.name }, { price: row.price, days: row.days, role: row.role });
     return reply.code(201).send({ plan: planJSON(row, '') });
   });
   app.patch('/api/admin/plans/:id', async req => {
-    const me = needTech(req), f = planFields(req.body || {}, false), keys = Object.keys(f);
+    const me = needEdit(req), f = planFields(req.body || {}, false), keys = Object.keys(f);
     if (!keys.length) throw E.bad('Нечего менять');
     const row = await one(pool, `UPDATE plans SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [req.params.id, ...keys.map(k => f[k])]);
     if (!row) throw E.notFound('Тариф не найден');
@@ -156,7 +157,7 @@ module.exports = async function (app) {
     return { plan: planJSON(row, '') };
   });
   app.put('/api/admin/discounts', async req => {
-    const me = needTech(req), b = req.body || {};
+    const me = needEdit(req), b = req.body || {};
     const next = {};
     for (const [k] of P.DISC_KEYS) next[k] = b[k] == null ? 0 : V.int(b[k], k, 0, 90);
     await tx(async c => {

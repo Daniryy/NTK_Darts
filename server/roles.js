@@ -11,6 +11,7 @@ const atLeast = (p, role) => !!p && !p.blocked && (RANK[p.role] || 0) >= RANK[ro
 
 // [ключ, роль по умолчанию, что разрешает, свои роли, которым право дано по умолчанию]
 const PERMS = [
+  ['create_tour', 'player', 'Создавать свои турниры'],
   ['pro', 'host', 'Pro: расширенная статистика, личные встречи, выходная музыка, без рекламы', ['plus']],
   ['club_tour', 'host', 'Турниры от имени своего клуба (официальные)'],
   ['club_tools', 'host', 'Клуб: логотип и спонсоры на табло, помощники, взносы, статистика клуба'],
@@ -18,6 +19,7 @@ const PERMS = [
   ['accounts', 'host', 'Заводить аккаунты с кодом входа'],
   ['host_nums', 'host', 'Свои номера игроков'],
   ['players', 'admin', 'Править любых игроков, подтверждать, выдавать коды'],
+  ['contacts', 'admin', 'Видеть телефон и почту игроков (кроме своих аккаунтов)'],
   ['block', 'admin', 'Блокировать игроков'],
   ['give_host', 'admin', 'Выдавать роли игроков (ведущий, роли тарифов)'],
   ['clubs', 'admin', 'Подтверждать клубы и назначать ведущих'],
@@ -27,13 +29,17 @@ const PERMS = [
   ['stats', 'admin', 'Сводка'],
   ['titles', 'admin', 'Подтверждать и снимать звания'],
   ['audit', 'admin', 'Журнал действий'],
-  ['banners', 'tech', 'Баннеры']
+  ['banners', 'tech', 'Баннеры'],
+  ['plans_edit', 'tech', 'Тарифы: цены и состав, скидки за звание'],
+  ['delete_players', 'tech', 'Удалять аккаунты игроков'],
+  ['cleanup', 'tech', 'Очистка сервера от демо-данных (все турниры и игроки без входа)']
 ];
 const PERM = Object.fromEntries(PERMS.map(([k, min, name, extra]) => [k, { min, name, extra: extra || [] }]));
 // роли, которым право можно дать в настройках (тех. администратору доступно всё и так)
 const grantable = () => ROLES.filter(r => r !== 'tech');
 // по умолчанию: роли не ниже нужной; свои роли (ранг 1) по умолчанию прав ведущего не получают
-const byDefault = k => grantable().filter(r => ((r in { player: 1, host: 1, admin: 1 }) && RANK[r] >= RANK[PERM[k].min]) || PERM[k].extra.includes(r));
+// право «для игроков» по умолчанию есть у всех ролей, в том числе своих (тарифы)
+const byDefault = k => PERM[k].min === 'player' ? grantable() : grantable().filter(r => ((r in { player: 1, host: 1, admin: 1 }) && RANK[r] >= RANK[PERM[k].min]) || PERM[k].extra.includes(r));
 
 let custom = {};
 // настройки из базы: { ключ: [роли] }; неизвестное отбрасывается

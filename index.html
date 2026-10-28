@@ -996,7 +996,15 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 .ocard.acard { max-width: 640px; display: grid; gap: 14px; }
 .ac-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
 .ac-top h2 { margin: 0; }
-.ac-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ac-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 520px) { .ac-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ac-cs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+@media (max-width: 520px) { .ac-cs { grid-template-columns: minmax(0, 1fr); } }
+.ac-c { display: grid; gap: 2px; min-width: 0; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.ac-c .label { font-size: 10.5px; }
+.ac-c .v { font-weight: 600; overflow-wrap: anywhere; }
+.ac-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dng-btn { background: var(--red); border-color: var(--red); color: #fff; box-shadow: none; }
 .ac-grid > div { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface2); min-width: 0; overflow-wrap: anywhere; }
 .ac-grid .label { font-size: 10.5px; }
 @media (max-width: 560px) { .ac-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -4239,7 +4247,7 @@ function admPlans() {
   const e = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
   const st = svState(e, 'тарифов');
   if (st) return st;
-  const d = e.data, tech = Api.role === 'tech';
+  const d = e.data, tech = Api.perm('plans_edit');
   let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b></span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
   h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
   h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
@@ -4247,7 +4255,7 @@ function admPlans() {
   // тарифы и скидки
   const roles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles.filter(r => r.rank < 2);
   const roleSel = (id, cur) => '<select class="inp sm" id="' + id + '" aria-label="Роль">' + roles.map(r => '<option value="' + r.key + '"' + (r.key === cur ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>';
-  h += '<div class="sec"><span class="label">Тарифы (видит тех. администратор)</span>' + d.plans.map(p => '<div class="card sec plan-ed"><div class="nrow"><input class="inp" id="pe-name-' + p.id + '" value="' + esc(p.name) + '" maxlength="40" aria-label="Название"><input class="inp" id="pe-price-' + p.id + '" value="' + p.price + '" inputmode="numeric" aria-label="Цена" style="max-width:110px"><input class="inp" id="pe-days-' + p.id + '" value="' + p.days + '" inputmode="numeric" aria-label="Дней" style="max-width:80px"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-' + p.id, p.role) + '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pe-active-' + p.id + '"' + (p.active ? ' checked' : '') + '> показывать</label></div><textarea class="inp" id="pe-about-' + p.id + '" rows="' + Math.max(3, p.about.split('\n').length + 1) + '" maxlength="1000" aria-label="Что даёт">' + esc(p.about) + '</textarea><button class="mini" data-act="plan-save" data-v="' + p.id + '">Сохранить тариф</button></div>').join('');
+  h += '<div class="sec"><span class="label">Тарифы: цены и состав</span>' + d.plans.map(p => '<div class="card sec plan-ed"><div class="nrow"><input class="inp" id="pe-name-' + p.id + '" value="' + esc(p.name) + '" maxlength="40" aria-label="Название"><input class="inp" id="pe-price-' + p.id + '" value="' + p.price + '" inputmode="numeric" aria-label="Цена" style="max-width:110px"><input class="inp" id="pe-days-' + p.id + '" value="' + p.days + '" inputmode="numeric" aria-label="Дней" style="max-width:80px"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-' + p.id, p.role) + '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pe-active-' + p.id + '"' + (p.active ? ' checked' : '') + '> показывать</label></div><textarea class="inp" id="pe-about-' + p.id + '" rows="' + Math.max(3, p.about.split('\n').length + 1) + '" maxlength="1000" aria-label="Что даёт">' + esc(p.about) + '</textarea><button class="mini" data-act="plan-save" data-v="' + p.id + '">Сохранить тариф</button></div>').join('');
   h += '<div class="card sec plan-ed"><span class="label">Новый тариф</span><div class="nrow"><input class="inp" id="pe-name-new" placeholder="Название" maxlength="40"><input class="inp" id="pe-price-new" placeholder="Цена, ₽" inputmode="numeric" style="max-width:110px"><input class="inp" id="pe-days-new" value="30" inputmode="numeric" style="max-width:80px" aria-label="Дней"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-new', 'plus') + '</div><textarea class="inp" id="pe-about-new" rows="3" maxlength="1000" placeholder="Что даёт — по строке на пункт"></textarea><button class="mini go" data-act="plan-add">Добавить тариф</button><span class="meta">Нужна своя роль для тарифа — добавьте её во вкладке «Права ролей» и отметьте, что ей доступно.</span></div></div>';
   h += '<div class="panel"><span class="h2">Скидка за звание, %</span><div class="nrow">' + d.discountKeys.map(k => '<label class="field" style="flex:1"><span class="label">' + esc(k.name) + '</span><input class="inp" id="disc-' + k.k + '" inputmode="numeric" value="' + d.discounts[k.k] + '"></label>').join('') + '</div><button class="btn sm" data-act="disc-save">Сохранить скидки</button></div>';
   return h;
@@ -4653,14 +4661,15 @@ function adminView() {
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
     P2('titles') ? [['titles', 'Звания']] : [], P2('plans') ? [['plans', 'Тарифы']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
-    Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
+    Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], P2('cleanup') ? [['srv', 'Сервер']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   // администратору нужен подтверждённый контакт: по нему восстанавливается доступ
-  if (Api.can('admin') && !(Api.me.emailOk || Api.me.phone || Api.me.vk)) h += '<div class="note-box warn"><b>Подтвердите почту или телефон.</b> Если забудете пароль, доступ восстановится только через подтверждённый контакт.<div class="warn-a">' + ((Api.config || {}).email ? '<button class="btn sm" data-act="link-email">Подтвердить почту</button>' : '') + ((Api.config || {}).phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div>' + (!(Api.config || {}).email && !(Api.config || {}).phone ? '<p class="meta">Письма и SMS на сервере ещё не настроены — см. docs/server.md, раздел «Почта».</p>' : '') + '</div>';
+  const cf = Api.config || {}, hasContact = Api.me.phone || Api.me.vk || (cf.email ? Api.me.emailOk : Api.me.email);
+  if (Api.can('admin') && !hasContact) h += '<div class="note-box warn"><b>' + (cf.email ? 'Подтвердите почту или телефон.' : 'Привяжите почту.') + '</b> ' + (cf.email ? 'Если забудете пароль, доступ восстановится только через подтверждённый контакт.' : 'По ней войдёте, если забудете логин; подтвердить кодом можно будет, когда на сервере включат письма.') + '<div class="warn-a"><button class="btn sm" data-act="link-email">' + (cf.email ? 'Подтвердить почту' : 'Привязать почту') + '</button>' + (cf.phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div></div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
-  h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
+  h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : T === 'srv' ? admServer() : admAccounts();
   return h + '</div>';
 }
 const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
@@ -4690,7 +4699,7 @@ function admRow(p) {
 // карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
 const ACT_NAME = {
   'login.password': 'вошёл по паролю', 'login.email': 'вошёл по почте и паролю', 'email.link': 'подтвердил почту', 'email.set': 'привязал почту (без подтверждения)', 'password.reset': 'задал новый пароль по письму', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
-  'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
+  'player.delete': 'удалил аккаунт', cleanup: 'очистил сервер от демо-данных', 'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
   'club.host_add': 'назначил ведущим', 'club.helper_add': 'добавил помощника клуба', 'club.helper_rm': 'убрал помощника клуба', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
   'title.submit': 'подал заявку на звание', 'title.approved': 'подтвердил звание', 'title.rejected': 'отклонил звание', 'title.revoke': 'снял звание',
@@ -4705,6 +4714,8 @@ function auditData(a) {
   if (/^title\./.test(a.action)) return [d.title, d.order ? 'приказ ' + d.order : '', d.note].filter(Boolean).join(' · ');
   if (/^plan\./.test(a.action)) return [d.plan, d.days ? d.days + ' дн.' : '', d.price != null ? rub(d.price) : '', d.note].filter(Boolean).join(' · ');
   if (a.action === 'player.block') return d.blocked ? 'заблокирован' : 'разблокирован';
+  if (a.action === 'player.delete') return [d.name, d.code].filter(Boolean).join(' · ');
+  if (a.action === 'cleanup') return 'турниров ' + d.tours + ', матчей ' + d.matches + ', игроков ' + d.players;
   if (a.action === 'perms') { const nm = k => { const x = SVC.aperms && SVC.aperms.data && SVC.aperms.data.perms.find(y => y.key === k); return x ? x.name : k; }; return Object.keys(d).map(k => nm(k) + ': ' + (d[k].length ? d[k].map(r => roleName(r)).join(', ') : 'только тех. администратор')).join('; '); }
   if (a.action === 'player.edit') return Object.keys(d).map(k => ({ name: 'имя', city: 'город', club: 'клуб', title: 'разряд', ver: d.ver ? 'подтверждён' : 'не подтверждён', code: 'новый код входа' }[k] || k)).join(', ');
   if (d.club) return d.club;
@@ -4713,6 +4724,7 @@ function auditData(a) {
   if (d.ip) return d.ip;
   return '';
 }
+const RANKS_UI = { player: 0, host: 1, admin: 2, tech: 3 };
 function admCardModal() {
   const id = S.admOpen, e = lz('acard:' + id, () => Api.get('/api/admin/players/' + id), 15000);
   const close = '<button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button>';
@@ -4723,13 +4735,18 @@ function admCardModal() {
   const canEdit = (full || (mine && !p.vk)) && (!high || tech || p.id === ME);
   h += '<div class="ac-top">' + avatar(p.id, 'lg') + '<div style="min-width:0;display:grid;gap:4px"><h2 class="ell">' + esc(p.name) + '</h2><span>' + roleChip(p.role) + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + (p.ver ? ' <span class="meta">✓ подтверждён</span>' : '') + '</span><span class="meta">ID ' + esc(p.code) + ' · @' + esc(p.handle) + '</span></div><button class="mini" data-act="go" data-v="p.' + p.id + '">Профиль</button></div>';
   const kv = (k, v) => '<div><span class="label">' + k + '</span><b>' + v + '</b></div>';
-  h += '<div class="ac-grid">' + kv('Телефон', p.phone ? esc(showPhone(p.phone)) : '—') + kv('VK', p.vk ? 'привязан' : '—') + kv('Почта', p.email ? esc(p.email) + (p.emailOk ? ' ✓ подтверждена' : ' · не подтверждена') : '—') + kv('Логин', p.login ? esc(p.login) + (d.locked ? ' (закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')' : '') : '—') + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
+  // контакты строками — длинная почта не рвётся; цифры — компактной полосой
+  const cr = (k, v, sub) => '<div class="ac-c"><span class="label">' + k + '</span><span class="v">' + v + (sub ? ' <span class="meta">' + sub + '</span>' : '') + '</span></div>';
+  h += '<div class="ac-cs">' + cr('Почта', p.email ? esc(p.email) : '—', p.email && p.email !== 'скрыта' ? (p.emailOk ? '✓ подтверждена' : 'не подтверждена') : '') + cr('Телефон', p.phone ? (p.phone === 'скрыт' ? 'скрыт' : esc(showPhone(p.phone))) : '—') +
+    cr('VK ID', p.vk ? 'привязан' : '—') + cr('Логин', p.login ? esc(p.login) : '—', d.locked ? 'закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '') + '</div>';
+  h += '<div class="ac-grid">' + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
-  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="mini" data-act="photo-pick" data-v="avatar|' + p.id + '">Фото</button></div></div>';
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
   // роль и доступ
-  const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles;
+  // пока список ролей грузится — хотя бы текущая роль, без пустого выбора
+  const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [{ key: p.role, rank: RANKS_UI[p.role] != null ? RANKS_UI[p.role] : 1 }] }).roles;
   const roles = tech ? allRoles.map(r => r.key) : Api.perm('give_host') && !high ? allRoles.filter(r => r.rank < 2).map(r => r.key) : null;
   const acts = [];
   if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + esc(roleName(r)) + '</option>').join('') + '</select></label>');
@@ -4747,10 +4764,22 @@ function admCardModal() {
     const subs = pe.data ? pe.data.subs.filter(x => x.status === 'active' && x.ends > Date.now()) : [];
     h += '<div class="ac-sec"><span class="label">Тариф</span>' + (subs.length ? subs.map(x => '<div class="meta"><b>' + esc(x.plan.name) + '</b> до ' + new Date(x.ends).toLocaleDateString('ru-RU') + ' <button class="lnk dng" data-act="plan-end" data-v="' + x.id + '">завершить</button></div>').join('') : '<div class="meta">Нет тарифа.</div>') + (ap.data ? '<div class="nrow"><select class="inp sm" id="ac-plan" aria-label="Тариф">' + ap.data.plans.filter(x => x.active).map(x => '<option value="' + x.id + '">' + esc(x.name) + ' · ' + rub(x.price) + '</option>').join('') + '</select><button class="mini" data-act="ac-plan" data-v="' + p.id + '">Подключить</button></div>' : '') + '</div>';
   }
+  // удалить аккаунт: не себя; администраторов — только тех. администратор
+  if (Api.perm('delete_players') && p.id !== ME && (!high || tech)) h += '<div class="ac-sec"><span class="label">Удаление</span>' + (S.admDel === p.id
+    ? '<p class="meta">Аккаунт <b>' + esc(p.name) + '</b> удалится без возврата: профиль, вход, тарифы, заявки. Дружеские матчи останутся у соперников. Если игрок в идущем или сыгранном турнире — удалить не получится, только заблокировать.</p><div class="ac-btns"><button class="btn sm dng-btn" data-act="ac-del" data-v="' + p.id + '">Да, удалить</button><button class="ghost sm" data-act="ac-del-no">Отмена</button></div>'
+    : '<div><button class="mini dng" data-act="ac-del-ask" data-v="' + p.id + '">Удалить аккаунт</button></div>') + '</div>';
   if (d.log.length) h += '<div class="ac-sec"><span class="label">Последние действия</span>' + d.log.map(a => '<div class="au-row"><span class="meta">' + fmtDate(+a.t) + ' ' + new Date(+a.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span><span>' + esc(a.actor_name || 'сервер') + ' — ' + esc(ACT_NAME[a.action] || a.action) + (auditData(a) ? ' <span class="meta">' + esc(auditData(a)) + '</span>' : '') + '</span></div>').join('') + '</div>';
   return h + '</div></div>';
 }
 // права ролей: какие роли что могут; тех. администратору доступно всё
+// сервер: очистка от демо-данных (право cleanup); на сервере перед очисткой делается копия базы
+function admServer() {
+  let h = '<div class="card sec"><span class="label">Очистка от демо-данных</span><p class="meta">Удаляются <b>все турниры и матчи, клубы, баннеры</b> и игроки, которые не могут войти сами (демо-игроки и аккаунты без входа). Остаются аккаунты с логином, почтой, телефоном или VK и заведённые ими; их рейтинг и статистика обнуляются. Перед очисткой сервер делает копию базы в /var/backups/oche.</p>';
+  if (S.cleanRes) h += '<div class="note-box ok">Готово: удалено турниров ' + S.cleanRes.tours + ', матчей ' + S.cleanRes.matches + ', игроков ' + S.cleanRes.removed + '. Осталось аккаунтов: ' + S.cleanRes.kept + '.</div>';
+  h += S.cleanAsk ? '<div class="note-box warn"><b>Точно удалить?</b> Вернуть можно только из копии базы через консоль сервера.<div class="ac-btns" style="margin-top:10px"><button class="btn sm dng-btn" data-act="cleanup-yes">Да, очистить сервер</button><button class="ghost sm" data-act="cleanup-no">Отмена</button></div></div>'
+    : '<div><button class="mini dng" data-act="cleanup-ask">Очистить сервер…</button></div>';
+  return h + '</div>';
+}
 function admPerms() {
   const e = lz('aperms', () => Api.get('/api/admin/perms'), 60000);
   const st = svState(e, 'прав');
@@ -5388,7 +5417,7 @@ function liveRender(m) {
 function tourCardS(c) {
   const st = c.status;
   const pill = st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">до ' + fmtDate(c.regUntil || c.start) + '</span>' : '<span class="pill">' + fmtDate(c.start) + '</span>';
-  let h = '<div class="card tc" role="button" tabindex="0" data-act="go" data-v="t.' + c.id + '"><div class="tc-h"><h3>' + esc(c.name) + '</h3>' + pill + '</div><div class="meta">' + esc(c.city) + ' · ' + fmtDate(c.start) + ' · ' + fmtName(c).toLowerCase() + (c.fee ? ' · ' + feeTxt(c.fee) : '') + '</div>';
+  let h = '<div class="card tc" role="button" tabindex="0" data-act="go" data-v="t.' + c.id + '"><div class="tc-h"><h3>' + esc(c.name) + '</h3>' + pill + '</div><div class="meta">' + [c.city, fmtDate(c.start)].filter(Boolean).map(esc).join(' · ') + ' · ' + fmtName(c).toLowerCase() + (c.fee ? ' · ' + feeTxt(c.fee) : '') + '</div>';
   const bar = (a, b, txt) => '<div class="tc-p"><div class="bar"><i style="width:' + Math.round(a / Math.max(1, b) * 100) + '%"></i></div><span class="meta">' + txt + '</span></div>';
   if (st === 'live') h += bar(c.progress.done, c.progress.total, c.stage === 'qual' ? 'квалификация ' + c.progress.done + '/' + c.progress.total : c.progress.done + '/' + c.progress.total + ' матчей');
   else if (st === 'reg') h += bar(c.count, c.cap, 'записались ' + c.count + '/' + c.cap + (c.joined ? ' · вы в списке' : ''));
@@ -5434,7 +5463,7 @@ function sideViewS() {
 }
 function toursViewS() {
   const L = { live: listE('live'), reg: listE('reg'), done: listE('done') }, cur = L[S.tf];
-  let h = '<div class="phead"><h1 class="h1">Турниры</h1><div class="phead-a"><button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (ME ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>') + '</div></div>';
+  let h = '<div class="phead"><h1 class="h1">Турниры</h1><div class="phead-a"><button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (!ME ? '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>' : Api.perm('create_tour') ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '') + '</div></div>';
   h += '<div class="seg2" role="group" aria-label="Статус">' + [['live', 'Идут'], ['reg', 'Регистрация'], ['done', 'Завершены']].map(([v, l]) => '<button class="' + (S.tf === v ? 'on' : '') + '" data-act="tf" data-v="' + v + '">' + l + ' <span class="muted">' + (L[v].data ? L[v].data.total : '…') + '</span></button>').join('') + '</div>';
   const st = svState(cur, 'турниров');
   if (st) return h + st;
@@ -5828,6 +5857,12 @@ document.addEventListener('click', e => {
       break;
     }
     case 'adm-f': S.admF = v; render(); break;
+    case 'ac-del-ask': S.admDel = v; render(); break;
+    case 'ac-del-no': S.admDel = null; render(); break;
+    case 'ac-del': svDo(Api.del('/api/admin/players/' + encodeURIComponent(v)), () => { S.admDel = null; closeModals(); svStale('admin:'); svStale('acard:'); svStale('rating'); toast('Аккаунт удалён.'); }); break;
+    case 'cleanup-ask': S.cleanAsk = true; S.cleanRes = null; render(); break;
+    case 'cleanup-no': S.cleanAsk = false; render(); break;
+    case 'cleanup-yes': S.cleanAsk = false; svDo(Api.post('/api/admin/cleanup', { confirm: true }), r => { S.cleanRes = r; Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); toast('Сервер очищен.'); }); break;
     case 'adm-block': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { blocked: on === '1' }), () => { svStale('admin:'); svStale('acard:'); toast(on === '1' ? 'Игрок заблокирован: вход закрыт.' : 'Игрок разблокирован.'); }); break; }
     case 'num-set': {
       const el = $('num-n'), n = el ? +el.value : 0;
