@@ -430,6 +430,8 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .back:hover { color: var(--fg); }
 .tstat { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
 .reg-cta { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.room { display: grid; gap: 12px; }
+.room .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .hint { display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .hint .row { display: flex; gap: 8px; align-items: center; }
 .hlp { padding: 2px 16px; }
@@ -518,6 +520,22 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .stages { display: grid; gap: 7px; flex: 1; min-width: min(100%, 290px); }
 .stg { display: grid; grid-template-columns: 100px minmax(60px, 1fr) 92px; gap: 10px; align-items: center; font-size: 13px; }
 .stg .meta { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+/* ход турнира полосой: этапы отрезками, у каждого своя заливка */
+.tbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13px; }
+.tbar-l { color: var(--muted); white-space: nowrap; }
+.tbar-l b { color: var(--fg); font-weight: 600; }
+.tbar-s { display: flex; gap: 4px; height: 8px; }
+.tbar-s i { flex: 1; border-radius: 99px; background: linear-gradient(90deg, var(--green) var(--p), var(--surface3) var(--p)); }
+.tbar-s i.done { background: color-mix(in srgb, var(--green) 55%, var(--surface3)); }
+.tbar-p { font-family: var(--display); font-size: 16px; font-variant-numeric: tabular-nums; }
+.tbar.tv { padding: .7vw 1.2vw; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); font-size: clamp(13px, 1.05vw, 24px); gap: 1.2vw; }
+.tbar.tv .tbar-s { height: clamp(8px, .7vw, 16px); gap: .4vw; }
+.tbar.tv .tbar-p { font-size: clamp(18px, 1.8vw, 42px); }
+.tvbox .stages { gap: .5vw; }
+.tvbox .stages > b { font-size: clamp(14px, 1.1vw, 26px); }
+.tvbox .stg { font-size: clamp(13px, 1.05vw, 24px); grid-template-columns: minmax(6em, auto) minmax(60px, 1fr) auto; gap: 1vw; }
+.tvbox .stg .bar { height: clamp(6px, .55vw, 12px); }
+@media (max-width: 560px) { .tbar { grid-template-columns: minmax(0, 1fr) auto; } .tbar-s { grid-column: 1 / -1; grid-row: 2; } }
 .stg.done .bar i { background: color-mix(in srgb, var(--green) 55%, var(--surface3)); }
 .qtbl td .mini { padding: 4px 9px; }
 .qtbl tr.sep td { border-top: 2px solid var(--line-bright); }
@@ -661,6 +679,12 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .gh-t > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gh-t b { font-weight: 600; }
 .gh-t span { color: var(--muted); font-size: 12.5px; }
+/* ход турнира в шапке счётчика — отдельной строкой во всю ширину */
+.ghead:has(.gh-p) { flex-wrap: wrap; row-gap: 6px; }
+.gh-p { flex-basis: 100%; display: grid; grid-template-columns: auto minmax(40px, 1fr) auto; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); padding: 0 6px 2px 0; white-space: nowrap; }
+.gh-p b { color: var(--fg); font-weight: 600; }
+.gh-p i { height: 5px; border-radius: 99px; background: var(--surface3); overflow: hidden; display: block; }
+.gh-p i b { display: block; height: 100%; background: var(--green); }
 body.ingame { padding-top: max(8px, env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 body.ingame .tabs, body.ingame .top-wrap { display: none; }
 /* табло для телевизора и экран организатора */
@@ -682,6 +706,8 @@ body.deskw .wrap { max-width: none; }
 .tvp .lg { font-family: var(--display); font-size: clamp(22px, 2vw, 44px); color: var(--muted); min-width: 1.2em; text-align: center; background: var(--surface2); border-radius: 8px; padding: 0 .3em; }
 .tvp .sc { font-family: var(--display); font-size: clamp(40px, 4.4vw, 104px); line-height: 1; font-weight: 700; min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
 .tvp.act .sc { color: var(--green); }
+/* полоска прогресса игрока снизу строки: --pp — доля сделанного */
+.tvp[style*="--pp"] { background-image: linear-gradient(var(--green), var(--green)), linear-gradient(var(--surface3), var(--surface3)); background-size: var(--pp) 4px, 100% 4px; background-position: left bottom, left bottom; background-repeat: no-repeat; padding-bottom: calc(.3vw + 6px); }
 .tvt .sub { display: flex; justify-content: space-between; gap: 8px; font-size: clamp(12px, .95vw, 20px); color: var(--muted); }
 /* Слежка: --u — сотая часть размера плитки, все размеры от неё */
 body.watchw { padding: 0 12px 12px; }
@@ -735,6 +761,30 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tvbox h2 { font-family: var(--display); font-size: clamp(16px, 1.3vw, 30px); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .tvrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1vw; align-items: center; font-size: clamp(15px, 1.25vw, 28px); padding: .25vw 0; border-bottom: 1px solid var(--line); }
 .tvrow:last-child { border-bottom: 0; }
+/* к мишеням: крупный номер мишени, игроки — каждый своей строкой */
+.tvcalls, .tvres { display: grid; gap: .55vw; }
+.tvcall { display: grid; grid-template-columns: clamp(58px, 4.6vw, 104px) minmax(0, 1fr) auto; gap: 1vw; align-items: center; padding: .55vw .8vw .55vw .55vw; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); }
+.tvcall.on { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 25%, transparent) inset; }
+.tvc-b { display: grid; place-items: center; align-content: center; aspect-ratio: 1; border-radius: 12px; background: var(--surface3, var(--surface)); border: 1px solid var(--line-bright); line-height: 1; }
+.tvcall.on .tvc-b { background: var(--green); border-color: var(--green); color: var(--green-ink); }
+.tvc-b small { font-size: clamp(9px, .62vw, 14px); text-transform: uppercase; letter-spacing: .08em; opacity: .75; font-weight: 600; }
+.tvc-b b { font-family: var(--display); font-size: clamp(26px, 2.5vw, 60px); font-weight: 700; margin-top: .15vw; }
+.tvc-p { display: grid; gap: .25vw; min-width: 0; }
+.tvn { display: flex; align-items: center; min-width: 0; font-size: clamp(15px, 1.3vw, 30px); font-weight: 600; }
+.tvn > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tvc-m { display: grid; gap: .2vw; justify-items: end; text-align: right; font-size: clamp(11px, .8vw, 18px); color: var(--muted); }
+.tvc-m b { font-family: var(--display); font-size: 1.35em; color: var(--fg); letter-spacing: .03em; }
+/* последние результаты: счёт по легам у каждого игрока, победитель ярче */
+.tvr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1vw; align-items: center; padding: .45vw .1vw; border-bottom: 1px solid var(--line); }
+.tvr:last-child { border-bottom: 0; }
+.tvr-p { display: grid; gap: .15vw; min-width: 0; }
+.tvr-l { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8vw; align-items: center; color: var(--muted); }
+.tvr-l .tvn { font-weight: 500; }
+.tvr-l.w { color: var(--fg); }
+.tvr-l.w .tvn { font-weight: 700; }
+.tvr-s { font-family: var(--display); font-weight: 700; font-size: clamp(16px, 1.35vw, 32px); min-width: 1.2em; text-align: center; }
+.tvr-l.w .tvr-s { color: var(--green); }
+.tvr-m { font-size: clamp(11px, .8vw, 18px); color: var(--muted); text-align: right; max-width: 12vw; }
 .tvrow .bd { font-size: clamp(14px, 1.2vw, 26px); padding: 2px 10px; }
 .tvrow .r { font-family: var(--display); font-weight: 600; }
 .desk-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -2008,7 +2058,7 @@ function topView() {
   const c = curTab();
   const resume = hasLiveGame() && !(R === 'play' && S.inGame);
   return '<button class="brand" data-act="go" data-v="feed" aria-label="Oche — лента">' + LOGO + 'Oche</button>' +
-    '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + r + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + '</button>').join('') + '</nav>' +
+    '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + '</button>').join('') + '</nav>' +
     '<div class="top-actions">' +
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
     (SRV && Api.ob.total() ? '<span class="pill" title="Подходы сохранены на телефоне и будут отправлены">не отправлено: ' + Api.ob.total() + '</span>' : '') +
@@ -2017,9 +2067,17 @@ function topView() {
     '<button class="icon-btn" data-act="open-settings" title="Настройки: тема, цвета, звук" aria-label="Настройки">' + I.gear + '</button>' +
     '</div>';
 }
+/* «Свой турнир» (комната): открыли турнир по QR или играете в нём — вкладка «Турниры» и запуск приложения
+   возвращают в него, на «Играть» видно свой матч. Забывается, когда турнир закончен, или через 18 часов. */
+const ROOM_TTL = 18 * 36e5;
+let ROOM_LINK = null; // турнир, с которого открыли приложение (ссылка или QR)
+function roomId() { const r = lsGet('oche2.room'); return r && r.id && Date.now() - r.at < ROOM_TTL ? r.id : null; }
+function roomSet(id) { const cur = lsGet('oche2.room'); if (id ? !(cur && cur.id === id && Date.now() - cur.at < 6e5) : cur) lsSet('oche2.room', id ? { id, at: Date.now() } : null); }
+// куда ведёт вкладка: «Турниры» — в свой турнир, если вы не в нём
+const tabTo = r => { const rm = r === 'tours' && roomId(); return rm && R !== 't.' + rm ? 't.' + rm : r; };
 function tabsView() {
   const c = curTab();
-  return TABS.map(([r, l, ic]) => '<button class="' + (c === r ? 'on' : '') + (r === 'play' ? ' play' : '') + '" data-act="go" data-v="' + r + '"' + (c === r ? ' aria-current="page"' : '') + '>' + I[ic] + '<span>' + l + (r === 'play' && hasLiveGame() ? ' •' : '') + '</span></button>').join('');
+  return TABS.map(([r, l, ic]) => '<button class="' + (c === r ? 'on' : '') + (r === 'play' ? ' play' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + I[ic] + '<span>' + l + (r === 'play' && hasLiveGame() ? ' •' : '') + '</span></button>').join('');
 }
 
 function feedItems() {
@@ -2082,7 +2140,7 @@ const rt = id => RATING[id] ? RATING[id].r : 1500;
 const liveCtxIs = (tid, r, i) => !!(hasLiveGame() && G.ctx && G.ctx.tid === tid && G.ctx.r === r && G.ctx.i === i);
 const gref = (t, g) => t.id + '|' + g.r + '|' + g.i;
 function bctx(t) { const rv = resolver(t); return { rv, nums: gameNums(t, rv), live: tStatus(t) === 'live', score: canDo(t, 'score') }; }
-// название матча: «A1–A2» (подписи как на листе NDL) или «№5»
+// название матча: «A1–A2» (подписи буквами) или «№5»
 const gName = (t, g, n) => (g && gameTag(t, g)) || (n ? '№' + n : '');
 // при подписях NDL: куда идут победитель и проигравший — «победитель → A1 · проигравший → A5»
 function gDest(t, g) {
@@ -2234,11 +2292,11 @@ function bracketView(t) {
   }
   return '<p class="meta">Проигравшие не выбывают — разыгрываются все места 1–' + N + '.' + (S > N ? ' Свободных мест: ' + (S - N) + '.' : '') + ' Линии делят круг на группы: в каждой группе играют за свои места.</p>' + top + plGridHTML(t, cx);
 }
-// организатор переключает подписи матчей: как на листе NDL (A1, B1) или номерами
+// организатор переключает подписи матчей: буквами (A1, B1) или номерами
 function labelsCtl(t) {
   if (!canDo(t, 'org') || !isBracket(t)) return '';
   const cur = t.labels === 'ab' ? 'ab' : 'num';
-  return '<div class="hp-row"><span class="label">Подписи матчей</span><div class="seg2">' + [['ab', 'A1, B1 — как на листе'], ['num', '№1, №2']].map(([v, l]) => '<button class="' + (cur === v ? 'on' : '') + '" data-act="t-labels" data-v="' + t.id + '|' + v + '">' + l + '</button>').join('') + '</div></div>';
+  return '<div class="hp-row"><span class="label">Подписи матчей</span><div class="seg2">' + [['ab', 'Буквы: A1, B1'], ['num', 'Номера: №1, №2']].map(([v, l]) => '<button class="' + (cur === v ? 'on' : '') + '" data-act="t-labels" data-v="' + t.id + '|' + v + '">' + l + '</button>').join('') + '</div></div>';
 }
 function partProgress(t, rv, k) {
   let done = 0, total = 0;
@@ -2316,6 +2374,8 @@ function tourView(id) {
   const t = TBY[id];
   if (!t) return '<div class="note-box">Турнир не найден.</div>';
   const st = tStatus(t), inQual = t.stage === 'qual';
+  if (st === 'done') { if (roomId() === t.id) roomSet(null); }
+  else if (ROOM_LINK === t.id || (ME && t.players.includes(ME))) roomSet(t.id);
   const fees = SRV && canDo(t, 'fees') ? [['fees', 'Взносы']] : [];
   const tabs = st === 'reg' ? [['people', 'Участники']].concat(fees)
     : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']]
@@ -2418,6 +2478,19 @@ function stagesOf(t, rv) {
   if (t.qual) { const n = t.players.filter(id => qBest(t, id) != null).length; out.push({ l: 'Квалификация', done: n, total: t.players.length }); }
   if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.format === 'rr' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
   return out;
+}
+// общий ход турнира: доля сыгранного по всем этапам (квалификация — попытки игроков) и текущий этап
+function tourPct(t, rv) {
+  const sts = stagesOf(t, rv || resolver(t));
+  if (!sts.length) return null;
+  const done = sts.reduce((a, x) => a + x.done, 0), total = sts.reduce((a, x) => a + x.total, 0), cur = sts.find(x => x.done < x.total);
+  return { pc: Math.round(done / Math.max(1, total) * 100), cur: cur ? cur.l : 'всё сыграно', sts };
+}
+// полоса хода турнира: на табло под заголовком, в счётчике над игрой
+function tourBar(t, cls) {
+  const tp = tStatus(t) === 'live' ? tourPct(t) : null;
+  if (!tp) return '';
+  return '<div class="tbar' + (cls ? ' ' + cls : '') + '"><span class="tbar-l">Ход турнира · <b>' + esc(tp.cur) + '</b></span><div class="tbar-s">' + tp.sts.map(x => '<i class="' + (x.done >= x.total ? 'done' : x.done ? 'cur' : '') + '" style="--p:' + Math.round(x.done / Math.max(1, x.total) * 100) + '%" title="' + esc(x.l) + ': ' + x.done + '/' + x.total + '"></i>').join('') + '</div><b class="tbar-p">' + tp.pc + '%</b></div>';
 }
 function stagesView(t, rv) {
   const sts = stagesOf(t, rv);
@@ -2624,10 +2697,10 @@ function newTourView() {
   h += '<div class="field"><span class="label">' + (nt.fmt === 'ndl' ? 'Игра в сетках' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4, 5], nt.ltw, 'nt-ltw') + '</div></div>';
   if (nt.fmt !== 'rr') {
-    // вид сетки: порядок матчей и подписи как на бумажном листе NDL или классические
-    const lab = nt.labels || (nt.fmt === 'ndl' ? 'ab' : 'num');
-    h += '<div class="field"><span class="label">Порядок матчей в сетке</span><div class="chips">' + [['ndl', 'Как на листе NDL: 1–8, 5–4, 3–6, 7–2'], ['std', 'Классический: 1–8, 4–5, 2–7, 3–6']].map(([v, l]) => '<button class="chip txt' + ((nt.layout || 'ndl') === v ? ' on' : '') + '" data-act="nt-layout" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">Пары и кто с кем играет дальше одинаковые — меняется только порядок сверху вниз.</span></div>';
-    h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'A1–A2, B1–B2 — как на листе'], ['num', '№1, №2 — по порядку']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
+    // вид сетки: порядок матчей сверху вниз и подписи; по умолчанию — классический порядок и подписи A/B
+    const lab = nt.labels || 'ab';
+    h += '<div class="field"><span class="label">Порядок матчей в сетке</span><div class="chips">' + [['std', 'Классический: 1–8, 4–5, 2–7, 3–6'], ['ndl', '1-й и 2-й по краям: 1–8, 5–4, 3–6, 7–2']].map(([v, l]) => '<button class="chip txt' + ((nt.layout || 'std') === v ? ' on' : '') + '" data-act="nt-layout" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">Пары и кто с кем играет дальше одинаковые — меняется только порядок сверху вниз.</span></div>';
+    h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'Буквы: A1–A2, B1–B2'], ['num', 'Номера: №1, №2']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
   }
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
@@ -2664,7 +2737,7 @@ function createTour() {
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
-    if (nt.fmt !== 'rr') { body.layout = nt.layout || 'ndl'; body.labels = nt.labels || (ndl ? 'ab' : 'num'); }
+    if (nt.fmt !== 'rr') { body.layout = nt.layout || 'std'; body.labels = nt.labels || 'ab'; }
     if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
     const fee = ntFee(nt);
     if (fee) body.fee = fee;
@@ -2675,7 +2748,7 @@ function createTour() {
   const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: meP().name, ver: false }, city: (nt.city || meP().city || '').trim() || '—', venue: (nt.venue || '').trim(), start: Date.now(), dbl: true, mode: ex.k === 'x01' ? ex.mode : 501, ltw: nt.ltw, status: null, cap: ids.length, format: ndl ? 'pl' : nt.fmt, players: [], games: [] };
   if (!(ex.k === 'x01' && !ex.lim)) t.ex = ex;
   if (ntFee(nt)) t.fee = ntFee(nt);
-  if (nt.fmt !== 'rr') { t.layout = nt.layout || 'ndl'; t.labels = nt.labels || (ndl ? 'ab' : 'num'); }
+  if (nt.fmt !== 'rr') { t.layout = nt.layout || 'std'; t.labels = nt.labels || 'ab'; }
   const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
   if (ndl) { t.players = ids.slice(); t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; t.split = 8; t.stage = 'qual'; }
   else if (nt.fmt === 'rr') { t.players = order; t.games = rrGames(order); }
@@ -2857,10 +2930,36 @@ function pResolve(n) {
   const m = resolvePlayer(n);
   return { cls: m ? 'ok' : 'guest', txt: m ? '<span>✓ Из базы</span>' : (n || '').trim() ? '<span>Гость — без статистики</span>' : '' };
 }
+// путь игрока в турнире: сыграно матчей и сколько всего (круговая — все его игры, «все места» — по кругу на круг)
+function pathOf(t, id) {
+  if (!t || !id || !t.games || !t.games.length) return null;
+  const rv = resolver(t), mine = t.games.map(g => gameState(t, g, rv)).filter(x => x.a === id || x.b === id);
+  if (!mine.length) return null;
+  return { done: mine.filter(x => x.st === 'done').length, total: t.format === 'rr' ? mine.length : t.format === 'pl' ? bRounds(t) : 0 };
+}
+// строка в шапке счётчика: ход турнира и путь вошедшего игрока, если он в этом матче
+function ghTour(t, ids) {
+  const tp = tourPct(t);
+  if (!tp) return '';
+  const me = ME && ids.includes(ME) ? pathOf(t, ME) : null;
+  const way = me ? (me.total ? 'ваш матч ' + Math.min(me.total, me.done + 1) + ' из ' + me.total : 'ваш ' + (me.done + 1) + '-й матч') : '';
+  return '<div class="gh-p"><span>Турнир <b>' + tp.pc + '%</b></span><i><b style="width:' + tp.pc + '%"></b></i>' + (way ? '<span>' + way + '</span>' : '') + '</div>';
+}
+// карточка своего турнира на «Играть»: вернуться в него, ход турнира, свой готовый матч
+function roomCard() {
+  const id = roomId();
+  if (!id) return '';
+  const t = SRV ? tourE(id).data : TBY[id];
+  if (!t) return '';
+  const st = tStatus(t);
+  if (st === 'done') { roomSet(null); return ''; }
+  return '<div class="card room"><div class="tstat"><div style="display:grid;gap:2px;min-width:0"><span class="label">Ваш турнир</span><b>' + esc(t.name) + '</b><span class="meta">' + (st === 'live' ? 'Идёт' : 'Регистрация до ' + fmtDate(t.regUntil)) + '</span></div>' +
+    '<div class="row"><button class="btn sm" data-act="go" data-v="t.' + esc(id) + '">Вернуться в турнир</button><button class="ghost sm" data-act="room-off" title="Вкладка «Турниры» снова ведёт в общий список">Забыть</button></div></div>' + tourBar(t) + '</div>' + (st === 'live' && !(myGame(t) && liveCtxIs(t.id, myGame(t).g.r, myGame(t).g.i)) ? yourMatch(t) : '');
+}
 function playView() {
   if (S.inGame && G) return gameView();
   const su = S.setup;
-  let h = '<div class="narrow"><h1 class="h1">Играть</h1>';
+  let h = '<div class="narrow"><h1 class="h1">Играть</h1>' + roomCard();
   if (G && G.over !== 'match') {
     const gs = G.kind === 'ex' ? exSt() : null;
     h += '<div class="resume"><div><b>Незаконченная игра</b><div class="meta">' + (gs ? esc(Games.name(G.ex)) + ' · ' + G.players.map((p, i) => esc(p.name) + ' (' + gs.tot[i] + ') — ' + gs.legs[i]).join(' : ') : G.mode + ' · ' + G.players.map(p => esc(p.name) + ' (' + p.score + ') — ' + p.legs).join(' : ')) + '</div></div><div class="acts">';
@@ -3252,7 +3351,7 @@ function gameView() {
   let h = '<div class="game">';
   h += '<div class="ghead g-head-area"><div class="gh-t">' + (t ? '<b>' + esc(t.name) + '</b><span>' + gameLabel(t, gameAt(t, g.ctx.r, g.ctx.i)) + ' · Лег ' + g.legNo + '</span>'
     : '<b>' + g.mode + (g.lim ? ' · ' + g.lim + ' подходов' : '') + ' · до ' + g.legsToWin + ' ' + pl(g.legsToWin, 'победы', 'побед', 'побед') + ' · Лег ' + g.legNo + (g.dbl ? '' : ' · без дубля') + '</b>') + '</div>';
-  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
+  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div>' + (t ? ghTour(t, g.players.map(q => q.id)) : '') + '</div>';
   h += obBar();
 
   const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && n > 1;
@@ -3262,7 +3361,9 @@ function gameView() {
     const r = routeFor(rem, act && darts ? 3 - g.visit.length : 3, g.dbl);
     h += '<div class="pl' + (act ? ' act' : '') + '">' + plPhoto(q.id) + '<div class="nm">' + (i === g.starter ? '<span class="st" role="img" title="Начинает лег" aria-label="Начинает лег">●</span>' : '') + '<span class="n">' + esc(q.name) + '</span><span class="legs" title="Выиграно легов">' + q.legs + '</span></div>' +
       '<div class="num big">' + rem + '</div><div class="co-chip">' + (r ? routeText(r) : '') + '</div>' +
-      '<div class="sub"><span>ср. ' + avg3(q.points, q.darts) + '</span><span>' + (g.lim ? 'подход ' + Math.min(g.lim, g.log.filter(e => e.leg === g.legNo && e.p === i && !e.tb).length + (act ? 1 : 0)) + '/' + g.lim : q.last ? 'посл. ' + q.last : q.legDarts + ' др.') + '</span></div></div>';
+      '<div class="sub"><span>ср. ' + avg3(q.points, q.darts) + '</span><span>' + (g.lim ? 'подход ' + Math.min(g.lim, g.log.filter(e => e.leg === g.legNo && e.p === i && !e.tb).length + (act ? 1 : 0)) + '/' + g.lim : q.last ? 'посл. ' + q.last : q.legDarts + ' др.') + '</span></div>' +
+      // прогресс лега: сколько очков из стартовых уже набрано
+      '<div class="prog" title="Набрано ' + Math.round((g.mode - rem) / g.mode * 100) + '% лега"><i style="width:' + Math.max(0, Math.round((g.mode - rem) / g.mode * 100)) + '%"></i></div></div>';
   });
   h += '</div>' + (canSwap ? '<button class="ghost sm swap" data-act="swap-start">Начинает другой</button>' : '') + '</div>';
 
@@ -4726,7 +4827,9 @@ function liveTile(t, m) {
   m.players.forEach((p, i) => {
     const ph = O.photos && photoOf(p.id) ? '<img class="tph" src="' + esc(photoOf(p.id)) + '" alt="">' : '';
     const av = O.avg && s.avg && s.avg[i] != null ? '<span class="meta" style="margin-left:.6vw;font-size:.6em;font-weight:500">ср. ' + s.avg[i].toFixed(1) + '</span>' : '';
-    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"><span class="nm">' + ph + (O.nums ? noBadge(t, p.id) : '') + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' + (P[p.id] && P[p.id].pro ? '<span class="tvpro">PRO</span>' : '') + av + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
+    // прогресс игрока: x01 — набрано очков из стартовых, набор очков — сделано подходов из N
+    const pp = !O.progress ? null : ex.k === 'x01' && s.scores && ex.mode ? (ex.mode - s.scores[i]) / ex.mode : N && s.vis ? Math.min(N, s.vis[i] || 0) / N : null;
+    h += '<div class="tvp' + (s.cur === i ? ' act' : '') + '"' + (pp != null ? ' style="--pp:' + Math.max(0, Math.round(pp * 100)) + '%"' : '') + '><span class="nm">' + ph + (O.nums ? noBadge(t, p.id) : '') + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' + (P[p.id] && P[p.id].pro ? '<span class="tvpro">PRO</span>' : '') + av + '</span>' + (m.players.length > 1 || m.ltw > 1 ? '<span class="lg">' + m.legs[i] + '</span>' : '<span></span>') + '<span class="sc">' + (s.scores ? s.scores[i] : '') + '</span></div>';
   });
   const L = s.last;
   // выход на матч: до первого броска — выходная музыка игроков Pro
@@ -4744,17 +4847,26 @@ function callsOf(t) {
   return t.games.map(g => ({ g, s: gameState(t, g, cx.rv), n: cx.nums.get(g.r + ':' + g.i) })).filter(x => x.s.st === 'ready' && !live.has(x.g.r + ':' + x.g.i) && !otherLive(t, x.g))
     .sort((a, b) => (boardOf(t, a.g.r, a.g.i) ? 0 : 1) - (boardOf(t, b.g.r, b.g.i) ? 0 : 1) || a.n - b.n);
 }
+// игрок строкой табло: номер в турнире и имя целиком, без переноса посередине
+const tvName = (t, id, cls) => '<span class="tvn' + (cls ? ' ' + cls : '') + '">' + noBadge(t, id) + '<span>' + esc(P[id] ? P[id].name : '—') + '</span></span>';
 function callsHTML(t, max) {
   const cs = callsOf(t).slice(0, max || 12);
   if (!cs.length) return '<p class="meta">Сейчас никого не вызываем.</p>';
-  return cs.map(x => '<div class="tvrow">' + (boardOf(t, x.g.r, x.g.i) ? '<span class="bd">М' + boardOf(t, x.g.r, x.g.i) + '</span>' : '<span class="meta">' + gName(t, x.g, x.n) + '</span>') + '<span>' + noBadge(t, x.s.a) + esc(P[x.s.a] ? P[x.s.a].name : '—') + ' — ' + noBadge(t, x.s.b) + esc(P[x.s.b] ? P[x.s.b].name : '—') + '</span><span class="meta">' + esc(gameLabel(t, x.g)) + '</span></div>').join('');
+  return '<div class="tvcalls">' + cs.map(x => {
+    const b = boardOf(t, x.g.r, x.g.i), nm = gName(t, x.g, x.n);
+    return '<div class="tvcall' + (b ? ' on' : '') + '"><div class="tvc-b">' + (b ? '<small>мишень</small><b>' + b + '</b>' : '<small>ждёт</small><b>—</b>') + '</div>' +
+      '<div class="tvc-p">' + tvName(t, x.s.a) + tvName(t, x.s.b) + '</div><div class="tvc-m">' + (nm ? '<b>' + esc(nm) + '</b>' : '') + '<span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
+  }).join('') + '</div>';
 }
 function recentHTML(t, max) {
   const done = (t.games || []).filter(g => g.res && gameState(t, g).st === 'done').map(g => ({ g, at: (MBY[g.res.mid] || {}).t || 0, s: gameState(t, g) }));
   // свежие сверху: в демо — по времени матча, на сервере — по номеру круга и игры с конца
   done.sort((a, b) => b.at - a.at || b.g.r - a.g.r || b.g.i - a.g.i);
   if (!done.length) return '<p class="meta">Результатов пока нет.</p>';
-  return done.slice(0, max || 8).map(x => { const w = x.g.res.w === x.s.a; return '<div class="tvrow"><span class="r">' + x.g.res.la + ':' + x.g.res.lb + '</span><span><b' + (w ? '' : ' class="muted"') + '>' + esc(P[x.s.a] ? P[x.s.a].name : '—') + '</b> — <b' + (w ? ' class="muted"' : '') + '>' + esc(P[x.s.b] ? P[x.s.b].name : '—') + '</b></span><span class="meta">' + esc(gameLabel(t, x.g)) + '</span></div>'; }).join('');
+  return '<div class="tvres">' + done.slice(0, max || 8).map(x => {
+    const w = x.g.res.w === x.s.a, line = (id, legs, win) => '<div class="tvr-l' + (win ? ' w' : '') + '">' + tvName(t, id) + '<span class="tvr-s">' + legs + '</span></div>';
+    return '<div class="tvr"><div class="tvr-p">' + line(x.s.a, x.g.res.la, w) + line(x.s.b, x.g.res.lb, !w) + '</div><span class="tvr-m">' + esc(gameLabel(t, x.g)) + '</span></div>';
+  }).join('') + '</div>';
 }
 // турнир для табло: на сервере — загрузка, в демо — из базы
 function tvTour(id) {
@@ -4771,6 +4883,7 @@ function tvView(id) {
   const live = liveOf(t, O.delay || 0).sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0) || (boardOf(t, a.r, a.i) || 99) - (boardOf(t, b.r, b.i) || 99));
   let h = '<div class="tvh"><div class="tvh-t">' + (t.org && t.org.logo ? '<img class="tvlogo" src="' + esc(t.org.logo) + '" alt="">' : '') + '<div><h1>' + esc(t.name) + '</h1><div class="meta">' + esc(fmtLine(t)) + '</div></div></div><div class="tvx">' + (O.clock ? '<span class="clock" id="tv-clock">' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<button class="mini" data-act="tvo-show">Настроить</button><button class="mini" data-act="tv-full">На весь экран</button><button class="mini" data-act="go" data-v="t.' + t.id + '">Выйти</button></div></div>';
   if (S.tvoOpen) h += tvoPanel();
+  if (O.stages) h += tourBar(t, 'tv');
   h += live.length ? '<div class="tvg">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<div class="tvbox"><h2>Сейчас матчей нет</h2><p class="meta">Как только маркер начнёт матч, счёт появится здесь.' + (SRV ? '' : ' В демо табло показывает игру, которую ведут в соседней вкладке этого браузера.') + '</p></div>';
   if (O.cams && streamsOf(t).length) h += '<div class="tvcams">' + streamsOf(t).slice(0, 2).map((s, k) => camHTML(s, 'tv' + k, { bare: true })).join('') + '</div>';
   h += '<div class="tvside">';
@@ -4975,7 +5088,7 @@ function exGameView() {
   const title = t ? '<b>' + esc(t.name) + '</b><span>' + (g.ctx.q ? 'Квалификация · попытка ' + (g.ctx.q.k + 1) + ' · ' + esc(Games.label(ex)) : gameLabel(t, gameAt(t, g.ctx.r, g.ctx.i)) + ' · ' + esc(Games.name(ex)) + ' · Лег ' + st.leg + ' · ' + ltwTxt(g.legsToWin)) + '</span>'
     : '<b>' + esc(Games.label(ex)) + (n > 1 ? ' · ' + ltwTxt(g.legsToWin) + ' · Лег ' + st.leg : '') + '</b>';
   let h = '<div class="game"><div class="ghead g-head-area"><div class="gh-t">' + title + '</div>';
-  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div></div>';
+  h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div>' + (t && !g.ctx.q ? ghTour(t, g.players.map(q => q.id)) : '') + '</div>';
   h += obBar();
   const canSwap = !g.over && st.leg === 1 && !g.log.length && !g.visit.length && n > 1;
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
@@ -5344,6 +5457,7 @@ document.addEventListener('click', e => {
   const saveSu = () => lsSet('oche2.setup', su);
   switch (a) {
     case 'go': go(v); break;
+    case 'room-off': roomSet(null); ROOM_LINK = null; toast('Вкладка «Турниры» снова открывает общий список.'); render(); break;
     case 'hlp-hide': lsSet('oche2.hlp', true); render(); break;
     case 'set-theme': S.theme = v; applyTheme(); render(); break;
     case 'open-settings': closeModals(); S.settings = true; render(); break;
@@ -6018,7 +6132,7 @@ window.addEventListener('appinstalled', () => { installEv = null; toast('Oche н
 const HELP = [
   ['Игроку', [
     ['Регистрация и вход', 'Нажмите «Войти» → «Почта» → «Зарегистрироваться»: имя, город, почта и пароль. На почту придёт код из 6 цифр — введите его, и аккаунт готов. Дальше входите по почте и паролю на любом устройстве. Забыли пароль — «Забыли пароль?» на том же экране: придёт код, зададите новый.'],
-    ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу.'],
+    ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу. Пока турнир идёт, вкладка «Турниры» и запуск Oche возвращают прямо в него, а на «Играть» видно ваш матч и ход турнира.'],
     ['Когда мой матч', 'Как только ваш матч можно играть, в ленте и в турнире появится яркая плашка «Ваш матч»: соперник и мишень, телефон коротко завибрирует. Кнопка «Играть» открывает счётчик уже с этим матчем.'],
     ['Как вести счёт', '«Сумма» — набираете очки за подход и жмёте ввод, это быстрее всего. «По дротикам» — каждый дротик отдельно (Дубль/Трипл перед числом), тогда считаются попытки на дубль. Ошиблись — «Отмена» снимает последний бросок, можно отменять подряд.'],
     ['Подсказки закрытия и озвучка', 'Когда остаётся 170 и меньше, счётчик показывает, как закрыть. В настройках (шестерёнка) можно включить «Озвучка счёта»: телефон проговорит набор, перебор и сколько осталось — не нужно смотреть на экран.'],
@@ -6086,7 +6200,9 @@ async function boot() {
     }
   }
   const h = location.hash.slice(1);
-  if (h && validRoute(h)) R = h;
+  if (h && validRoute(h)) { R = h; if (h.startsWith('t.')) ROOM_LINK = h.slice(2); }
+  // без адреса — в свой турнир, если он ещё идёт
+  else if (!h && roomId() && validRoute('t.' + roomId())) R = 't.' + roomId();
   render();
 }
 boot();
