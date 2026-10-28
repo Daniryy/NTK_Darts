@@ -445,7 +445,8 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
   .rtbl th:last-child, .rtbl td:last-child { text-align: right; }
 }
 /* аккаунт под профилем: карточки сеткой, кнопки по ширине текста */
-.acc-grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.acc-grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+.acc-grid > .card { align-content: start; }
 @media (min-width: 820px) { .acc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .acc-grid .card.sec > .mini, .acc-grid .card.sec > div > .mini { justify-self: start; }
 .acc-grid .acc-adm { grid-column: 1 / -1; }
@@ -484,6 +485,12 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .seg2 button { padding: 8px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
 .seg2 button:hover { color: var(--fg); }
 .seg2 button.on { background: var(--fg); color: var(--bg); font-weight: 600; }
+.seg2 { scrollbar-width: none; }
+.seg2::-webkit-scrollbar { display: none; }
+/* вкладки панели управления: переносятся на новую строку, без полосы прокрутки */
+.seg2.wrap { flex-wrap: wrap; overflow: visible; justify-self: stretch; width: 100%; }
+.seg2.wrap button { flex: 1 0 auto; text-align: center; }
+@media (max-width: 700px) { .seg2.wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } .seg2.wrap button { padding: 8px 4px; white-space: normal; } }
 .seg2.full { justify-self: stretch; width: 100%; }
 .seg2.full button { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 6px; }
 /* линии сетки держатся на равной высоте колонок и flex:1 у пар/слотов */
@@ -1867,6 +1874,7 @@ const S = {
   modalMatch: null, quickModal: null, qualModal: null, settings: false, clearRes: false, gf: 'all', confirmQual: null, hp: null,
   buf: '' // ввод суммы в счётчике, не часть G
 };
+// окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
 const closeModals = () => { S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
 const anyModal = () => !!(S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
@@ -1993,13 +2001,13 @@ function renderModals() {
   if (S.modalMatch) {
     if (SRV && !MBY[S.modalMatch]) {
       const e = lz('match:' + S.modalMatch, () => Api.get('/api/matches/' + S.modalMatch).then(r => { if (r.match.card) svMatch(r.match.card); return r; }));
-      return '<div class="over" data-backdrop="1" role="dialog" aria-modal="true"><div class="ocard"><div class="ohead"><span class="label">Протокол</span>' + closeBtn + '</div>' + (svState(e, 'протокола') || '<div class="note-box">Матч ещё идёт.</div>') + '</div></div>';
+      return '<div class="over" role="dialog" aria-modal="true"><div class="ocard"><div class="ohead"><span class="label">Протокол</span>' + closeBtn + '</div>' + (svState(e, 'протокола') || '<div class="note-box">Матч ещё идёт.</div>') + '</div></div>';
     }
     const m = MBY[S.modalMatch];
     if (!m) { S.modalMatch = null; return ''; }
     const t = m.tid ? TBY[m.tid] : null;
     const A = m.pl[0], B = m.pl[1];
-    let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true"><div class="ocard">';
+    let h = '<div class="over" role="dialog" aria-modal="true"><div class="ocard">';
     const tg = t ? t.games.find(x => x.res && x.res.mid === m.id) : null;
     const no = tg ? gameNums(t, resolver(t)).get(tg.r + ':' + tg.i) : 0;
     h += '<div class="ohead"><span class="label">' + (tg && gName(t, tg, no) ? gName(t, tg, no) + ' · ' : '') + (t ? '<button class="lnk" data-act="go" data-v="t.' + t.id + '">' + esc(t.name) + '</button>' + (tg ? ' · ' + gameLabel(t, tg) : m.q ? ' · квалификация' : '') : 'Дружеский · ' + esc(exName(m))) + ' · ' + fmtDate(m.t) + '</span>' + closeBtn + '</div>';
@@ -2030,7 +2038,7 @@ function renderModals() {
     if (!gs || gs.st !== 'ready' || !P[gs.a] || !P[gs.b]) { S.quickModal = null; return ''; }
     const pa = P[gs.a], pb = P[gs.b], ltw = t.ltw, n = gameNums(t, resolver(t)).get(r + ':' + i);
     const valid = (la === ltw && lb >= 0 && lb < ltw) || (lb === ltw && la >= 0 && la < ltw);
-    let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Счёт матча"><div class="ocard">';
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Счёт матча"><div class="ocard">';
     h += '<div class="ohead"><span class="label">' + (gName(t, g, n) ? gName(t, g, n) + ' · ' : '') + gameLabel(t, g) + '</span>' + closeBtn + '</div>';
     h += '<div class="qm-names">' + noBadge(t, pa.id) + esc(pa.name) + ' — ' + noBadge(t, pb.id) + esc(pb.name) + '</div><div class="meta">' + esc(Games.label(exOf(t))) + ' · ' + ltwTxt(ltw) + '</div>';
     if (t.boards && t.boards.n && canDo(t, 'org')) {
@@ -2052,7 +2060,7 @@ function renderModals() {
     const { tid, id, k, val, err } = S.qualModal, t = TBY[tid];
     if (!t || !t.qual || !P[id]) { S.qualModal = null; return ''; }
     const ex = Games.norm(t.qual.ex), had = qRes(t, id)[k];
-    let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Результат квалификации"><div class="ocard">';
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Результат квалификации"><div class="ocard">';
     h += '<div class="ohead"><span class="label">Квалификация · попытка ' + (k + 1) + '</span>' + closeBtn + '</div>';
     h += '<div class="qm-names">' + noBadge(t, id) + esc(P[id].name) + '</div><div class="meta">' + esc(Games.label(ex)) + ' · ' + Games.unit(ex).tot + ' за ' + qVisits(ex) + ' ' + pl(qVisits(ex), 'подход', 'подхода', 'подходов') + ', от 0 до ' + exMax(ex) + '</div>';
     h += '<input class="inp num" id="q-val" type="number" inputmode="numeric" min="0" max="' + exMax(ex) + '" value="' + esc(val) + '" placeholder="Результат" style="font-size:28px;text-align:center" aria-label="Результат">';
@@ -2065,13 +2073,13 @@ function renderModals() {
   if (S.crop && cropImg) return cropModal();
   if (S.qr) {
     const t = TBY[S.qr], url = tourUrl(S.qr);
-    return '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
+    return '<div class="over" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
   }
   if (S.login) return loginModal();
   if (S.admOpen && SRV) return admCardModal();
   if (S.lbox) return '<div class="lbox" data-act="lbox-close" role="dialog" aria-modal="true" aria-label="Фото"><img src="' + esc(S.lbox) + '" alt=""></div>';
   if (S.settings) {
-    let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Настройки"><div class="ocard">';
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Настройки"><div class="ocard">';
     h += '<div class="ohead"><h2>Настройки</h2>' + closeBtn + '</div>';
     h += '<div class="seg2 full">' + [['dark', I.moon + ' Тёмная'], ['light', I.sun + ' Светлая']].map(([v, l]) => '<button class="' + (S.theme === v ? 'on' : '') + '" data-act="set-theme" data-v="' + v + '" aria-pressed="' + (S.theme === v) + '">' + l + '</button>').join('') + '</div>';
     h += '<div class="sws">' + PALETTES.map(p => '<button class="sw' + (S.palette === p.id ? ' on' : '') + '" data-act="set-palette" data-v="' + p.id + '" aria-pressed="' + (S.palette === p.id) + '"><i style="background:' + p.acc[S.theme === 'light' ? 1 : 0] + '"></i>' + p.name + '</button>').join('') + '</div>';
@@ -2408,6 +2416,13 @@ function tourDelLink(t) {
 function tourView(id) {
   if (SRV) {
     const e = tourE(id);
+    // турнира больше нет (удалён, очистка сервера): вкладка «Турниры» перестаёт вести в него
+    if (e.err && e.err.status === 404) {
+      // пришли сюда вкладкой «Турниры» — сразу в общий список
+      if (roomId() === id) { roomSet(null); setTimeout(() => { if (R === 't.' + id) go('tours'); }); }
+      if (ROOM_LINK === id) ROOM_LINK = null;
+      return '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button></div><div class="note-box"><b>Турнир не найден</b> — его удалили или ссылка устарела. <button class="mini" data-act="go" data-v="tours">Все турниры</button></div>';
+    }
     if (e.data == null) return '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button></div>' + svState(e, 'турнира');
   }
   const t = TBY[id];
@@ -3970,7 +3985,7 @@ function loginModal() {
   const L = S.login, c = Api.config || {};
   const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
   const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
-  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  let h = '<div class="over" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
   if (!tabs.some(x => x[0] === L.tab)) L.tab = tabs[0][0];
   if (tabs.length > 1) h += '<div class="seg2 full" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (L.tab === v) + '" class="' + (L.tab === v ? 'on' : '') + '" data-act="login-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -4107,9 +4122,9 @@ function meCard() {
   if (c.phone || me.phone) h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? off('phone') : '<button class="mini" data-act="link-phone">Привязать</button>');
   if (c.vk || me.vk) h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? off('vk') : '<button class="mini" data-act="link-vk">Привязать</button>');
   h += '</div>';
-  if (me.email && !me.emailOk && !c.email) h += '<p class="meta">Подтвердить почту можно будет, когда на сервере включат отправку писем. Входить по почте и паролю можно уже сейчас.</p>';
+  if (me.email && !me.emailOk && !c.email) h += '<p class="meta">Входить по почте' + (me.login ? '' : ' и паролю') + ' можно уже сейчас, подтвердить её — когда на сервере включат письма.</p>';
   if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
-  if (anyAdm() && (!c.vk || !c.email)) { const t = [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(' и '); h += '<p class="meta">' + t[0].toUpperCase() + t.slice(1) + ' пока не настроены на сервере — см. docs/server.md.</p>'; }
+  if (Api.role === 'tech' && (!c.vk || !c.email)) h += '<p class="meta">На сервере пока не подключены: ' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(', ') + '.</p>';
   h += '</div>';
   return '<div class="acc-grid">' + h + titleCard() + planCard() + clubCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
 }
@@ -4667,7 +4682,7 @@ function adminView() {
   // администратору нужен подтверждённый контакт: по нему восстанавливается доступ
   const cf = Api.config || {}, hasContact = Api.me.phone || Api.me.vk || (cf.email ? Api.me.emailOk : Api.me.email);
   if (Api.can('admin') && !hasContact) h += '<div class="note-box warn"><b>' + (cf.email ? 'Подтвердите почту или телефон.' : 'Привяжите почту.') + '</b> ' + (cf.email ? 'Если забудете пароль, доступ восстановится только через подтверждённый контакт.' : 'По ней войдёте, если забудете логин; подтвердить кодом можно будет, когда на сервере включат письма.') + '<div class="warn-a"><button class="btn sm" data-act="link-email">' + (cf.email ? 'Подтвердить почту' : 'Привязать почту') + '</button>' + (cf.phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div></div>';
-  h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  h += '<div class="seg2 wrap" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
   h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : T === 'srv' ? admServer() : admAccounts();
   return h + '</div>';
@@ -4728,7 +4743,7 @@ const RANKS_UI = { player: 0, host: 1, admin: 2, tech: 3 };
 function admCardModal() {
   const id = S.admOpen, e = lz('acard:' + id, () => Api.get('/api/admin/players/' + id), 15000);
   const close = '<button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button>';
-  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Карточка игрока"><div class="ocard acard"><div class="ohead"><span class="label">Карточка игрока</span>' + close + '</div>';
+  let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Карточка игрока"><div class="ocard acard"><div class="ohead"><span class="label">Карточка игрока</span>' + close + '</div>';
   const st = svState(e, 'карточки');
   if (st) return h + st + '</div></div>';
   const d = e.data, p = svPlayer(d.player), full = Api.perm('players'), tech = Api.role === 'tech', mine = p.owner === ME, high = p.role === 'admin' || p.role === 'tech';
@@ -4867,14 +4882,14 @@ const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', 
 function admBanners() {
   const e = lz('abanners', () => Api.get('/api/admin/banners'));
   const b = S.bnr || (S.bnr = { place: 'feed', title: '', body: '', link: '', image: '' });
-  let h = '<div class="panel"><span class="h2">Новый баннер</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (b.place === v ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '">' + BN_PLACE[v] + '</button>').join('') + '</div>';
+  let h = '<div class="panel" id="bnr-form"><span class="h2">' + (b.id ? 'Изменить баннер' : 'Новый баннер') + '</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (b.place === v ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '">' + BN_PLACE[v] + '</button>').join('') + '</div>';
   h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '"><input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link) + '">';
   h += '<div class="nrow"><input class="inp" data-bnr="image" placeholder="Картинка: ссылка https://… или загрузите" aria-label="Картинка" value="' + esc(b.image) + '"><label class="mini" style="cursor:pointer">Загрузить<input type="file" id="bnr-file" accept="image/jpeg,image/png,image/webp" hidden></label></div>';
   if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b), true);
-  h += '<button class="btn sm" data-act="bnr-add">Добавить баннер</button></div>';
+  h += b.id ? '<div class="row2"><button class="btn sm" data-act="bnr-add">Сохранить</button><button class="btn sm alt" data-act="bnr-cancel">Отмена</button></div></div>' : '<button class="btn sm" data-act="bnr-add">Добавить баннер</button></div>';
   const st = svState(e, 'баннеров');
   if (st) return h + st;
-  return h + (e.data.banners.length ? e.data.banners.map(x => '<div class="card sec">' + bannerBox(x, true) + '<div class="tstat"><span class="meta">' + BN_PLACE[x.place] + ' · переходов: ' + x.clicks + (x.ends ? ' · до ' + fmtDate(x.ends) : '') + '</span><div class="gacts"><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>').join('') : '<div class="note-box">Баннеров пока нет.</div>');
+  return h + (e.data.banners.length ? e.data.banners.map(x => '<div class="card sec">' + bannerBox(x, true) + '<div class="tstat"><span class="meta">' + BN_PLACE[x.place] + ' · переходов: ' + x.clicks + (x.ends ? ' · до ' + fmtDate(x.ends) : '') + '</span><div class="gacts"><button class="mini" data-act="bnr-edit" data-v="' + x.id + '">Изменить</button><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>').join('') : '<div class="note-box">Баннеров пока нет.</div>');
 }
 
 /* Баннеры: лента, страница турнира, табло. Переход считается на сервере. */
@@ -5570,11 +5585,6 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 document.addEventListener('click', e => {
   // защита от двойного тапа на конце лега
   if (R === 'play' && G && Date.now() < tapLock && e.target.closest && e.target.closest('.game, .over')) return;
-  if (e.target && e.target.dataset && e.target.dataset.backdrop) {
-    closeModals();
-    render();
-    return;
-  }
   const b = e.target.closest('[data-act]');
   if (!b || b.disabled) return;
   const a = b.dataset.act, v = b.dataset.v;
@@ -5893,9 +5903,17 @@ document.addEventListener('click', e => {
     case 'bnr-place': S.bnr.place = v; render(); break;
     case 'bnr-add': {
       const b = S.bnr, body = { place: b.place, title: b.title.trim(), body: b.body.trim(), link: b.link.trim() || null, image: b.image.trim() || null };
-      svDo(Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast('Баннер добавлен.'); });
+      svDo(b.id ? Api.patch('/api/admin/banners/' + b.id, body) : Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast(b.id ? 'Баннер сохранён.' : 'Баннер добавлен.'); });
       break;
     }
+    case 'bnr-edit': {
+      const e = SVC.abanners, x = e && e.data && e.data.banners.find(y => String(y.id) === v);
+      if (!x) break;
+      S.bnr = { id: x.id, place: x.place, title: x.title || '', body: x.body || '', link: x.link || '', image: x.image || '' };
+      render(); const f = $('bnr-form'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
+    }
+    case 'bnr-cancel': S.bnr = null; render(); break;
     case 'bnr-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/banners/' + id, { active: on === '1' }), () => { svStale('abanners'); svStale('banners:'); }); break; }
     case 'bnr-del': svDo(Api.del('/api/admin/banners/' + v), () => { svStale('abanners'); svStale('banners:'); toast('Баннер удалён.'); }); break;
     case 'banner': { const b = BANNERS[v]; if (b && b.link) { Api.post('/api/banners/' + v + '/click').catch(() => {}); window.open(b.link, '_blank', 'noopener'); } break; }
