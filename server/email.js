@@ -5,7 +5,7 @@ const config = require('./config');
 const { pool, tx, one } = require('./db');
 const { E, V, ApiError } = require('./errors');
 const { atLeast } = require('./roles');
-const { hashPassword, verifyPassword } = require('./password');
+const { hashPassword, verifyPassword, passwordProblem } = require('./password');
 const { mailOn, sendMail } = require('./mail');
 const { createPlayer } = require('./players');
 const { audit } = require('./audit');
@@ -133,6 +133,8 @@ module.exports = function routes(app) {
       }
       if (!owner || owner.id !== row.player_id) throw E.conflict('code_expired', 'Код устарел — запросите новый');
       if (owner.blocked) throw A.blockedErr();
+      // у администратора с логином пароль строже — от 10 символов
+      if (owner.login && passwordProblem(pw)) throw E.bad(passwordProblem(pw), 'password');
       const out = await one(c, 'UPDATE players SET pass_hash = $2, email_ok = true, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [owner.id, pass]);
       // новый пароль — старые входы закрываются
       await c.query('DELETE FROM sessions WHERE player_id = $1', [owner.id]);

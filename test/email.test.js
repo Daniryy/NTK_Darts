@@ -133,6 +133,11 @@ test('администратор подтверждает свою почту: �
   ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'tech@mail.ru', password: 'tech-darts-2026' }));
   const log = ok(await call(T, 'GET', '/api/admin/audit?target=' + ME)).items.map(x => x.action);
   assert.ok(log.includes('email.link') && log.includes('login.email'));
+  // новый пароль по письму: у администратора с логином — от 10 символов
+  await pool.query(`UPDATE players SET login = 'tech1' WHERE id = $1`, [ME]);
+  await forget('tech@mail.ru');
+  const r = ok(await call(anon(), 'POST', '/api/auth/email/send', { email: 'tech@mail.ru', purpose: 'reset' }));
+  err(await call(anon(), 'POST', '/api/auth/email/verify', { email: 'tech@mail.ru', purpose: 'reset', code: r.devCode, password: 'short-12' }), 400);
 });
 
 test('почта на сервере не настроена: регистрация сразу, адрес не подтверждён; письма не отправляются', async () => {
