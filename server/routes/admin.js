@@ -236,7 +236,7 @@ module.exports = async function (app) {
     const config = require('../config');
     if (config.prod) {
       const backup = require('node:path').join(__dirname, '..', '..', 'deploy', 'backup.sh');
-      try { await new Promise((ok, fail) => require('node:child_process').execFile('bash', [backup], { timeout: 180000 }, e => e ? fail(e) : ok())); }
+      try { await new Promise((ok, fail) => require('node:child_process').execFile('bash', [backup, '--full'], { timeout: 180000 }, e => e ? fail(e) : ok())); }
       catch (e) { req.log.error({ err: e.message }, 'backup before cleanup failed'); throw new (require('../errors').ApiError)(500, 'backup_failed', 'Копия базы не создалась — очистка отменена'); }
     }
     const n = await require('../clean').cleanAll([me.id]);
