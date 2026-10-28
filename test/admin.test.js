@@ -143,3 +143,58 @@ test('карточка игрока, завершить сеансы, журна
   const all = ok(await call(TECH, 'GET', '/api/admin/audit?limit=200')).items.map(x => x.action);
   assert.ok(all.includes('player.create'));
 });
+
+test('удаление аккаунта: право delete_players, не себя, не игрока турниров; турниры на регистрации — запись убирается', async () => {
+  // свой аккаунт без матчей и турниров
+  const a = ok(await call(TECH, 'POST', '/api/admin/players', { name: 'На Удаление' }), 201).player;
+  err(await call(ADMIN, 'DELETE', '/api/admin/players/' + a.id), 403);
+  err(await call(TECH, 'DELETE', '/api/admin/players/' + ME), 409);
+  // в сыгранных турнирах — нельзя
+  const busy = err(await call(TECH, 'DELETE', '/api/admin/players/p6'), 409);
+  assert.equal(busy.code, 'in_tournaments');
+  ok(await call(TECH, 'DELETE', '/api/admin/players/' + a.id));
+  err(await call(null, 'GET', '/api/players/' + a.id), 404);
+  assert.ok(ok(await call(TECH, 'GET', '/api/admin/audit?limit=20')).items.some(x => x.action === 'player.delete' && x.data.name === 'На Удаление'));
+  // право можно выдать администратору; администратора он всё равно не удалит
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { delete_players: ['admin'] } }));
+  const b = ok(await call(ADMIN, 'POST', '/api/admin/players', { name: 'Ещё Один' }), 201).player;
+  ok(await call(ADMIN, 'DELETE', '/api/admin/players/' + b.id));
+  err(await call(ADMIN, 'DELETE', '/api/admin/players/' + ME), 403);
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { delete_players: [] } }));
+});
+
+test('права: создавать турниры (create_tour), видеть контакты (contacts), тарифы (plans_edit)', async () => {
+  const body = { name: 'Проверка права', format: 'rr', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8'] };
+  ok(await call(PL, 'POST', '/api/tournaments', body), 201);
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { create_tour: ['host', 'admin'] } }));
+  err(await call(PL, 'POST', '/api/tournaments', body), 403);
+  ok(await call(HOST, 'POST', '/api/tournaments', body), 201);
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { create_tour: ['player', 'host', 'admin'] } }));
+  // контакты: администратор без права видит «скрыт», свой аккаунт ведущий видит всегда
+  await pool.query(`UPDATE players SET phone = '+79990001122' WHERE id = 'p11'`);
+  assert.equal(ok(await call(ADMIN, 'GET', '/api/admin/players/p11')).player.phone, '+79990001122');
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { contacts: [] } }));
+  const card = ok(await call(ADMIN, 'GET', '/api/admin/players/p11')).player;
+  assert.equal(card.phone, 'скрыт'); assert.equal(card.contacts, false);
+  assert.ok(!ok(await call(ADMIN, 'GET', '/api/admin/players?q=0001122')).players.some(x => x.id === 'p11'), 'поиск по телефону без права не находит');
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { contacts: ['admin'] } }));
+  // тарифы: по умолчанию только тех. администратор, право можно выдать
+  err(await call(ADMIN, 'PUT', '/api/admin/discounts', { ms: 20, kms: 10, r1: 5 }), 403);
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { plans_edit: ['admin'] } }));
+  ok(await call(ADMIN, 'PUT', '/api/admin/discounts', { ms: 20, kms: 10, r1: 5 }));
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { plans_edit: [] } }));
+});
+
+test('очистка сервера от демо-данных: право cleanup, подтверждение; остаются аккаунты со входом и тот, кто чистил', async () => {
+  err(await call(ADMIN, 'POST', '/api/admin/cleanup', { confirm: true }), 403);
+  err(await call(TECH, 'POST', '/api/admin/cleanup', {}), 400);
+  await pool.query(`UPDATE players SET email = 'p20@mail.ru' WHERE id = 'p20'`);
+  const n = ok(await call(TECH, 'POST', '/api/admin/cleanup', { confirm: true }));
+  assert.ok(n.tours > 0 && n.removed > 0);
+  const left = (await pool.query('SELECT id FROM players ORDER BY id')).rows.map(x => x.id);
+  assert.ok(left.includes(ME) && left.includes('p20') && left.includes('p11'), 'со входом и тот, кто чистил');
+  assert.ok(!left.includes('p6'));
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM tournaments')).rows[0].n, 0);
+  assert.equal(ok(await call(null, 'GET', '/api/rating')).total, 0);
+  assert.equal(ok(await call(TECH, 'GET', '/api/me')).player.id, ME);
+});

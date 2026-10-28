@@ -169,6 +169,12 @@
 ### `POST /api/admin/players/:id/logout` — право `players`
 Завершить все сеансы игрока. Ответ `{ ok, sessions }`.
 
+### `DELETE /api/admin/players/:id` — право `delete_players`
+Удалить аккаунт без возврата: профиль, вход, сеансы, тарифы, заявки. Себя — нельзя (`409`); администраторов — только тех. администратор (`403`). Игрок в идущем или сыгранном турнире не удаляется — `409 in_tournaments` (его можно заблокировать); из турниров на регистрации запись убирается. Дружеские матчи остаются у соперников без ссылки на игрока. Ответ `{ ok: true }`; в журнале `player.delete` с именем и ID.
+
+### `POST /api/admin/cleanup` — право `cleanup`
+Очистка сервера от демо-данных, тело `{ "confirm": true }`. На сервере (`NODE_ENV=production`) сначала `deploy/backup.sh` — не вышло, очистка отменяется (`500 backup_failed`). Удаляются все турниры и матчи, клубы, баннеры и игроки без входа; остаются аккаунты с логином, почтой, телефоном или VK, заведённые ими и тот, кто чистит; рейтинг и статистика обнуляются. Ответ `{ tours, matches, players, kept, removed, files }`.
+
 ### `PUT /api/admin/players/:id/login`, `DELETE /api/admin/players/:id/login` — тех. администратор
 Выдать (`{ login, password }`) или убрать вход по логину и паролю. Только для ролей `admin` и `tech`; `409 login_taken` — логин занят. При понижении роли ниже администратора логин снимается сам.
 
@@ -178,12 +184,14 @@
 
 | Право | По умолчанию | Что разрешает |
 |---|---|---|
+| `create_tour` | все роли | создавать свои турниры |
 | `club_tour` | ведущий | турниры от имени своего клуба |
 | `club_tools` | ведущий | логотип и спонсоры клуба на табло, помощники, взносы, статистика клуба |
 | `streams` | ведущий | камеры в своих турнирах |
 | `accounts` | ведущий | заводить аккаунты с кодом входа (видеть свои) |
 | `host_nums` | ведущий | свои номера игроков |
 | `players` | администратор | править любых игроков, подтверждать, коды, завершать сеансы |
+| `contacts` | администратор | видеть телефон и почту игроков в списке и карточке (свои аккаунты видны всегда); без права — «скрыт», поиск по ним не работает |
 | `block` | администратор | блокировать |
 | `give_host` | администратор | выдавать и снимать роли игроков: ведущий и свои роли (ранг 1) |
 | `clubs` | администратор | клубы и их ведущие |
@@ -195,9 +203,12 @@
 | `titles` | администратор | проверять, подтверждать и снимать звания |
 | `audit` | администратор | журнал |
 | `banners` | тех. администратор | баннеры |
+| `plans_edit` | тех. администратор | тарифы: цены и состав (`POST`, `PATCH /api/admin/plans`), скидки за звание |
+| `delete_players` | тех. администратор | удалять аккаунты |
+| `cleanup` | тех. администратор | очистка сервера от демо-данных |
 
 ### `GET /api/admin/audit?limit=50&before=время&target=id` — право `audit`
-Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `login.email`, `email.link`, `email.set`, `password.change`, `password.reset`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `club.helper_add|helper_rm`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
+Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `login.email`, `email.link`, `email.set`, `password.change`, `password.reset`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.delete`, `cleanup`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `banner.create|edit|delete`, `club.helper_add|helper_rm`, `title.*`, `plan.request|grant|extend|reject|end|create|edit`, `discounts`, `role.create|rename|delete`, `cli.*`.
 
 ## Звания
 

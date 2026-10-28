@@ -21,10 +21,15 @@ async function newClaim(c) {
     if (!await one(c, 'SELECT 1 FROM players WHERE claim = $1', [code])) return code;
   }
 }
-const adminJSON = p => Object.assign(playerShort(p), {
-  vk: p.vk_id != null, phone: p.phone || null, claim: p.claim || null, role: p.role, blocked: p.blocked, owner: p.owner_id, created: p.created_at,
-  login: p.login || null, email: p.email || null, emailOk: !!p.email_ok
-});
+// телефон и почта — с правом contacts, а свои аккаунты и себя видно всегда
+const seesContacts = (me, p) => !me || can(me, 'contacts') || p.owner_id === me.id || p.id === me.id;
+const adminJSON = (p, me) => {
+  const c = seesContacts(me, p);
+  return Object.assign(playerShort(p), {
+    vk: p.vk_id != null, phone: c ? p.phone || null : p.phone ? 'скрыт' : null, claim: p.claim || null, role: p.role, blocked: p.blocked, owner: p.owner_id, created: p.created_at,
+    login: p.login || null, email: c ? p.email || null : p.email ? 'скрыта' : null, emailOk: !!p.email_ok, contacts: c
+  });
+};
 // свой номер ведущего для игрока: n — 1…9999, занятый номер переходит к новому игроку
 async function setNum(c, hostId, n, playerId) {
   await c.query('DELETE FROM host_nums WHERE host_id = $1 AND (n = $2 OR player_id = $3)', [hostId, n, playerId]);
@@ -48,10 +53,11 @@ module.exports = async function (app) {
     if (req.query.blocked === '1') where.push('blocked');
     if (q) {
       const a = arg(q), digits = q.replace(/\D/g, '');
-      where.push(`(position(${a} in lower(name)) > 0 OR position(${a} in handle) > 0 OR position(${a} in lower(code)) > 0 OR position(${a} in coalesce(login, '')) > 0 OR position(${a} in coalesce(email, '')) > 0` + (digits.length >= 4 ? ` OR position(${arg(digits)} in coalesce(phone, '')) > 0` : '') + ')');
+      const ct = can(me, 'contacts');
+      where.push(`(position(${a} in lower(name)) > 0 OR position(${a} in handle) > 0 OR position(${a} in lower(code)) > 0 OR position(${a} in coalesce(login, '')) > 0` + (ct ? ` OR position(${a} in coalesce(email, '')) > 0` : '') + (ct && digits.length >= 4 ? ` OR position(${arg(digits)} in coalesce(phone, '')) > 0` : '') + ')');
     }
     const rows = await all(pool, 'SELECT * FROM players' + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ` ORDER BY ${q ? 'name' : 'created_at DESC, id DESC'} LIMIT ${limit}`, args);
-    return { players: rows.map(adminJSON) };
+    return { players: rows.map(p => adminJSON(p, me)) };
   });
 
   // GET /api/admin/players/:id — карточка: всё об аккаунте, клубы, сеансы, матчи, турниры, последние действия
@@ -63,7 +69,7 @@ module.exports = async function (app) {
     const n = async (sql) => (await one(pool, sql, [p.id])).n;
     const owner = p.owner_id ? await one(pool, 'SELECT id, name FROM players WHERE id = $1', [p.owner_id]) : null;
     return {
-      player: adminJSON(p),
+      player: adminJSON(p, me),
       owner,
       clubs: await all(pool, `SELECT c.id, c.name, c.status FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 ORDER BY c.name`, [p.id]),
       sessions: await n('SELECT count(*)::int AS n FROM sessions WHERE player_id = $1 AND expires_at > ' + Date.now()),
@@ -91,7 +97,7 @@ module.exports = async function (app) {
       await audit(c, me, 'player.create', out, { phone: !!phone });
       return out;
     });
-    return reply.code(201).send({ player: adminJSON(p) });
+    return reply.code(201).send({ player: adminJSON(p, me) });
   });
 
   // PATCH /api/admin/players/:id — { name, city, club, title, claim: true (новый код) | false (убрать),
@@ -150,7 +156,7 @@ module.exports = async function (app) {
       return out;
     });
     clearCache();
-    return { player: adminJSON(p) };
+    return { player: adminJSON(p, me) };
   });
 
   // завершить все сеансы игрока (потерял телефон, вход с чужого устройства)
@@ -185,7 +191,7 @@ module.exports = async function (app) {
       return out;
     });
     clearCache();
-    return { player: adminJSON(p) };
+    return { player: adminJSON(p, me) };
   });
   app.delete('/api/admin/players/:id/login', async req => {
     const me = needTech(req);
@@ -198,7 +204,45 @@ module.exports = async function (app) {
       return out;
     });
     clearCache();
-    return { player: adminJSON(p) };
+    return { player: adminJSON(p, me) };
+  });
+
+  // удалить аккаунт (право delete_players): не себя; администраторов — только тех. администратор.
+  // Игрок в идущем или сыгранном турнире не удаляется (сломались бы сетка и рейтинг); из турниров на регистрации
+  // его запись убирается. Дружеские матчи остаются у соперников без ссылки на игрока.
+  app.delete('/api/admin/players/:id', async req => {
+    const me = needPerm(req, 'delete_players', 'Удалять аккаунты может тех. администратор');
+    const out = await tx(async c => {
+      const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (!p) throw E.notFound('Игрок не найден');
+      if (p.id === me.id) throw E.conflict('conflict', 'Свой аккаунт удалить нельзя');
+      if (RANK[p.role] >= RANK.admin && me.role !== 'tech') throw E.forbidden('Администраторов удаляет тех. администратор');
+      const busy = await one(c, `SELECT count(*)::int AS n FROM entries e JOIN tournaments t ON t.id = e.tournament_id WHERE e.player_id = $1 AND t.status <> 'reg'`, [p.id]);
+      if (busy.n) throw E.conflict('in_tournaments', 'Игрок участвует в ' + busy.n + ' ' + (busy.n === 1 ? 'турнире' : 'турнирах') + ' — пока они есть, аккаунт удалить нельзя (можно заблокировать)');
+      await c.query('DELETE FROM players WHERE id = $1', [p.id]);
+      await audit(c, me, 'player.delete', null, { id: p.id, name: p.name, code: p.code });
+      return { id: p.id, photo: p.photo };
+    });
+    // фото профиля — файлом на диске
+    if (out.photo) try { require('node:fs').unlinkSync(require('node:path').join(require('../config').uploadDir, out.photo.replace(/^.*\//, ''))); } catch (e) { /* уже нет */ }
+    clearCache();
+    return { ok: true };
+  });
+
+  // очистка сервера от демо-данных (право cleanup): на сервере сначала копия базы (deploy/backup.sh)
+  app.post('/api/admin/cleanup', async req => {
+    const me = needPerm(req, 'cleanup', 'Очистку делает тех. администратор');
+    if ((req.body || {}).confirm !== true) throw E.bad('Подтвердите очистку', 'confirm');
+    const config = require('../config');
+    if (config.prod) {
+      const backup = require('node:path').join(__dirname, '..', '..', 'deploy', 'backup.sh');
+      try { await new Promise((ok, fail) => require('node:child_process').execFile('bash', [backup], { timeout: 180000 }, e => e ? fail(e) : ok())); }
+      catch (e) { req.log.error({ err: e.message }, 'backup before cleanup failed'); throw new (require('../errors').ApiError)(500, 'backup_failed', 'Копия базы не создалась — очистка отменена'); }
+    }
+    const n = await require('../clean').cleanAll([me.id]);
+    await audit(pool, me, 'cleanup', null, { tours: n.tours, matches: n.matches, players: n.removed });
+    clearCache();
+    return n;
   });
 
   // права ролей: таблица и изменение (тех. администратор). PUT { perms: { ключ: [роли] } }

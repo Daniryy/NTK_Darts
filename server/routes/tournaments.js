@@ -143,6 +143,7 @@ module.exports = async function (app) {
 
   app.post('/api/tournaments', async (req, reply) => {
     const me = needPlayer(req), b = req.body || {};
+    if (!can(me, 'create_tour')) throw E.forbidden('Создавать турниры вам не разрешено — обратитесь к администратору');
     const f = tourFields(b, true, me);
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
