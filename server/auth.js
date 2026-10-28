@@ -98,7 +98,7 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, dev: config.devLogin }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
@@ -127,7 +127,7 @@ function routes(app) {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
       if (!t) throw E.notFound('Код не найден — проверьте у организатора');
       if (t.id === me.id) throw E.conflict('conflict', 'Этот аккаунт уже ваш');
-      if (t.vk_id != null || t.phone != null) throw E.conflict('conflict', 'К аккаунту уже привязан вход');
+      if (t.vk_id != null || t.phone != null || t.email != null) throw E.conflict('conflict', 'К аккаунту уже привязан вход');
       const used = await one(c, `SELECT (SELECT count(*) FROM match_lines WHERE player_id = $1) + (SELECT count(*) FROM entries WHERE player_id = $1)
         + (SELECT count(*) FROM tournaments WHERE owner_id = $1) AS n`, [me.id]);
       if (used.n > 0) throw E.conflict('conflict', 'У вашего аккаунта уже есть матчи или турниры — объединить может только администратор');
@@ -137,11 +137,11 @@ function routes(app) {
         + (SELECT count(*) FROM player_plans WHERE player_id = $1 AND status IN ('active', 'requested')) + (SELECT count(*) FROM title_requests WHERE player_id = $1 AND status = 'review')
         + (SELECT count(*) FROM clubs WHERE owner_id = $1 AND status IN ('pending', 'active')) AS n`, [me.id]);
       if (cur.role !== 'player' || cur.title || cur.login || own.n > 0) throw E.conflict('conflict', 'У вашего аккаунта есть роль, звание, клуб или тариф — объединить может только администратор');
-      await c.query('UPDATE players SET vk_id = NULL, phone = NULL WHERE id = $1', [me.id]);
+      await c.query('UPDATE players SET vk_id = NULL, phone = NULL, email = NULL WHERE id = $1', [me.id]);
       await c.query('UPDATE sessions SET player_id = $2 WHERE player_id = $1', [me.id, t.id]);
       await c.query('UPDATE photos SET owner_id = $2 WHERE owner_id = $1', [me.id, t.id]);
       await c.query('UPDATE players SET owner_id = $2 WHERE owner_id = $1', [me.id, t.id]);
-      const out = await one(c, 'UPDATE players SET vk_id = $2, phone = $3, claim = NULL WHERE id = $1 RETURNING *', [t.id, cur.vk_id, cur.phone]);
+      const out = await one(c, 'UPDATE players SET vk_id = $2, phone = $3, email = $4, email_ok = $5, pass_hash = $6, claim = NULL WHERE id = $1 RETURNING *', [t.id, cur.vk_id, cur.phone, cur.email, cur.email_ok, cur.pass_hash]);
       await c.query('DELETE FROM players WHERE id = $1', [me.id]);
       return out;
     });
@@ -249,29 +249,33 @@ function routes(app) {
     return meResp(pool, p);
   });
 
-  // сменить свой пароль: { current, password }
+  // сменить свой пароль: { current, password }. Пароля ещё нет, а почта привязана — задать без current
   app.put('/api/me/password', async req => {
     const me = needPlayer(req), b = req.body || {};
     ipLimit(req, 'pass', 10, 10 * 6e4);
     const cur = await one(pool, 'SELECT * FROM players WHERE id = $1', [me.id]);
-    if (!cur.login || !cur.pass_hash) throw E.conflict('conflict', 'У вас нет входа по паролю');
-    if (!await verifyPassword(typeof b.current === 'string' ? b.current : '', cur.pass_hash)) throw E.conflict('bad_login', 'Текущий пароль неверный');
-    const bad = passwordProblem(b.password);
+    if (!cur.pass_hash && !cur.email) throw E.conflict('conflict', 'Сначала привяжите почту — по ней и паролю будете входить');
+    if (cur.pass_hash && !await verifyPassword(typeof b.current === 'string' ? b.current : '', cur.pass_hash)) throw E.conflict('bad_login', 'Текущий пароль неверный');
+    // администраторам с логином — строже (от 10 символов)
+    const bad = cur.login ? passwordProblem(b.password) : require('./email').playerPassProblem(b.password);
     if (bad) throw E.bad(bad, 'password');
     await tx(async c => {
       await c.query('UPDATE players SET pass_hash = $2, pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [me.id, await hashPassword(b.password)]);
       await require('./audit').audit(c, me, 'password.change', me, null);
     });
+    cache.clear();
     return { ok: true };
   });
 
-  // отвязать способ входа: { phone | vk }; хотя бы один должен остаться
+  // отвязать способ входа: { phone | vk | email }; хотя бы один должен остаться
   app.delete('/api/me/login/:kind', async req => {
-    const me = needPlayer(req), kind = V.oneOf(req.params.kind, 'kind', ['phone', 'vk']);
+    const me = needPlayer(req), kind = V.oneOf(req.params.kind, 'kind', ['phone', 'vk', 'email']);
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
-      if ((kind === 'phone' ? cur.vk_id : cur.phone) == null && !(cur.login && cur.pass_hash)) throw E.conflict('conflict', 'Это единственный способ входа — сначала привяжите другой');
-      return one(c, `UPDATE players SET ${kind === 'phone' ? 'phone' : 'vk_id'} = NULL WHERE id = $1 RETURNING *`, [me.id]);
+      const ways = { phone: cur.phone != null, vk: cur.vk_id != null, email: !!(cur.email && cur.pass_hash), login: !!(cur.login && cur.pass_hash) };
+      delete ways[kind];
+      if (!Object.values(ways).some(Boolean)) throw E.conflict('conflict', 'Это единственный способ входа — сначала привяжите другой');
+      return one(c, `UPDATE players SET ${kind === 'phone' ? 'phone = NULL' : kind === 'vk' ? 'vk_id = NULL' : 'email = NULL, email_ok = false'} WHERE id = $1 RETURNING *`, [me.id]);
     });
     cache.clear();
     return meResp(pool, p);
@@ -350,4 +354,4 @@ function routes(app) {
   });
 }
 
-module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone };
+module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone, ipLimit, tooMany, blockedErr, sha, PASS_FAILS, PASS_LOCK, PASS_SESSION, SESSION_MS };

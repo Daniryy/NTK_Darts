@@ -429,6 +429,7 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .back { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14px; font-weight: 500; justify-self: start; padding: 4px 0; }
 .back:hover { color: var(--fg); }
 .tstat { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.reg-cta { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 .hint { display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .hint .row { display: flex; gap: 8px; align-items: center; }
 .hlp { padding: 2px 16px; }
@@ -3753,24 +3754,26 @@ function parseNums(s) {
   return out;
 }
 
-// окно входа: телефон (код из SMS), VK ID, код от ведущего; link — привязать телефон к своему аккаунту
+// окно входа: почта и пароль (и регистрация), телефон (код из SMS), VK ID, код от ведущего;
+// link: true — привязать телефон, 'email' — привязать почту к своему аккаунту
 function loginOpen(o) {
   closeModals();
-  const c = Api.config || {};
-  S.login = Object.assign({ tab: c.phone ? 'phone' : c.vk ? 'vk' : 'code', phone: '', otp: '', code: '', sent: false, dev: '', err: '', busy: false }, o || {});
+  S.login = Object.assign({ tab: 'email', mode: 'login', phone: '', otp: '', code: '', sent: false, dev: '', err: '', busy: false, email: '', name: (Api.me && Api.me.name) || '', city: '', step: '' }, o || {});
   render();
   setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30);
 }
 const devBox = () => Api.config && Api.config.dev ? '<details class="meta"><summary>Вход для разработки</summary><div class="nrow" style="margin-top:8px"><input class="inp" id="dev-id" placeholder="id игрока, например p17" value="p17"><button class="mini go" data-act="dev-login">Войти</button></div></details>' : '';
 function loginModal() {
   const L = S.login, c = Api.config || {};
-  const tabs = [['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === 'phone'));
-  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Вход"><div class="ocard login"><div class="ohead"><h2>' + (L.link ? 'Привязать телефон' : 'Вход в Oche') + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
+  const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
+  let h = '<div class="over" data-backdrop="1" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
   if (!tabs.some(x => x[0] === L.tab)) L.tab = tabs[0][0];
   if (tabs.length > 1) h += '<div class="seg2 full" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (L.tab === v) + '" class="' + (L.tab === v ? 'on' : '') + '" data-act="login-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const dis = L.busy ? ' disabled' : '', call = (L.method || c.phoneBy) !== 'sms', digits = L.digits || (call ? 4 : 6);
-  if (L.tab === 'phone' && !L.sent) {
+  if (L.tab === 'email') h += mailForm(L, c, dis);
+  else if (L.tab === 'phone' && !L.sent) {
     h += '<div class="field"><label class="label" for="login-phone">Номер телефона</label><input class="inp big" id="login-phone" data-lf="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" value="' + esc(L.phone) + '"></div>';
     h += '<button class="btn" data-act="login-send"' + dis + '>' + (call ? 'Позвоните мне' : 'Получить код') + '</button><span class="meta">' + (call ? 'Вам поступит звонок — брать трубку не нужно: код — последние 4 цифры номера, с которого звонят.' : 'Пришлём SMS с кодом из 6 цифр.') + (L.link ? '' : ' Номер новый — создадим аккаунт, имя укажете в профиле.') + '</span>';
   } else if (L.tab === 'phone') {
@@ -3785,6 +3788,65 @@ function loginModal() {
   if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
   if (!L.link) h += devBox();
   return h + '</div></div>';
+}
+// вкладка «Почта»: вход (почта + пароль), регистрация, новый пароль, привязка почты; step 'code' — ввод кода из письма
+function mailForm(L, c, dis) {
+  const inp = (id, lf, type, ph, extra) => '<input class="inp big" id="' + id + '" data-lf="' + lf + '" type="' + type + '" placeholder="' + ph + '" aria-label="' + ph + '" value="' + esc(L[lf] || '') + '"' + (extra || '') + '>';
+  const mailInp = inp('mail-email', 'email', 'email', 'Почта', ' inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false"');
+  const linkBtn = (act, txt) => '<button class="lnk meta" data-act="mail-mode" data-v="' + act + '">' + txt + '</button>';
+  let h = '';
+  if (L.step === 'code') {
+    h += '<p class="meta">Письмо с кодом отправлено на <b>' + esc(L.email) + '</b>. Не пришло за минуту — проверьте папку «Спам».</p>';
+    h += '<div class="field"><label class="label" for="mail-code">Код из письма</label><input class="inp big code-inp" id="mail-code" data-lf="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="' + esc(L.otp || '') + '"></div>';
+    if (L.mode === 'reset') h += inp('mail-pass', 'pass', 'password', 'Новый пароль, от 8 символов', ' autocomplete="new-password"');
+    if (L.dev) h += '<div class="note-box">Разработка: письма не отправляются, код <b>' + esc(L.dev) + '</b>.</div>';
+    h += '<button class="btn" data-act="mail-verify"' + dis + '>' + (L.mode === 'reg' ? 'Создать аккаунт' : L.mode === 'reset' ? 'Сохранить пароль и войти' : 'Подтвердить') + '</button>';
+    h += '<div class="row2"><button class="ghost sm" data-act="mail-back">Другая почта</button><button class="ghost sm" data-act="mail-resend"' + dis + '>Прислать код ещё раз</button></div>';
+    return h;
+  }
+  if (L.link === 'email') return h + '<p class="meta">Пришлём код на почту. Подтверждённая почта — вход по паролю и восстановление пароля, если забудете.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>';
+  if (L.mode === 'reg') {
+    h += inp('mail-name', 'name', 'text', 'Имя и фамилия', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
+    h += '<button class="btn" data-act="mail-reg"' + dis + '>Зарегистрироваться</button><span class="meta">' + (c.email ? 'Пришлём на почту код подтверждения.' : 'Почта понадобится для входа вместе с паролем.') + ' Уже есть аккаунт? ' + linkBtn('login', 'Войти') + '</span>';
+    return h;
+  }
+  if (L.mode === 'reset') return h + '<p class="meta">Пришлём на почту код — с ним зададите новый пароль.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>' + linkBtn('login', '← Назад ко входу');
+  h += mailInp + inp('mail-pass', 'pass', 'password', 'Пароль', ' autocomplete="current-password"') + '<button class="btn" data-act="mail-login"' + dis + '>Войти</button>';
+  if (c.email) h += '<button class="lnk meta" data-act="mail-mode" data-v="reset" style="justify-self:end">Забыли пароль?</button>';
+  h += '<div class="reg-cta"><span class="meta">Впервые в Oche?</span><button class="btn alt" data-act="mail-mode" data-v="reg">Зарегистрироваться</button></div>';
+  return h;
+}
+function mailAct(a) {
+  const L = S.login;
+  if (!L) return;
+  const val = id => { const el = $(id); return el ? el.value.trim() : ''; }, pass = () => { const el = $('mail-pass'); return el ? el.value : ''; };
+  const toCode = r => { L.step = 'code'; L.otp = ''; L.dev = r.devCode || ''; setTimeout(() => { const el = $('mail-code'); if (el) el.focus(); }, 30); };
+  if (a === 'login') {
+    L.email = val('mail-email');
+    if (!L.email || !pass()) { L.err = 'Введите почту и пароль.'; return render(); }
+    return loginDo(Api.mailLogin(L.email, pass()), () => loggedIn());
+  }
+  if (a === 'reg') {
+    L.name = val('mail-name'); L.city = val('mail-city'); L.email = val('mail-email'); L.regPass = pass();
+    if (!L.name || !L.email) { L.err = 'Введите имя и почту.'; return render(); }
+    return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: pass() }), r => r.player ? loggedIn('Аккаунт создан. Добро пожаловать!') : toCode(r));
+  }
+  if (a === 'send' || a === 'resend') {
+    if (a === 'send') L.email = val('mail-email');
+    if (!L.email) { L.err = 'Введите почту.'; return render(); }
+    // повтор кода при регистрации — та же форма регистрации ещё раз
+    if (L.mode === 'reg') return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: L.regPass || '' }), toCode);
+    return loginDo(Api.mailSend(L.email, L.link === 'email' ? 'link' : 'reset'), toCode);
+  }
+  if (a === 'verify') {
+    L.otp = val('mail-code');
+    const purpose = L.link === 'email' ? 'link' : L.mode === 'reg' ? 'reg' : 'reset';
+    return loginDo(Api.mailVerify({ email: L.email, purpose, code: L.otp, password: purpose === 'reset' ? pass() : undefined }), r => {
+      if (purpose === 'link') { svPlayer(Api.me); svStale('player:'); closeModals(); toast('Почта подтверждена.'); return; }
+      loggedIn(purpose === 'reg' ? 'Аккаунт создан. Добро пожаловать!' : 'Пароль изменён, вы вошли.');
+      if (r.created) go('p.me');
+    });
+  }
 }
 async function loginDo(p, ok) {
   const L = S.login;
@@ -3826,8 +3888,13 @@ function meCard() {
   const row = (name, val, act) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + act + '</div>';
   let h = '<div class="card sec"><span class="label">Вход в аккаунт</span><div>';
   h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? (me.vk ? '<button class="ghost sm" data-act="unlink" data-v="phone">Отвязать</button>' : '') : c.phone ? '<button class="mini" data-act="link-phone">Привязать</button>' : '');
-  h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
-  h += '</div>' + (!me.phone && !me.vk ? '<p class="meta">Привяжите телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
+  h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? (me.phone || (me.email && me.pass) ? '<button class="ghost sm" data-act="unlink" data-v="vk">Отвязать</button>' : '') : c.vk ? '<button class="mini" data-act="link-vk">Привязать</button>' : '');
+  const ways = n => [me.phone, me.vk, me.email && me.pass, me.login].filter(Boolean).length > n;
+  h += row('Почта', me.email ? esc(me.email) + (me.emailOk ? ' · подтверждена' : ' · не подтверждена') : 'не привязана',
+    (me.email && !me.emailOk && c.email ? '<button class="mini" data-act="link-email">Подтвердить</button>' : !me.email && c.email ? '<button class="mini" data-act="link-email">Привязать</button>' : '') + (me.email && ways(1) ? '<button class="ghost sm" data-act="unlink" data-v="email">Отвязать</button>' : ''));
+  if (me.email && !me.login) h += row('Пароль', me.pass ? 'задан — вход по почте и паролю' : 'не задан', '<button class="mini" data-act="pass-ed">' + (me.pass ? 'Сменить' : 'Задать') + '</button>');
+  if (S.passEd && me.email && !me.login) h += '<div class="panel">' + (me.pass ? '<input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль">' : '') + '<input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль"><input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="pass-set">Сохранить пароль</button></div>';
+  h += '</div>' + (!ways(0) ? '<p class="meta">Привяжите почту, телефон или VK — тогда сможете входить сами на любом устройстве. Без них после выхода войти можно только по коду от ведущего.</p>' : '') + '</div>';
   h += titleCard() + planCard() + clubCard();
   if (anyAdm()) h += '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>';
   return h;
@@ -3959,7 +4026,7 @@ function planCard() {
   const e = lz('plans', () => Api.get('/api/plans'), 60000);
   if (!e.data) return '';
   const m = e.data.mine[0];
-  return '<div class="card sec"><span class="label">Тариф</span>' + (m ? '<div><b>' + esc(m.plan.name) + '</b> <span class="meta">до ' + new Date(m.ends).toLocaleDateString('ru-RU') + '</span></div>' : e.data.request ? '<p class="meta">Заявка на «' + esc(e.data.request.plan.name) + '» ждёт подключения.</p>' : '<p class="meta">Обычный аккаунт. Тарифы: Игрок+, Ведущий — для турниров от клуба.</p>') + '<button class="mini" data-act="go" data-v="plans">Тарифы</button></div>';
+  return '<div class="card sec"><span class="label">Тариф</span>' + (m ? '<div><b>' + esc(m.plan.name) + '</b> <span class="meta">до ' + new Date(m.ends).toLocaleDateString('ru-RU') + '</span></div>' : e.data.request ? '<p class="meta">Заявка на «' + esc(e.data.request.plan.name) + '» ждёт подключения.</p>' : '<p class="meta">Обычный аккаунт. Тарифы: Pro — статистика и без рекламы, «Ведущий» — турниры от клуба и инструменты клуба.</p>') + '<button class="mini" data-act="go" data-v="plans">Тарифы</button></div>';
 }
 // админка: заявки, действующие, подключить вручную; тех. администратор — тарифы и скидки
 function admPlans() {
@@ -4381,6 +4448,8 @@ function adminView() {
     Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('banners') ? [['banners', 'Баннеры']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
+  // администратору нужен подтверждённый контакт: по нему восстанавливается доступ
+  if (Api.can('admin') && !(Api.me.emailOk || Api.me.phone || Api.me.vk)) h += '<div class="note-box warn"><b>Подтвердите почту или телефон.</b> Если забудете пароль, доступ восстановится только через подтверждённый контакт.<div class="row2" style="margin-top:8px">' + ((Api.config || {}).email ? '<button class="btn sm" data-act="link-email">Подтвердить почту</button>' : '') + ((Api.config || {}).phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div>' + (!(Api.config || {}).email && !(Api.config || {}).phone ? '<p class="meta">Письма и SMS на сервере ещё не настроены — см. docs/server.md, раздел «Почта».</p>' : '') + '</div>';
   h += '<div class="seg2" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
   h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : admAccounts();
@@ -4397,7 +4466,7 @@ function admAccounts() {
   if (S.admNew) h += codeNote(S.admNew);
   h += '</details>';
   if (full) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон, логин" aria-label="Найти игрока">';
+  h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон, почта, логин" aria-label="Найти игрока">';
   const st = svState(e, 'игроков');
   if (st) return h + st;
   const rows = e.data.players;
@@ -4407,12 +4476,12 @@ function admAccounts() {
 // строка игрока: вся строка открывает карточку
 function admRow(p) {
   svPlayer(p);
-  const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.login ? ' · логин ' + p.login : '');
+  const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.email ? ' · ' + p.email + (p.emailOk ? ' ✓' : '') : '') + (p.login ? ' · логин ' + p.login : '');
   return '<div class="adm-row click" role="button" tabindex="0" data-act="adm-open" data-v="' + p.id + '">' + avatar(p.id) + '<div style="min-width:0;display:grid"><span class="ell"><b>' + esc(p.name) + '</b> ' + roleChip(p.role) + (p.ver ? ' <span class="meta">✓</span>' : '') + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + '</span><span class="meta ell">' + esc(meta) + '</span>' + (p.claim ? '<span class="meta">код входа: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><span class="meta">›</span></div>';
 }
 // карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
 const ACT_NAME = {
-  'login.password': 'вошёл по паролю', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
+  'login.password': 'вошёл по паролю', 'login.email': 'вошёл по почте и паролю', 'email.link': 'подтвердил почту', 'password.reset': 'задал новый пароль по письму', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
   'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
   'club.host_add': 'назначил ведущим', 'club.helper_add': 'добавил помощника клуба', 'club.helper_rm': 'убрал помощника клуба', 'club.host_rm': 'снял с ведущих', 'banner.create': 'добавил баннер', 'banner.edit': 'изменил баннер', 'banner.delete': 'удалил баннер',
@@ -4446,7 +4515,7 @@ function admCardModal() {
   const canEdit = (full || (mine && !p.vk)) && (!high || tech || p.id === ME);
   h += '<div class="ac-top">' + avatar(p.id, 'lg') + '<div style="min-width:0;display:grid;gap:4px"><h2 class="ell">' + esc(p.name) + '</h2><span>' + roleChip(p.role) + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + (p.ver ? ' <span class="meta">✓ подтверждён</span>' : '') + '</span><span class="meta">ID ' + esc(p.code) + ' · @' + esc(p.handle) + '</span></div><button class="mini" data-act="go" data-v="p.' + p.id + '">Профиль</button></div>';
   const kv = (k, v) => '<div><span class="label">' + k + '</span><b>' + v + '</b></div>';
-  h += '<div class="ac-grid">' + kv('Телефон', p.phone ? esc(showPhone(p.phone)) : '—') + kv('VK', p.vk ? 'привязан' : '—') + kv('Логин', p.login ? esc(p.login) + (d.locked ? ' (закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')' : '') : '—') + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
+  h += '<div class="ac-grid">' + kv('Телефон', p.phone ? esc(showPhone(p.phone)) : '—') + kv('VK', p.vk ? 'привязан' : '—') + kv('Почта', p.email ? esc(p.email) + (p.emailOk ? ' ✓ подтверждена' : ' · не подтверждена') : '—') + kv('Логин', p.login ? esc(p.login) + (d.locked ? ' (закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')' : '') : '—') + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
@@ -5352,13 +5421,28 @@ document.addEventListener('click', e => {
     case 'dev-login': { const el = $('dev-id'); svDo(Api.devLogin(el ? el.value.trim() : ''), () => loggedIn()); break; }
     case 'login-tab': if (S.login) { S.login.tab = v; S.login.err = ''; render(); setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30); } break;
     case 'login-send': loginAct('send'); break;
+    case 'mail-mode': if (S.login) { Object.assign(S.login, { mode: v, step: '', err: '', otp: '', dev: '' }); render(); setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30); } break;
+    case 'mail-login': mailAct('login'); break;
+    case 'mail-reg': mailAct('reg'); break;
+    case 'mail-send': mailAct('send'); break;
+    case 'mail-resend': mailAct('resend'); break;
+    case 'mail-verify': mailAct('verify'); break;
+    case 'mail-back': if (S.login) { Object.assign(S.login, { step: '', err: '', otp: '', dev: '' }); render(); } break;
+    case 'link-email': loginOpen({ tab: 'email', link: 'email', email: (Api.me && Api.me.email) || '' }); break;
+    case 'pass-ed': S.passEd = !S.passEd; render(); break;
+    case 'pass-set': {
+      const g = id => { const el = $(id); return el ? el.value : ''; };
+      if (g('pw-new') !== g('pw-new2')) { toast('Пароли не совпадают.'); break; }
+      svDo(Api.put('/api/me/password', { current: g('pw-cur'), password: g('pw-new') }), () => { S.passEd = false; Api.me.pass = true; toast('Пароль сохранён. Входите по почте и паролю.'); });
+      break;
+    }
     case 'login-verify': loginAct('verify'); break;
     case 'login-code': loginAct('code'); break;
     case 'login-back': if (S.login) { S.login.sent = false; S.login.err = ''; render(); } break;
     case 'login-vk': location.href = Api.loginUrl(location.pathname + location.hash); break;
     case 'link-phone': loginOpen({ tab: 'phone', link: true }); break;
     case 'link-vk': location.href = Api.loginUrl(location.pathname + location.hash, true); break;
-    case 'unlink': svDo(Api.del('/api/me/login/' + v), r => { Api.setMe(r); svPlayer(r.player); toast(v === 'phone' ? 'Телефон отвязан.' : 'VK отвязан.'); }); break;
+    case 'unlink': svDo(Api.del('/api/me/login/' + v), r => { Api.setMe(r); svPlayer(r.player); toast(v === 'phone' ? 'Телефон отвязан.' : v === 'email' ? 'Почта отвязана.' : 'VK отвязан.'); }); break;
     case 'copy-id': copyText(v, 'ID скопирован: ' + v); break;
     case 'club-form': S.clubForm = !S.clubForm; render(); break;
     case 'club-send': {
@@ -5846,6 +5930,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
+  if (e.key === 'Enter' && t && /^mail-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
   if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
   if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && t && (t.id === 'st-login' || t.id === 'st-pass')) { e.preventDefault(); if (t.id === 'st-login') { const n = $('st-pass'); if (n) n.focus(); } else { const b = $('app').querySelector('[data-act="staff-login"]'); if (b) b.click(); } return; }
@@ -5932,6 +6017,7 @@ window.addEventListener('appinstalled', () => { installEv = null; toast('Oche н
 /* ===== Как пользоваться: коротко для игроков и ведущих ===== */
 const HELP = [
   ['Игроку', [
+    ['Регистрация и вход', 'Нажмите «Войти» → «Почта» → «Зарегистрироваться»: имя, город, почта и пароль. На почту придёт код из 6 цифр — введите его, и аккаунт готов. Дальше входите по почте и паролю на любом устройстве. Забыли пароль — «Забыли пароль?» на том же экране: придёт код, зададите новый.'],
     ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу.'],
     ['Когда мой матч', 'Как только ваш матч можно играть, в ленте и в турнире появится яркая плашка «Ваш матч»: соперник и мишень, телефон коротко завибрирует. Кнопка «Играть» открывает счётчик уже с этим матчем.'],
     ['Как вести счёт', '«Сумма» — набираете очки за подход и жмёте ввод, это быстрее всего. «По дротикам» — каждый дротик отдельно (Дубль/Трипл перед числом), тогда считаются попытки на дубль. Ошиблись — «Отмена» снимает последний бросок, можно отменять подряд.'],

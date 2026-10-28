@@ -27,6 +27,17 @@ module.exports = {
     from: env.SMS_FROM || '',
     dayMax: +env.SMS_DAY_MAX || 300 // SMS за сутки на весь сервер: защита от счёта за рассылку
   },
+  // письма с кодами: SMTP_HOST, SMTP_PORT (465 — SSL, 587 — STARTTLS), SMTP_USER, SMTP_PASS, MAIL_FROM;
+  // без SMTP_HOST в разработке — log (код пишется в журнал и приходит в ответе)
+  mail: {
+    provider: env.SMTP_HOST ? 'smtp' : (prod ? '' : 'log'),
+    host: env.SMTP_HOST || '',
+    port: +env.SMTP_PORT || 465,
+    user: env.SMTP_USER || '',
+    pass: env.SMTP_PASS || '',
+    from: env.MAIL_FROM || env.SMTP_USER || '',
+    dayMax: +env.MAIL_DAY_MAX || 500 // писем за сутки на весь сервер
+  },
   rateMax: +env.RATE_MAX || 20, // запросов за 2 с с одного устройства
   logLevel: env.LOG_LEVEL || (prod ? 'info' : 'warn')
 };
