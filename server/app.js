@@ -48,6 +48,7 @@ function build(opts = {}) {
     auth.hooks(api);
     api.get('/api/health', async () => { await pool.query('SELECT 1'); return { ok: true }; });
     auth.routes(api);
+    require('./email')(api);
     api.register(require('./routes/players'));
     api.register(require('./routes/tournaments'));
     api.register(require('./routes/matches'));

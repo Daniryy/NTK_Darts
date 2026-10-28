@@ -92,6 +92,13 @@ SMS_RU_API_ID=
 # оповещения: токен бота от @BotFather и id чата
 TELEGRAM_TOKEN=
 TELEGRAM_CHAT=
+# письма с кодами (регистрация, новый пароль): ящик Яндекса или Mail.ru и пароль приложения.
+# Задать: bash /srv/oche/app/deploy/set.sh SMTP_HOST=smtp.yandex.ru SMTP_USER=ящик@yandex.ru SMTP_PASS=пароль_приложения
+# Проверить: bash /srv/oche/app/deploy/mailtest.sh ваш@адрес. Без почты регистрация работает, но адреса не подтверждаются.
+SMTP_HOST=
+SMTP_PORT=465
+SMTP_USER=
+SMTP_PASS=
 EOF
   chown root:oche "$ENV_FILE"; chmod 640 "$ENV_FILE"
 else
@@ -184,4 +191,5 @@ if [[ -z $DOMAIN ]]; then
   echo "Когда будет домен: DOMAIN=ваш.домен EMAIL=почта bash $0"
 fi
 [[ $has != 0 ]] || echo "Администратор: cd $APP && sudo -u oche bash -c 'set -a; . $ENV_FILE; set +a; node tools/admin.js new \"Имя Фамилия\" --login логин'"
+grep -q '^SMTP_HOST=.\+' "$ENV_FILE" || echo "Почта для кодов регистрации: bash $APP/deploy/set.sh SMTP_HOST=smtp.yandex.ru SMTP_USER=ящик@yandex.ru SMTP_PASS=пароль_приложения"
 echo "Обновить код: bash $APP/deploy/deploy.sh"

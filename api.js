@@ -117,6 +117,11 @@
     phoneStart: phone => Api.post('/api/auth/phone', { phone }),
     async phoneVerify(phone, code, link) { return Api.setMe(await Api.post('/api/auth/phone/verify', { phone, code, link: !!link })); },
     async codeLogin(code) { return Api.setMe(await Api.post('/api/auth/code', { code })); },
+    // почта: регистрация (ответ — письмо с кодом или сразу аккаунт), письмо с кодом (link | reset), проверка кода, вход
+    async register(b) { const r = await Api.post('/api/auth/register', b); return r.player ? Api.setMe(r) : r; },
+    mailSend: (email, purpose) => Api.post('/api/auth/email/send', { email, purpose }),
+    async mailVerify(b) { return Api.setMe(await Api.post('/api/auth/email/verify', b)); },
+    async mailLogin(email, password) { return Api.setMe(await Api.post('/api/auth/email/login', { email, password })); },
     async logout() { await Api.post('/api/auth/logout'); Api.setMe({}); },
 
     /* ===== Очередь неотправленного =====

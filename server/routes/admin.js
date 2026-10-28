@@ -23,7 +23,7 @@ async function newClaim(c) {
 }
 const adminJSON = p => Object.assign(playerShort(p), {
   vk: p.vk_id != null, phone: p.phone || null, claim: p.claim || null, role: p.role, blocked: p.blocked, owner: p.owner_id, created: p.created_at,
-  login: p.login || null
+  login: p.login || null, email: p.email || null, emailOk: !!p.email_ok
 });
 // свой номер ведущего для игрока: n — 1…9999, занятый номер переходит к новому игроку
 async function setNum(c, hostId, n, playerId) {
@@ -48,7 +48,7 @@ module.exports = async function (app) {
     if (req.query.blocked === '1') where.push('blocked');
     if (q) {
       const a = arg(q), digits = q.replace(/\D/g, '');
-      where.push(`(position(${a} in lower(name)) > 0 OR position(${a} in handle) > 0 OR position(${a} in lower(code)) > 0 OR position(${a} in coalesce(login, '')) > 0` + (digits.length >= 4 ? ` OR position(${arg(digits)} in coalesce(phone, '')) > 0` : '') + ')');
+      where.push(`(position(${a} in lower(name)) > 0 OR position(${a} in handle) > 0 OR position(${a} in lower(code)) > 0 OR position(${a} in coalesce(login, '')) > 0 OR position(${a} in coalesce(email, '')) > 0` + (digits.length >= 4 ? ` OR position(${arg(digits)} in coalesce(phone, '')) > 0` : '') + ')');
     }
     const rows = await all(pool, 'SELECT * FROM players' + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ` ORDER BY ${q ? 'name' : 'created_at DESC, id DESC'} LIMIT ${limit}`, args);
     return { players: rows.map(adminJSON) };
@@ -116,7 +116,7 @@ module.exports = async function (app) {
       if (b.claim === true) {
         if (cur.vk_id != null) throw E.conflict('conflict', 'Аккаунт привязан к VK — игрок входит сам');
         // по коду войдёт любой, у кого он есть: аккаунту с телефоном новый код выдаёт только администратор
-        if (!full && (cur.phone != null || cur.login)) throw E.forbidden('Игрок входит по номеру телефона — новый код выдаёт администратор');
+        if (!full && (cur.phone != null || cur.login || cur.email)) throw E.forbidden('Игрок входит сам (телефон или почта) — новый код выдаёт администратор');
         set.claim = await newClaim(c);
       } else if (b.claim === false) set.claim = null;
       if (b.ver !== undefined) {
