@@ -330,6 +330,47 @@ module.exports = async function (app) {
     });
   });
 
+  // протокол результатов (организатор или помощник): шапка, главный судья, места с данными игроков для протокола
+  app.get('/api/tournaments/:id/protocol', async (req, reply) => {
+    const me = needPlayer(req), t = await getTour(pool, req.params.id, false);
+    needStaff(t, me);
+    const R = require('../regions');
+    const rows = await all(pool, `SELECT e.place_lo, e.place_hi, e.seed_no, p.id, p.name, p.last_name, p.first_name, p.mid_name, p.birth_year, p.sex,
+      p.title, p.region, p.city, p.club FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = $1
+      ORDER BY e.place_lo NULLS LAST, e.place_hi NULLS LAST, e.seed_no`, [t.id]);
+    reply.header('Cache-Control', 'private, no-store');
+    return {
+      proto: t._row.proto || {}, chief: (t.refs && t.refs.chief) || null,
+      rows: rows.map(p => ({ id: p.id, lo: p.place_lo, hi: p.place_hi, name: p.name, lastName: p.last_name, firstName: p.first_name, midName: p.mid_name,
+        birthYear: p.birth_year, sex: p.sex, title: p.title || '', region: p.region || R.regionOf(p.city) || '', city: p.city, club: p.club }))
+    };
+  });
+  // шапка протокола и выполненные разряды (организатор): { league, tour, about, done: { id: «КМС» } }
+  app.patch('/api/tournaments/:id/protocol', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      const pr = Object.assign({}, t._row.proto);
+      if (b.league !== undefined) pr.league = V.optStr(b.league, 'league', 120);
+      if (b.tour !== undefined) pr.tour = V.optStr(b.tour, 'tour', 120);
+      if (b.about !== undefined) pr.about = V.optStr(b.about, 'about', 1500);
+      if (b.done !== undefined) {
+        if (!b.done || typeof b.done !== 'object' || Array.isArray(b.done)) throw E.bad('done: { id: разряд }', 'done');
+        const done = {};
+        for (const [id, v] of Object.entries(b.done)) {
+          if (!t.players.includes(id)) throw E.bad('Игрок не участвует в турнире', 'done');
+          const x = V.optStr(v, 'done', 20);
+          if (x) done[id] = x;
+        }
+        pr.done = done;
+      }
+      await c.query('UPDATE tournaments SET proto = $2 WHERE id = $1', [t.id, JSON.stringify(pr)]);
+      forget('t', t.id);
+      return { proto: pr };
+    });
+  });
+
   // QR-карточки участников с лайт-профилем: игрок наводит камеру — входит и сразу видит турнир. Организатор получает
   // карточки тех, кого завёл сам (или его клуб); с правом players — всех. Кода ещё нет — выдаётся.
   app.post('/api/tournaments/:id/cards', async req => {

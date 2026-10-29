@@ -62,7 +62,7 @@ module.exports = async function (app) {
       await c.query('DELETE FROM title_requests WHERE player_id = $1', [p.id]);
       await c.query(`UPDATE players SET name = 'Удалённый игрок', handle = 'deleted_' || id, city = '', club = '', ver = false, vk_id = NULL, phone = NULL,
         email = NULL, email_ok = false, login = NULL, pass_hash = NULL, claim = NULL, photo = NULL, title = '', walkon = '', role = 'player',
-        base_role = 'player', blocked = true, rated = 0, consent_at = NULL WHERE id = $1`, [p.id]);
+        base_role = 'player', blocked = true, rated = 0, consent_at = NULL, last_name = '', first_name = '', mid_name = '', birth_year = NULL, sex = NULL, region = '', note = '' WHERE id = $1`, [p.id]);
       return out;
     });
     for (const f of files) fs.promises.unlink(f).catch(() => {});

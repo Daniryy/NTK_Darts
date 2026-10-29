@@ -43,8 +43,23 @@ async function createPlayer(c, p) {
   throw new Error('createPlayer: не удалось подобрать handle и code');
 }
 
+// данные для протокола: { lastName, firstName, midName, birthYear, sex, region } → поля players (только присланные)
+function infoFields(b) {
+  const { V, E } = require('./errors'), R = require('./regions'), o = {};
+  if (b.lastName !== undefined) o.last_name = V.optStr(b.lastName, 'lastName', 40);
+  if (b.firstName !== undefined) o.first_name = V.optStr(b.firstName, 'firstName', 40);
+  if (b.midName !== undefined) o.mid_name = V.optStr(b.midName, 'midName', 40);
+  if (b.birthYear !== undefined) o.birth_year = b.birthYear === null || b.birthYear === '' ? null : V.int(+b.birthYear, 'birthYear', 1920, new Date().getFullYear());
+  if (b.sex !== undefined) o.sex = b.sex === null || b.sex === '' ? null : V.oneOf(b.sex, 'sex', ['m', 'f']);
+  if (b.region !== undefined) {
+    o.region = V.optStr(b.region, 'region', 80);
+    if (o.region && !R.REGIONS.some(r => r[0] === o.region)) throw E.bad('Субъект РФ — из списка', 'region');
+  }
+  return o;
+}
+const infoJSON = p => ({ lastName: p.last_name || '', firstName: p.first_name || '', midName: p.mid_name || '', birthYear: p.birth_year || null, sex: p.sex || null, region: p.region || '' });
 const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '', lite: !!p.lite });
 // свой профиль: ещё способы входа (телефон целиком — только себе)
-const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '', phone: p.phone || null, vk: p.vk_id != null, login: p.login || null, email: p.email || null, emailOk: !!p.email_ok, pass: !!p.pass_hash, lite: !!p.lite, twofa: !!p.totp_on, backupLeft: p.totp_on ? (p.totp_backup || []).length : null } : null;
+const meJSON = p => p ? Object.assign(infoJSON(p), { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '', phone: p.phone || null, vk: p.vk_id != null, login: p.login || null, email: p.email || null, emailOk: !!p.email_ok, pass: !!p.pass_hash, lite: !!p.lite, twofa: !!p.totp_on, backupLeft: p.totp_on ? (p.totp_backup || []).length : null }) : null;
 
-module.exports = { createPlayer, playerShort, meJSON };
+module.exports = { createPlayer, playerShort, meJSON, infoFields, infoJSON };
