@@ -15,7 +15,7 @@ async function loadTours(c, rows) {
   const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
-  const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished,
+  const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished, m.started, m.quick,
     (SELECT json_agg(json_build_array(l.pts, l.darts) ORDER BY l.idx) FROM match_lines l WHERE l.match_id = m.id) AS ln
     FROM matches m WHERE m.tournament_id = ANY($1)`, [ids]);
   const ph = await all(c, `SELECT id, file, tournament_id, w, h FROM photos WHERE tournament_id = ANY($1) ORDER BY created_at`, [ids]);
@@ -54,6 +54,7 @@ function build(row, ents, ms, qs) {
   if (row.split) t.split = row.split;
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
+  if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
   if (row.layout) t.layout = row.layout;
   if (row.labels) t.labels = row.labels;
@@ -61,6 +62,9 @@ function build(row, ents, ms, qs) {
     t.qual = { ex: row.qual.ex, tries: row.qual.tries, res: {} };
     qs.forEach(q => { (t.qual.res[q.player_id] = t.qual.res[q.player_id] || [])[q.try] = { v: q.v, mid: q.match_id, t: q.t }; });
   }
+  // темп: средняя длительность матча и попытки квалификации в счётчике (мс) — для «осталось примерно»
+  const dur = q => { const d = ms.filter(m => m.status === 'done' && !m.quick && (m.q_player != null) === q && m.started && m.finished).map(m => m.finished - m.started).filter(x => x > 30e3 && x < 90 * 6e4); return d.length ? Math.round(d.reduce((a, x) => a + x, 0) / d.length) : null; };
+  t.pace = { match: dur(false), qual: dur(true) };
   Object.defineProperty(t, '_row', { value: row });
   Object.defineProperty(t, '_ents', { value: ents });
   if (row.status === 'reg') return t;

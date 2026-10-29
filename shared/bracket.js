@@ -247,7 +247,12 @@
   // свободные мишени получают готовые игры без мишени по порядку номеров. true — что-то поменялось.
   function assignBoards(t, rv) {
     const bd = t.boards;
-    if (!bd || !t.games || !t.games.length) return false;
+    if (!bd) return false;
+    if (t.stage === 'qual') return assignQual(t);
+    // квалификация закрыта — её мишени больше не нужны
+    const wasQ = !!bd.q;
+    delete bd.q;
+    if (!t.games || !t.games.length) return wasQ;
     rv = rv || resolver(t);
     const at = bd.at || (bd.at = {}), before = JSON.stringify(at), used = new Set();
     Object.keys(at).forEach(k => {
@@ -263,7 +268,29 @@
       if (b > bd.n) break;
       at[g.r + ':' + g.i] = b; used.add(b);
     }
-    return JSON.stringify(at) !== before;
+    return JSON.stringify(at) !== before || wasQ;
+  }
+  // квалификация: игроки по двое на мишень (бросают по очереди), сначала по одному на каждую.
+  // Сдавший все попытки освобождает место — его получает следующий по номеру. bd.q — { id игрока: мишень }
+  function assignQual(t) {
+    const bd = t.boards, q = bd.q || (bd.q = {}), before = JSON.stringify(q);
+    const tries = t.qual ? t.qual.tries : 0, res = (t.qual && t.qual.res) || {};
+    const done = id => { const r = res[id] || []; for (let k = 0; k < tries; k++) if (!r[k]) return false; return true; };
+    const cnt = {};
+    Object.keys(q).forEach(id => {
+      const b = q[id];
+      if (!t.players.includes(id) || done(id) || !(Number.isInteger(b) && b >= 1 && b <= bd.n) || (cnt[b] || 0) >= 2) delete q[id];
+      else cnt[b] = (cnt[b] || 0) + 1;
+    });
+    const no = id => (t.nums && t.nums[id]) || t.players.indexOf(id) + 1;
+    const wait = t.players.filter(id => !q[id] && !done(id)).sort((x, y) => no(x) - no(y));
+    for (const id of wait) {
+      let best = 0;
+      for (let b = 1; b <= bd.n; b++) if ((cnt[b] || 0) < 2 && (!best || (cnt[b] || 0) < (cnt[best] || 0))) best = b;
+      if (!best) break;
+      q[id] = best; cnt[best] = (cnt[best] || 0) + 1;
+    }
+    return JSON.stringify(q) !== before;
   }
 
   // все игроки с местами: [{ id, lo, hi }], по возрастанию места; для сервера и итоговой таблицы
