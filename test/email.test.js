@@ -135,12 +135,10 @@ test('администратор подтверждает свою почту: �
   const s = ok(await call(T, 'POST', '/api/auth/email/send', { email: 'tech@mail.ru', purpose: 'link' }));
   ok(await call(T, 'POST', '/api/auth/email/verify', { email: 'tech@mail.ru', purpose: 'link', code: s.devCode }));
   ok(await call(T, 'PUT', '/api/me/password', { password: 'tech-darts-2026' }));
-  // у администратора после пароля — код из приложения; вход в журнал пишется после него
-  const st = ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'tech@mail.ru', password: 'tech-darts-2026' }));
-  assert.equal(st.need2fa, 'setup');
-  ok(await call(anon(), 'POST', '/api/auth/2fa', { ticket: st.ticket, code: require('../server/totp').codeAt(st.secret, Math.floor(Date.now() / 30000)) }));
+  // администраторы по почте не входят — только по логину на #admin
+  err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'tech@mail.ru', password: 'tech-darts-2026' }), 403);
   const log = ok(await call(T, 'GET', '/api/admin/audit?target=' + ME)).items.map(x => x.action);
-  assert.ok(log.includes('email.link') && log.includes('login.email'));
+  assert.ok(log.includes('email.link'));
   // новый пароль по письму: у администратора с логином — от 10 символов
   await pool.query(`UPDATE players SET login = 'tech1' WHERE id = $1`, [ME]);
   await forget('tech@mail.ru');
@@ -240,24 +238,29 @@ test('квота: не больше 100 новых гостей в сутки у
   err(await call(u, 'POST', '/api/players', { name: 'Гость 100' }), 429, 'quota');
 });
 
-test('администратор: вход по почте и новый пароль по письму — только с кодом из приложения', async () => {
+test('администратор: по почте не входит; новый пароль по письму — без сеанса, для входа по логину', async () => {
   const u = anon();
   const r = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Почтовый Админ', email: 'adm2fa@mail.ru', password: 'darts-2026' }));
   const id = ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'adm2fa@mail.ru', purpose: 'reg', code: r.devCode })).player.id;
   await pool.query(`UPDATE players SET role = 'admin' WHERE id = $1`, [id]);
   const v = anon();
-  const l = ok(await call(v, 'POST', '/api/auth/email/login', { email: 'adm2fa@mail.ru', password: 'darts-2026' }));
-  assert.equal(l.need2fa, 'setup');
+  // верный пароль — всё равно отказ (неверный — как у всех: bad_login, не выдаёт, что аккаунт админский)
+  err(await call(v, 'POST', '/api/auth/email/login', { email: 'adm2fa@mail.ru', password: 'darts-2026' }), 403);
+  err(await call(v, 'POST', '/api/auth/email/login', { email: 'adm2fa@mail.ru', password: 'wrong-2026' }), 409, 'bad_login');
   assert.equal(ok(await call(v, 'GET', '/api/me')).player, null);
-  // новый пароль по письму: сеансы закрыты, вход — через код
+  // новый пароль по письму: сеансы закрыты, входа нет — дальше по логину с кодом
   await forget('adm2fa@mail.ru');
   const s = ok(await call(v, 'POST', '/api/auth/email/send', { email: 'adm2fa@mail.ru', purpose: 'reset' }));
   const x = ok(await call(v, 'POST', '/api/auth/email/verify', { email: 'adm2fa@mail.ru', purpose: 'reset', code: s.devCode, password: 'Admin-Pass-2026' }));
-  assert.equal(x.need2fa, 'setup');
+  assert.equal(x.adminLogin, true);
   assert.equal(x.player, undefined);
   assert.equal(ok(await call(v, 'GET', '/api/me')).player, null);
+  // с логином новый пароль работает — через код из приложения
+  await pool.query(`UPDATE players SET login = 'adm2fa' WHERE id = $1`, [id]);
+  const st = ok(await call(v, 'POST', '/api/auth/password', { login: 'adm2fa', password: 'Admin-Pass-2026' }));
+  assert.equal(st.need2fa, 'setup');
   const T = require('../server/totp');
-  const me = ok(await call(v, 'POST', '/api/auth/2fa', { ticket: x.ticket, code: T.codeAt(x.secret, Math.floor(Date.now() / 30000)) }));
+  const me = ok(await call(v, 'POST', '/api/auth/2fa', { ticket: st.ticket, code: T.codeAt(st.secret, Math.floor(Date.now() / 30000)) }));
   assert.equal(me.player.id, id);
   assert.equal(me.player.twofa, true);
 });
