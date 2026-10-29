@@ -230,7 +230,7 @@ module.exports = async function (app) {
           const err = checkVisit(m, visits, v);
           if (err) throw E.badEvent(err, ev.seq);
           visits.push(v);
-          data = ev.type === 'bull' ? { leg: v.leg, p: v.p } : v;
+          data = ev.type === 'bull' ? Object.assign({ leg: v.leg, p: v.p }, v.at ? { at: v.at } : {}) : v;
         } else if (ev.type === 'undo') {
           if (!visits.length) throw E.badEvent('Нечего отменять', ev.seq);
           if (own >= 0 && !visits[visits.length - 1].tb && visits[visits.length - 1].p !== own) throw E.badEvent('Отменить можно только свой последний подход — соперник уже бросил', ev.seq);
@@ -356,6 +356,8 @@ module.exports = async function (app) {
     const ids = m.players.map(p => p.id).filter(Boolean), ph = ids.length ? await all(pool, 'SELECT id, photo FROM players WHERE id = ANY($1)', [ids]) : [];
     const out = matchJSON(m, req, card);
     out.players = m.players.map(p => Object.assign({}, p, { photo: (ph.find(x => x.id === p.id) || {}).photo || null }));
+    // время ходов игроков — по всем событиям (когда запрошен весь матч)
+    if (since == null) out.times = require('../timing').matchTimes(m, evs);
     return { match: out, events: evs.map(eventJSON), version: m.version };
   });
 };

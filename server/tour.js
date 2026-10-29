@@ -66,6 +66,10 @@ function build(row, ents, ms, qs) {
   // темп: средняя длительность матча и попытки квалификации в счётчике (мс) — для «осталось примерно»
   const dur = q => { const d = ms.filter(m => m.status === 'done' && !m.quick && (m.q_player != null) === q && m.started && m.finished).map(m => m.finished - m.started).filter(x => x > 30e3 && x < 90 * 6e4); return d.length ? Math.round(d.reduce((a, x) => a + x, 0) / d.length) : null; };
   t.pace = { match: dur(false), qual: dur(true) };
+  // когда турнир на деле начался — первый матч в счётчике (для «идёт 1 ч 20 мин»)
+  const st0 = ms.map(m => +m.started).filter(Boolean);
+  if (st0.length) t.began = Math.min(...st0);
+  if (row.done_at) t.doneAt = +row.done_at;
   Object.defineProperty(t, '_row', { value: row });
   Object.defineProperty(t, '_ents', { value: ents });
   if (row.status === 'reg') return t;

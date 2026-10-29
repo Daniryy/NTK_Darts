@@ -37,10 +37,14 @@ function activeVisits(rows) {
 }
 
 // подход из события: только известные поля
+// at — момент подхода на телефоне (для статистики времени): принимается, если он в пределах матча
 function visitOf(m, ev) {
-  if (ev.type === 'bull') return { leg: ev.leg, p: ev.p, tb: 1 };
-  if (exOf(m).k === 'x01') return { leg: ev.leg, p: ev.p, s: ev.s, pts: ev.pts, n: ev.n, b: ev.b, d: ev.d == null ? null : ev.d };
-  return { leg: ev.leg, p: ev.p, v: ev.v, d: ev.d == null ? null : ev.d };
+  const at = Number.isFinite(ev.at) && ev.at >= (+m.started || 0) - 6e4 && ev.at <= Date.now() + 6e4 ? Math.round(ev.at) : null;
+  const v = ev.type === 'bull' ? { leg: ev.leg, p: ev.p, tb: 1 }
+    : exOf(m).k === 'x01' ? { leg: ev.leg, p: ev.p, s: ev.s, pts: ev.pts, n: ev.n, b: ev.b, d: ev.d == null ? null : ev.d }
+      : { leg: ev.leg, p: ev.p, v: ev.v, d: ev.d == null ? null : ev.d };
+  if (at != null) v.at = at;
+  return v;
 }
 
 // ошибка — текст; иначе null. Подход должен совпасть с тем, что считает сервер.

@@ -380,6 +380,19 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .duo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: duoPulse 1.2s ease-in-out infinite; }
 @keyframes duoPulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
 .g-pad-area.duo-off { position: relative; min-height: 220px; }
+.tm-tiles { margin-bottom: 4px; }
+.tm-match { display: flex; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-top: 8px; border-top: 1px solid var(--line); }
+.tm-match b { color: var(--fg); }
+.tm-list { display: grid; gap: 2px; }
+.tm-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) minmax(70px, 30%) auto; grid-template-areas: "n name bar v" ". sub sub sub"; align-items: center; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tm-row:last-child { border-bottom: 0; }
+.tm-row.me .tm-name { color: var(--green); }
+.tm-n { grid-area: n; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tm-name { grid-area: name; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-bar { grid-area: bar; height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.tm-bar i { display: block; height: 100%; border-radius: 4px; background: var(--green); }
+.tm-row .num { grid-area: v; font-variant-numeric: tabular-nums; }
+.tm-sub { grid-area: sub; font-size: 12px; }
 .conf-note { text-align: left; cursor: pointer; width: 100%; color: var(--fg); }
 .conf-note:hover { border-color: var(--green); }
 .consent { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.45; }
@@ -2134,6 +2147,9 @@ function renderModals() {
       const ms = l => ({ ...l, avg: l.darts ? l.pts / l.darts * 3 : null, coa: l.coa || l.coh });
       if (m.pl.every(l => !l.darts)) h += '<div class="note-box">Счёт внесён по легам, без статистики бросков.</div>';
       else h += '<div>' + statRows(ms(A), ms(B)) + '</div>';
+      // время: сколько шёл матч и среднее время на подход у каждого (сервер)
+      const te = SRV && !m.quick ? lz('match:' + m.id, () => Api.get('/api/matches/' + m.id), 60000) : null, tm = te && te.data && te.data.match.times;
+      if (tm && (tm.dur || tm.per.some(x => x.n))) h += '<div class="tm-match"><span>' + esc(nameOf(A)) + ': <b>' + secTxt(tm.per[0] && tm.per[0].avg) + '</b> на подход</span><span>' + (tm.dur ? 'матч шёл ' + msTxt(tm.dur) : '') + '</span><span>' + esc(nameOf(B)) + ': <b>' + secTxt(tm.per[1] && tm.per[1].avg) + '</b> на подход</span></div>';
     } else {
       h += '<div class="stats"><table><thead><tr><th>Игрок</th><th>Леги</th><th>Ср.</th><th>Перв. 9</th><th>180</th></tr></thead><tbody>';
       m.pl.forEach(p => { h += '<tr><td>' + esc(nameOf(p)) + '</td><td>' + p.legs + '</td><td>' + lAvg(p) + '</td><td>' + (p.f9 ? (+p.f9).toFixed(1) : '—') + '</td><td>' + (p.c180 || 0) + '</td></tr>'; });
@@ -2602,9 +2618,9 @@ function tourView(id) {
   else if (ROOM_LINK === t.id || (ME && t.players.includes(ME))) roomSet(t.id);
   const fees = SRV && canDo(t, 'fees') ? [['fees', 'Взносы']] : [];
   const tabs = st === 'reg' ? [['people', 'Участники']].concat(fees)
-    : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']]
+    : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']].concat(SRV ? [['time', 'Время']] : [])
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']] : [['table', 'Таблица'], ['games', 'Матчи']])
-      .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : [], fees);
+      .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : [], SRV ? [['time', 'Время']] : [], fees);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -2654,6 +2670,7 @@ function tourView(id) {
   else if (tab === 'stream') h += streamView(t);
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
   else if (tab === 'fees') h += feesView(t);
+  else if (tab === 'time') h += timeView(t);
   else if (st !== 'reg') h += numsView(t);
   else {
     h += '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
@@ -2710,41 +2727,51 @@ function tourPct(t, rv) {
   const done = sts.reduce((a, x) => a + x.done, 0), total = sts.reduce((a, x) => a + x.total, 0), cur = sts.find(x => x.done < x.total);
   return { pc: Math.round(done / Math.max(1, total) * 100), cur: cur ? cur.l : 'всё сыграно', sts };
 }
-// сколько примерно осталось, мин: оставшиеся матчи по кругам (и попытки квалификации), сколько идёт разом —
-// по мишеням или готовым парам; темп — средний матч этого турнира в счётчике, пока его нет — по формату
-function etaMin(t, rv) {
-  if (tStatus(t) !== 'live') return null;
-  rv = rv || resolver(t);
-  const ex = exOf(t), legMin = ex.k === 'x01' ? ({ 301: 3, 501: 4.5, 701: 6 }[ex.mode] || 4.5) : 3;
-  const matchMs = (t.pace && t.pace.match) || legMin * t.ltw * 1.5 * 6e4, boards = (t.boards && t.boards.n) || 0;
-  let ms = 0;
-  if (t.stage === 'qual') {
-    const N = t.players.length, left = t.players.reduce((a, id) => a + t.qual.tries - qRes(t, id).filter(Boolean).length, 0);
-    const par = boards || Math.max(1, Math.ceil(N / 4));
-    ms = Math.ceil(left / par) * ((t.pace && t.pace.qual) || 4 * 6e4);
-    // потом сетки: примерно N/2 матчей на круг
-    ms += Math.ceil(Math.log2(Math.max(2, Math.min(N, t.split || N)))) * Math.ceil(N / 2 / par) * matchMs;
-  } else {
-    const par = boards || Math.max(1, callsOf(t).length + liveOf(t).length);
-    Bracket.roundProgress(t, rv).forEach(x => { ms += Math.ceil((x.total - x.done) / par) * matchMs; });
-    if (!t.games.length) ms = 0;
-  }
-  return ms ? Math.max(1, Math.round(ms / 6e4)) : null;
+// сколько идёт турнир, мин: с первого матча в счётчике (сервер), иначе с начала по расписанию; завершён — сколько длился
+function elapsedMin(t) {
+  const st = tStatus(t), b = t.began || (st !== 'reg' ? t.start : null);
+  if (!b || b > Date.now()) return null;
+  const end = st === 'done' ? t.doneAt || null : Date.now();
+  return end && end > b ? Math.max(1, Math.round((end - b) / 6e4)) : null;
 }
-const etaTxt = m => m == null ? '' : '≈ ' + (m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч' + (m % 60 >= 5 ? ' ' + Math.round(m % 60 / 5) * 5 + ' мин' : ''));
+const durTxt = m => m == null ? '' : m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч' + (m % 60 ? ' ' + (m % 60) + ' мин' : '');
+// время ходов: «12 с», «1 мин 05 с»
+const msTxt = ms => ms == null ? '—' : ms < 6e4 ? secTxt(ms) : durTxt(Math.round(ms / 6e4));
+const secTxt = ms => { if (ms == null) return '—'; const s = Math.round(ms / 1000); return s < 60 ? s + ' с' : Math.floor(s / 60) + ' мин ' + String(s % 60).padStart(2, '0') + ' с'; };
+// вкладка «Время»: сколько идёт турнир, матчи, квалификация; игроки — среднее время на подход (ход: от подхода соперника до своего)
+function timeView(t) {
+  const e = lz('ttime:' + t.id, () => Api.get('/api/tournaments/' + encodeURIComponent(t.id) + '/time'), 20000);
+  const stE = svState(e, 'времени');
+  if (stE) return stE;
+  const d = e.data, done = tStatus(t) === 'done', b = d.began || t.began;
+  const total = b ? ((done ? d.ended || t.doneAt : d.now) || Date.now()) - b : null;
+  const tile = (l, v, sub) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span>' + (sub ? '<span class="s">' + sub + '</span>' : '') + '</div>';
+  let h = '<div class="tiles tm-tiles">' + tile(done ? 'Турнир длился' : 'Турнир идёт', total ? durTxt(Math.max(1, Math.round(total / 6e4))) : '—', b ? 'с ' + new Date(b).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'ещё нет матчей в счётчике') +
+    tile('Средний матч', d.matches.avg ? msTxt(d.matches.avg) : '—', d.matches.n ? 'сыграно в счётчике: ' + d.matches.n : '') +
+    (d.matches.longest ? tile('Самый долгий', msTxt(d.matches.longest.dur), esc(d.matches.longest.players.join(' — '))) : '') +
+    (d.qual.n ? tile('Попытка квалификации', msTxt(d.qual.avg), 'в среднем, попыток: ' + d.qual.n) : '') + '</div>';
+  const ps = d.players;
+  if (!ps.length) return h + '<p class="meta">Время ходов появится, когда матчи начнут вести в счётчике.</p>';
+  const max = Math.max(...ps.map(p => p.avg));
+  h += '<div class="card sec"><div class="tstat"><span class="label">Время на подход</span><span class="meta">ход — от подхода соперника до своего</span></div><div class="tm-list">' + ps.map((p, k) =>
+    '<div class="tm-row' + (p.id === ME ? ' me' : '') + '"><span class="tm-n">' + (k + 1) + '</span><button class="lnk tm-name" data-act="go" data-v="p.' + esc(p.id) + '">' + esc(p.name) + '</button>' +
+    '<div class="tm-bar"><i style="width:' + Math.max(6, Math.round(p.avg / max * 100)) + '%"></i></div><b class="num">' + secTxt(p.avg) + '</b>' +
+    '<span class="meta tm-sub">' + p.visits + ' ' + pl(p.visits, 'подход', 'подхода', 'подходов') + (p.board ? ' · у мишени ' + msTxt(p.board) : '') + (p.max ? ' · дольше всего ' + secTxt(p.max) : '') + '</span></div>').join('') + '</div></div>';
+  return h + '<p class="meta">Паузы дольше 5 минут (смена лега, перерыв) в среднее не входят. Быстрые сверху.</p>';
+}
 // полоса хода турнира: на табло под заголовком, в счётчике над игрой
 function tourBar(t, cls) {
   const tp = tStatus(t) === 'live' ? tourPct(t) : null;
   if (!tp) return '';
-  const eta = etaMin(t);
-  return '<div class="tbar' + (cls ? ' ' + cls : '') + '"><span class="tbar-l">Ход турнира · <b>' + esc(tp.cur) + '</b>' + (eta ? ' · осталось ' + etaTxt(eta) : '') + '</span><div class="tbar-s">' + tp.sts.map(x => '<i class="' + (x.done >= x.total ? 'done' : x.done ? 'cur' : '') + '" style="--p:' + Math.round(x.done / Math.max(1, x.total) * 100) + '%" title="' + esc(x.l) + ': ' + x.done + '/' + x.total + '"></i>').join('') + '</div><b class="tbar-p">' + tp.pc + '%</b></div>';
+  const el = elapsedMin(t);
+  return '<div class="tbar' + (cls ? ' ' + cls : '') + '"><span class="tbar-l">Ход турнира · <b>' + esc(tp.cur) + '</b>' + (el ? ' · идёт ' + durTxt(el) : '') + '</span><div class="tbar-s">' + tp.sts.map(x => '<i class="' + (x.done >= x.total ? 'done' : x.done ? 'cur' : '') + '" style="--p:' + Math.round(x.done / Math.max(1, x.total) * 100) + '%" title="' + esc(x.l) + ': ' + x.done + '/' + x.total + '"></i>').join('') + '</div><b class="tbar-p">' + tp.pc + '%</b></div>';
 }
 function stagesView(t, rv) {
   const sts = stagesOf(t, rv);
   if (!sts.length) return '';
   const pr = tProgress(t, rv);
-  const eta = etaMin(t, rv);
-  return '<div class="stages"><b>' + (t.stage === 'qual' ? 'Ход турнира' : 'Сыграно ' + pr.done + ' из ' + pr.total + ' ' + pl(pr.total, 'матча', 'матчей', 'матчей')) + (eta ? ' <span class="meta">· до конца ' + etaTxt(eta) + '</span>' : '') + '</b>' + sts.map(s => {
+  const el = elapsedMin(t);
+  return '<div class="stages"><b>' + (t.stage === 'qual' ? 'Ход турнира' : 'Сыграно ' + pr.done + ' из ' + pr.total + ' ' + pl(pr.total, 'матча', 'матчей', 'матчей')) + (el ? ' <span class="meta">· ' + (tStatus(t) === 'done' ? 'длился ' : 'идёт ') + durTxt(el) + '</span>' : '') + '</b>' + sts.map(s => {
     const pc = Math.round(s.done / Math.max(1, s.total) * 100);
     return '<div class="stg' + (pc === 100 ? ' done' : '') + '"><span>' + s.l + '</span><div class="bar"><i style="width:' + pc + '%"></i></div><span class="meta">' + s.done + '/' + s.total + ' · ' + pc + '%</span></div>';
   }).join('') + '</div>';
@@ -3510,7 +3537,7 @@ function endVisit(bust, win, n) {
   if (p.legVisits < 3) { p.f9p += pts; p.f9d += n; }
   p.legVisits++;
   p.last = bust ? 'перебор' : String(pts);
-  G.log.push({ p: G.cur, leg: G.legNo, s: start, pts, n, b: bust ? 1 : 0, d: G.entry !== 'total' ? G.visit.map(x => x.l) : null });
+  G.log.push({ p: G.cur, leg: G.legNo, s: start, pts, n, b: bust ? 1 : 0, d: G.entry !== 'total' ? G.visit.map(x => x.l) : null, at: Date.now() });
   G.prev = { i: G.cur, d: G.entry !== 'total' ? G.visit.map(x => x.l) : null, pts, bust };
   if (!bust) {
     p.score -= pts;
@@ -3542,7 +3569,7 @@ function bullOff(p) {
   if (G.kind === 'ex') return exSubmit({ tb: 1, p });
   if (!G.tb || !G.tb.includes(p)) return;
   snap();
-  G.log.push({ p, leg: G.legNo, tb: 1 });
+  G.log.push({ p, leg: G.legNo, tb: 1, at: Date.now() });
   G.tb = null; G.cur = p;
   playSfx('win'); legWon();
   saveGame(); render();
@@ -3796,10 +3823,11 @@ function startBody() {
   return { ex, ltw: G.legsToWin, starter: G.mstart, players: G.players.map(p => p.id ? { id: p.id } : { name: p.name }) };
 }
 // запись G.log → событие API
+// at — момент подхода на этом телефоне: по нему сервер считает время ходов
 function logEvent(e) {
-  if (e.tb) return { type: 'bull', leg: e.leg, p: e.p };
-  if (G.kind === 'ex') return { type: 'visit', leg: e.leg, p: e.p, v: e.v, d: e.d || null };
-  return { type: 'visit', leg: e.leg, p: e.p, s: e.s, pts: e.pts, n: e.n, b: e.b, d: e.d || null };
+  if (e.tb) return { type: 'bull', leg: e.leg, p: e.p, at: e.at };
+  if (G.kind === 'ex') return { type: 'visit', leg: e.leg, p: e.p, v: e.v, d: e.d || null, at: e.at };
+  return { type: 'visit', leg: e.leg, p: e.p, s: e.s, pts: e.pts, n: e.n, b: e.b, d: e.d || null, at: e.at };
 }
 // итог матча для события finish — как строки commitMatch()
 function finishEvent() {
@@ -5772,6 +5800,7 @@ function exSubmit(v, noSnap) {
   const err = Games.check(exCfg(), G.log, ev);
   if (err) { G.note = err; G.visit = []; S.buf = ''; saveGame(); return render(); }
   if (!noSnap) snap();
+  ev.at = Date.now();
   G.log.push(ev); G.visit = []; G.mult = 1; G.note = ''; S.buf = '';
   const st2 = exSt();
   if (st2.winner != null) { G.over = 'match'; G.winner = st2.winner; tapLock = Date.now() + 450; playSfx('win'); commitMatch(); }

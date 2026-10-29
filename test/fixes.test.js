@@ -110,3 +110,26 @@ test('рейтинг честно: итог без игры вносит тол�
   await tx(require('../server/stats').eloAll);
   assert.equal(await rat(ids), now);
 });
+
+test('время у мишени: ход игрока — от предыдущего подхода до своего; по матчу и по турниру', async () => {
+  const t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Время', format: 'ko', mode: 301, ltw: 1, players: ['p6', 'p7', 'p8', 'p9'] }), 201).tournament;
+  const g = t.games.find(x => x.r === 0);
+  const B = require('../shared/bracket.js'), st = B.gameState(t, g);
+  const id = 'gtime' + Date.now().toString(36);
+  const m = ok(await call(HOST, 'PUT', '/api/matches/' + id, { tournamentId: t.id, r: 0, i: g.i }), 201).match;
+  const t0 = m.started;
+  const v = (seq, p, s, pts, at) => ({ seq, type: 'visit', leg: 1, p, s, pts, n: 3, b: 0, at: t0 + at * 1000 });
+  ok(await call(HOST, 'POST', '/api/matches/' + id + '/events', { events: [v(1, 0, 301, 180, 10), v(2, 1, 301, 60, 25), v(3, 0, 121, 121, 45),
+    { seq: 4, type: 'finish', w: 0, pl: [{ id: st.a, legs: 1, pts: 301, darts: 6 }, { id: st.b, legs: 0, pts: 60, darts: 3 }] }] }));
+  const mt = ok(await call(null, 'GET', '/api/matches/' + id)).match.times;
+  assert.deepEqual(mt.per.map(x => [x.n, x.avg]), [[2, 15000], [1, 15000]]);
+  assert.equal(mt.per[0].max, 20000);
+  const tt = ok(await call(null, 'GET', '/api/tournaments/' + t.id + '/time'));
+  assert.equal(tt.matches.n, 1);
+  assert.ok(tt.began > 0 && tt.ended == null);
+  const a = tt.players.find(x => x.id === st.a), b = tt.players.find(x => x.id === st.b);
+  assert.equal(a.visits, 2); assert.equal(a.avg, 15000); assert.equal(b.visits, 1);
+  assert.equal((await call(null, 'GET', '/api/tournaments/t_nope/time')).s, 404);
+  // время с телефона вне матча не принимается — берётся время сервера
+  assert.ok(ok(await call(null, 'GET', '/api/tournaments/' + t.id)).tournament.began > 0);
+});
