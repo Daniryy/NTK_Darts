@@ -78,9 +78,35 @@ test('«Готов»: отметился один — ждём; второй —
   assert.equal(after.live[g.r + ':' + g.i], r.match.id);
   assert.ok(!after.ready || !after.ready[g.r + ':' + g.i]);
   err(await call(PL, 'POST', url), 409, 'game_taken');
-  // счёт ведёт телефон второго: события с первого не принимаются, забрать ведение может
-  err(await call(PL, 'POST', '/api/matches/' + r.match.id + '/events', { events: [{ seq: 1, type: 'visit', leg: 0, p: 0, pts: 60 }] }), 423);
-  ok(await call(PL, 'POST', '/api/matches/' + r.match.id + '/takeover'));
+  // оба отметились со своих телефонов — «каждый за себя»
+  assert.equal(r.match.duo, true);
+  const mid = r.match.id, ev = (u, e) => call(u, 'POST', '/api/matches/' + mid + '/events', { events: [e] });
+  const dev = { [g.a]: g.a === 'p6' ? PL : O, [g.b]: g.b === 'p6' ? PL : O }, P0 = dev[g.a], P1 = dev[g.b];
+  const v = (seq, p, s, pts) => ({ seq, type: 'visit', leg: 1, p, s, pts, n: 3, b: 0 });
+  // за соперника — нельзя, свой — можно; посторонний — замок
+  err(await ev(P1, v(1, 0, 501, 60)), 422, 'bad_event');
+  err(await ev(X, v(1, 0, 501, 60)), 423);
+  ok(await ev(P0, v(1, 0, 501, 60)));
+  err(await ev(P0, v(2, 1, 501, 100)), 422, 'bad_event');
+  ok(await ev(P1, v(2, 1, 501, 100)));
+  // отменить свой последний подход — можно; чужой — нельзя
+  err(await ev(P0, { seq: 3, type: 'undo' }), 422, 'bad_event');
+  ok(await ev(P1, { seq: 3, type: 'undo' }));
+  ok(await ev(P1, v(4, 1, 501, 140)));
+  // отставший телефон: под этим номером уже другое — 409 stale, а не тихий пропуск подхода
+  ok(await ev(P1, { seq: 5, type: 'undo' }));
+  err(await ev(P0, v(5, 0, 441, 60)), 409, 'stale');
+  ok(await ev(P1, v(6, 1, 501, 140)));
+  const st = ok(await call(null, 'GET', '/api/matches/' + mid)).match;
+  assert.equal(st.lastSeq, 6);
+  assert.deepEqual(st.legs, [0, 0]);
+  // «Вести счёт за обоих»: забрал ведение — дальше один телефон за обоих
+  const tk = ok(await call(PL, 'POST', '/api/matches/' + mid + '/takeover'));
+  assert.equal(tk.match.duo, false);
+  assert.equal(tk.events.length, 6);
+  ok(await ev(PL, v(7, 0, 441, 45)));
+  ok(await ev(PL, v(8, 1, 361, 26)));
+  err(await ev(O, v(9, 0, 396, 60)), 423);
 });
 
 test('квалификация по мишеням: по двое на мишень, сдавший освобождает место следующему', async () => {
