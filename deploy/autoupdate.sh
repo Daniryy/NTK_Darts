@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Автообновление (от root): раз в 5 минут сервер проверяет ветку на GitHub и, если есть новое, обновляется (deploy.sh).
+# Автообновление (от root): раз в 5 минут сервер проверяет ветку на GitHub и, если есть новое, обновляется (deploy.sh):
+# копия базы перед миграциями, откат на прежнюю версию, если новая не встала.
 #   bash /srv/oche/app/deploy/autoupdate.sh on      — включить
 #   bash /srv/oche/app/deploy/autoupdate.sh off     — выключить
 #   bash /srv/oche/app/deploy/autoupdate.sh status  — включено ли и что было в последние разы
@@ -53,7 +54,13 @@ run)
   cd "$APP"
   sudo -u oche git fetch -q origin
   cur=$(sudo -u oche git rev-parse HEAD); new=$(sudo -u oche git rev-parse '@{u}')
-  [[ $cur == "$new" ]] && exit 0
+  if [[ $cur == "$new" ]]; then
+    # сервер, поставленный до nginx-app.conf, переводится на него и без нового кода
+    grep -qs nginx-app.conf /etc/nginx/sites-available/oche || bash "$APP/deploy/nginx-sync.sh" || true
+    exit 0
+  fi
+  # эта версия уже не встала и была откачена — ждём следующую (вручную: deploy.sh)
+  [[ -f /srv/oche/update-bad && $(cat /srv/oche/update-bad) == "$new" ]] && exit 0
   echo "обновление: $(sudo -u oche git log --oneline -1 "$new")"
   if ! bash "$APP/deploy/deploy.sh"; then
     "$APP/deploy/notify.sh" "Oche: автообновление не удалось — journalctl -u oche-update -n 50"
