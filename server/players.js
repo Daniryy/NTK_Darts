@@ -45,6 +45,6 @@ async function createPlayer(c, p) {
 
 const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '' });
 // свой профиль: ещё способы входа (телефон целиком — только себе)
-const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '', phone: p.phone || null, vk: p.vk_id != null, login: p.login || null, email: p.email || null, emailOk: !!p.email_ok, pass: !!p.pass_hash } : null;
+const meJSON = p => p ? { id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '', phone: p.phone || null, vk: p.vk_id != null, login: p.login || null, email: p.email || null, emailOk: !!p.email_ok, pass: !!p.pass_hash, twofa: !!p.totp_on, backupLeft: p.totp_on ? (p.totp_backup || []).length : null } : null;
 
 module.exports = { createPlayer, playerShort, meJSON };

@@ -24,6 +24,20 @@ async function call(u, method, url, body) {
 const ok = (r, code = 200) => { assert.equal(r.s, code, JSON.stringify(r.b)); return r.b; };
 const err = (r, code, ecode) => { assert.equal(r.s, code, JSON.stringify(r.b)); if (ecode) assert.equal(r.b.error.code, ecode); return r.b.error; };
 async function login(playerId) { const u = anon(); ok(await call(u, 'POST', '/api/auth/dev', { playerId })); return u; }
+const T = require('../server/totp');
+const nowStep = () => Math.floor(Date.now() / 30000);
+// вход администратора целиком: пароль, затем код из приложения (привязка при первом входе). В тестах входы идут чаще,
+// чем раз в 30 с, а один код дважды не принимается — поэтому «последний шаг» сбрасываем
+async function full(u, url, body) {
+  const r = ok(await call(u, 'POST', url, body));
+  if (!r.need2fa) return r;
+  let secret = r.secret;
+  if (r.need2fa === 'code') {
+    const row = (await pool.query('UPDATE players SET totp_last = 0 WHERE login = $1 OR email = $1 RETURNING totp_secret', [String(body.login || body.email).trim().toLowerCase()])).rows[0];
+    secret = T.dec(row.totp_secret);
+  }
+  return ok(await call(u, 'POST', '/api/auth/2fa', { ticket: r.ticket, code: T.codeAt(secret, nowStep()) }));
+}
 
 let TECH, ADMIN, HOST, PL;
 test.before(async () => {
@@ -42,7 +56,7 @@ test('вход по логину и паролю: верный, неверный
   const u = anon();
   err(await call(u, 'POST', '/api/auth/password', { login: 'danil', password: 'wrong-password' }), 409, 'bad_login');
   err(await call(u, 'POST', '/api/auth/password', { login: 'nobody', password: 'Darts-Secret-1' }), 409, 'bad_login');
-  const r = ok(await call(u, 'POST', '/api/auth/password', { login: ' DANIL ', password: 'Darts-Secret-1' }));
+  const r = await full(u, '/api/auth/password', { login: ' DANIL ', password: 'Darts-Secret-1' });
   assert.equal(r.player.id, ME);
   assert.equal(r.role, 'tech');
   assert.ok(r.perms.includes('banners') && r.perms.includes('audit'));
@@ -80,7 +94,7 @@ test('зал с одного IP: удачные входы не упираютс
 
 test('смена своего пароля', async () => {
   const u = anon();
-  ok(await call(u, 'POST', '/api/auth/password', { login: 'danil', password: 'Darts-Secret-1' }));
+  await full(u, '/api/auth/password', { login: 'danil', password: 'Darts-Secret-1' });
   err(await call(u, 'PUT', '/api/me/password', { current: 'wrong', password: 'New-Secret-22' }), 409, 'bad_login');
   err(await call(u, 'PUT', '/api/me/password', { current: 'Darts-Secret-1', password: '1234567890123' }), 400);
   err(await call(u, 'PUT', '/api/me/password', { current: 'Darts-Secret-1', password: 'short' }), 400);
@@ -100,7 +114,7 @@ test('логин администратору выдаёт только тех. 
   err(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'danil', password: 'Customer-Pass-1' }), 409, 'login_taken');
   assert.equal(ok(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'customer', password: 'Customer-Pass-1' })).player.login, 'customer');
   const u = anon();
-  assert.equal(ok(await call(u, 'POST', '/api/auth/password', { login: 'customer', password: 'Customer-Pass-1' })).role, 'admin');
+  assert.equal((await full(u, '/api/auth/password', { login: 'customer', password: 'Customer-Pass-1' })).role, 'admin');
   // роль ниже администратора — логин снимается, сеансы закрываются
   ok(await call(TECH, 'PATCH', '/api/admin/players/p4', { role: 'host' }));
   assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
@@ -228,7 +242,7 @@ test('роль игроку с почтой и снятие входа по ло
   // понижение администратора с логином: логин снят, сеансы закрыты, почта по-прежнему пускает
   ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
   const a = anon();
-  ok(await call(a, 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' }));
+  await full(a, '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' });
   const down = ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'player' }));
   assert.equal(down.player.login, null);
   err(await call(a, 'GET', '/api/admin/stats'), 401);
@@ -279,4 +293,63 @@ test('администраторы входят только с паролем: 
   const s2 = ok(await call(anon(), 'POST', '/api/auth/phone', { phone: ph }));
   err(await call(Object.assign(anon(), { ip: '10.6.6.6' }), 'POST', '/api/auth/phone/verify', { phone: ph, code: s2.devCode }), 429, 'too_many');
   limits.reset();
+});
+
+test('двухфакторный вход администраторов: привязка, код, резервные коды, повтор кода, сброс', async () => {
+  const adm = await tx(c => require('../server/players').createPlayer(c, { name: 'Админ Двухфакторный' }));
+  const AID = adm.id;
+  await pool.query(`UPDATE players SET role = 'admin', login = 'twofa', pass_hash = $1 WHERE id = $2`, [await hashPassword('Twofa-Secret-1'), AID]);
+  // пароль верный — сеанса ещё нет: привязка приложения
+  const u = anon();
+  const s = ok(await call(u, 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' }));
+  assert.equal(s.need2fa, 'setup');
+  assert.match(s.secret, /^[A-Z2-7]{32}$/);
+  assert.match(s.otpauth, /^otpauth:\/\/totp\/Oche%3Atwofa\?secret=/);
+  assert.equal(s.player, undefined);
+  assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
+  err(await call(u, 'POST', '/api/auth/2fa', { ticket: s.ticket, code: '000000' === T.codeAt(s.secret, nowStep()) ? '111111' : '000000' }), 409, 'bad_code');
+  err(await call(u, 'POST', '/api/auth/2fa', { ticket: 'нет-такого', code: '123456' }), 409, 'code_expired');
+  const on = ok(await call(u, 'POST', '/api/auth/2fa', { ticket: s.ticket, code: T.codeAt(s.secret, nowStep()) }));
+  assert.equal(on.player.id, AID);
+  assert.equal(on.player.twofa, true);
+  assert.equal(on.backup.length, 8);
+  assert.match(on.backup[0], /^[a-z2-7]{4}-[a-z2-7]{4}$/);
+  // секрет в базе зашифрован
+  const row = (await pool.query(`SELECT totp_secret FROM players WHERE id = $1`, [AID])).rows[0];
+  assert.notEqual(row.totp_secret, s.secret);
+  assert.equal(T.dec(row.totp_secret), s.secret);
+  // билет одноразовый
+  err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: s.ticket, code: T.codeAt(s.secret, nowStep()) }), 409, 'code_expired');
+  // следующий вход: код; тот же код второй раз не принимается
+  const c1 = ok(await call(anon(), 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' }));
+  assert.equal(c1.need2fa, 'code');
+  assert.equal(c1.secret, undefined);
+  err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c1.ticket, code: T.codeAt(s.secret, nowStep()) }), 409, 'bad_code');
+  // резервный код — один раз
+  const v = anon();
+  const r1 = ok(await call(v, 'POST', '/api/auth/2fa', { ticket: c1.ticket, code: on.backup[0].toUpperCase() }));
+  assert.equal(r1.backupLeft, 7);
+  assert.equal(ok(await call(v, 'GET', '/api/me')).player.id, AID);
+  const c2 = ok(await call(anon(), 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' }));
+  err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c2.ticket, code: on.backup[0] }), 409, 'bad_code');
+  // новые резервные коды — по коду из приложения
+  await pool.query(`UPDATE players SET totp_last = 0 WHERE id = $1`, [AID]);
+  const nb = ok(await call(v, 'POST', '/api/me/2fa/backup', { code: T.codeAt(s.secret, nowStep()) })).backup;
+  assert.equal(nb.length, 8);
+  assert.notDeepEqual(nb, on.backup);
+  // 5 неверных кодов — пауза
+  limits.reset();
+  const c3 = ok(await call(anon(), 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' }));
+  for (let k = 0; k < 5; k++) err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c3.ticket, code: '00000' + k }), 409, 'bad_code');
+  err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c3.ticket, code: nb[1] }), 429, 'too_many');
+  limits.reset();
+  // вход по почте у администратора — тоже с кодом
+  await pool.query(`UPDATE players SET email = 'twofa@mail.ru' WHERE id = $1`, [AID]);
+  assert.equal(ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'twofa@mail.ru', password: 'Twofa-Secret-1' })).need2fa, 'code');
+  // сброс: только тех. администратор, сеансы закрываются, при входе — привязка заново
+  err(await call(await login((await tx(c => require('../server/players').createPlayer(c, { name: 'Простой Игрок' }))).id), 'DELETE', '/api/admin/players/' + AID + '/2fa'), 403);
+  assert.equal(ok(await call(TECH, 'DELETE', '/api/admin/players/' + AID + '/2fa')).player.twofa, false);
+  assert.equal(ok(await call(v, 'GET', '/api/me')).player, null);
+  assert.equal(ok(await call(anon(), 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' })).need2fa, 'setup');
+  err(await call(TECH, 'DELETE', '/api/admin/players/' + AID + '/2fa'), 409);
 });

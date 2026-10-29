@@ -21,6 +21,6 @@ pass() {
 case "${1:-}" in
 new) [[ $# -eq 3 ]] || { echo "Нужно: new \"Имя Фамилия\" логин"; exit 1; }; pass; run "$PW" new "$2" --login "$3" ;;
 password) [[ $# -eq 2 ]] || { echo "Нужно: password логин"; exit 1; }; pass; run "$PW" password "$2" ;;
-list|unlock|off) run "" "$@" ;;
-*) echo "Команды: new \"Имя Фамилия\" логин · password логин · list · unlock логин · off логин"; exit 1 ;;
+list|unlock|off|2fa-off) run "" "$@" ;;
+*) echo "Команды: new \"Имя Фамилия\" логин · password логин · list · unlock логин · off логин · 2fa-off логин"; exit 1 ;;
 esac

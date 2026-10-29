@@ -109,7 +109,10 @@
     // право из настроек ролей сервера (club_tour, streams, accounts, host_nums, players, block, give_host, clubs, …)
     perm: k => !!Api.me && (Api.role === 'tech' || Api.perms.includes(k)),
     // вход администратора по логину и паролю
-    async passwordLogin(login, password) { return Api.setMe(await Api.post('/api/auth/password', { login, password })); },
+    async passwordLogin(login, password) { return Api.meOr2fa(await Api.post('/api/auth/password', { login, password })); },
+    // администратор: после пароля — код из приложения (need2fa: 'code' | 'setup'), сеанса ещё нет
+    meOr2fa: r => r.need2fa ? r : Api.setMe(r),
+    async twofa(ticket, code) { return Api.setMe(await Api.post('/api/auth/2fa', { ticket, code })); },
     // link — привязать VK к аккаунту, в который уже вошли
     loginUrl: (ret, link) => '/api/auth/vk?return=' + encodeURIComponent(ret || '/') + (link ? '&link=1' : ''),
     async devLogin(playerId) { await Api.post('/api/auth/dev', { playerId }); return Api.loadMe(); },
@@ -120,8 +123,8 @@
     // почта: регистрация (ответ — письмо с кодом или сразу аккаунт), письмо с кодом (link | reset), проверка кода, вход
     async register(b) { const r = await Api.post('/api/auth/register', b); return r.player ? Api.setMe(r) : r; },
     mailSend: (email, purpose) => Api.post('/api/auth/email/send', { email, purpose }),
-    async mailVerify(b) { return Api.setMe(await Api.post('/api/auth/email/verify', b)); },
-    async mailLogin(email, password) { return Api.setMe(await Api.post('/api/auth/email/login', { email, password })); },
+    async mailVerify(b) { return Api.meOr2fa(await Api.post('/api/auth/email/verify', b)); },
+    async mailLogin(email, password) { return Api.meOr2fa(await Api.post('/api/auth/email/login', { email, password })); },
     async logout() { await Api.post('/api/auth/logout'); Api.setMe({}); },
 
     /* ===== Очередь неотправленного =====
