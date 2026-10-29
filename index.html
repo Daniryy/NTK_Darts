@@ -1006,11 +1006,20 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 @media (max-width: 480px) { .pbar { grid-template-columns: 58px minmax(0, 1fr) 96px; } .pf-d { display: none; } }
 .ptitle { font-weight: 600; margin: 2px 0 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
-.card.plan { padding: 16px; display: grid; gap: 8px; align-content: start; }
+.card.plan { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
 .card.plan.on { border-color: var(--green); }
-.plan-h { display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
-.plan-p { font-family: var(--display); font-size: 30px; }
+.plan-h { display: flex; justify-content: space-between; align-items: center; font-size: 19px; min-height: 28px; }
+.plan-p { font-family: var(--display); font-size: 34px; line-height: 1.1; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .plan-p s { color: var(--muted); font-size: 20px; }
+.plan-p .meta { font-family: inherit; font-size: 14px; }
+/* список растягивается — кнопки «Подключить» у всех карточек на одной линии */
+.card.plan .plan-f { flex: 1; align-content: start; font-size: 14px; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); padding-left: 20px; }
+.card.plan .plan-f li { padding-left: 2px; }
+.card.plan > .btn { margin-top: 6px; }
+.plan-per { justify-self: start; }
+.plan-save { color: var(--ok, #3ecf8e); font-weight: 600; }
+.plan-disc { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plan-disc .tchip { font-size: 12.5px; }
 .plan-f { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 3px; }
 .plan-ed { display: grid; gap: 8px; }
 .plan-ed .mini, .panel .nrow .mini { white-space: nowrap; }
@@ -4374,15 +4383,25 @@ function plansView() {
   const e = lz('plans', () => Api.get('/api/plans'), 30000);
   const st = svState(e, 'тарифов');
   if (st) return h + st + '</div>';
-  const d = e.data, ds = d.discounts;
-  h += '<p class="meta">Скидка за подтверждённое звание: МС и выше −' + ds.ms + '%, КМС −' + ds.kms + '%, 1 разряд −' + ds.r1 + '%.' + (ME && !(meP().title) ? ' <button class="lnk" data-act="go" data-v="title">Подтвердить звание</button>' : '') + '</p>';
-  if (d.mine.length) h += d.mine.map(s => '<div class="note-box ok">Подключён тариф <b>' + esc(s.plan.name) + '</b> до ' + new Date(s.ends).toLocaleDateString('ru-RU') + '.</div>').join('');
-  if (d.request) h += '<div class="note-box">Заявка на тариф <b>' + esc(d.request.plan.name) + '</b> отправлена — администратор подключит его и свяжется с вами. <button class="lnk" data-act="plan-unreq" data-v="' + d.request.id + '">Отозвать</button></div>';
+  const d = e.data, ds = d.discounts, year = !!S.planYear && d.plans.some(p => p.year != null);
+  const DN = [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']].filter(([k]) => ds[k]);
+  h += '<div class="plan-disc"><span class="meta">Скидка за подтверждённое звание:</span>' + DN.map(([k, n]) => '<span class="tchip">' + n + ' −' + ds[k] + '%</span>').join('') + (ME && !(meP().title) ? '<button class="lnk meta" data-act="go" data-v="title">Подтвердить звание</button>' : '') + '</div>';
+  if (d.mine.length) h += d.mine.map(s => '<div class="note-box ok">Подключён тариф <b>' + esc(s.plan.name) + '</b>' + (s.year ? ' на год' : '') + ' до ' + new Date(s.ends).toLocaleDateString('ru-RU') + '.</div>').join('');
+  if (d.request) h += '<div class="note-box">Заявка на тариф <b>' + esc(d.request.plan.name) + '</b>' + (d.request.year ? ' на год' : '') + ' отправлена — администратор подключит его и свяжется с вами. <button class="lnk" data-act="plan-unreq" data-v="' + d.request.id + '">Отозвать</button></div>';
+  // переключатель: помесячно или за год (год дешевле — показываем, сколько выходит в месяц)
+  if (d.plans.some(p => p.year != null)) {
+    const best = Math.max(0, ...d.plans.filter(p => p.year != null).map(p => Math.round((1 - p.year / (p.price * 12)) * 100)));
+    h += '<div class="seg2 plan-per" role="tablist"><button role="tab" aria-selected="' + !year + '" class="' + (year ? '' : 'on') + '" data-act="plan-per" data-v="m">Помесячно</button><button role="tab" aria-selected="' + year + '" class="' + (year ? 'on' : '') + '" data-act="plan-per" data-v="y">На год' + (best ? ' · −' + best + '%' : '') + '</button></div>';
+  }
   h += '<div class="plans">' + d.plans.map(p => {
-    const on = d.mine.some(s => s.plan.id === p.id);
-    return '<div class="card plan' + (on ? ' on' : '') + '"><div class="plan-h"><b>' + esc(p.name) + '</b>' + (on ? '<span class="tchip">подключён</span>' : '') + '</div><div class="plan-p">' + (p.discount ? '<s>' + rub(p.price) + '</s> ' : '') + '<b>' + rub(p.final) + '</b><span class="meta"> / ' + daysTxt(p.days) + '</span></div>' + (p.discount ? '<div class="meta">−' + p.discount + '% · ' + esc(p.why) + '</div>' : '') +
+    const on = d.mine.some(s => s.plan.id === p.id), y = year && p.year != null;
+    const base = y ? p.year : p.price, fin = y ? p.yearFinal : p.final;
+    const sub = y ? '≈ ' + rub(Math.round(fin / 12)) + ' в месяц' + (p.price * 12 > p.year ? ' · <span class="plan-save">выгода ' + rub(Math.round(p.price * 12 * (100 - p.discount) / 100) - fin) + '</span>' : '') : '';
+    return '<div class="card plan' + (on ? ' on' : '') + '"><div class="plan-h"><b>' + esc(p.name) + '</b>' + (on ? '<span class="tchip">подключён</span>' : '') + '</div>' +
+      '<div class="plan-p">' + (p.discount ? '<s>' + rub(base) + '</s>' : '') + '<b>' + rub(fin) + '</b><span class="meta">/ ' + (y ? 'год' : daysTxt(p.days)) + '</span></div>' +
+      (p.discount || sub ? '<div class="meta">' + (p.discount ? '−' + p.discount + '% · ' + esc(p.why) + (sub ? ' · ' : '') : '') + sub + '</div>' : '') +
       '<ul class="plan-f">' + p.about.split('\n').filter(Boolean).map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' +
-      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + '">' + (on ? 'Продлить' : 'Подключить') + '</button>') + '</div>';
+      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + (y ? '|y' : '') + '">' + (on ? 'Продлить' : 'Подключить') + (y ? ' на год' : '') + '</button>') + '</div>';
   }).join('') + '</div><p class="meta">Онлайн-оплата появится позже. Сейчас после заявки тариф подключает администратор.</p>';
   return h + '</div>';
 }
@@ -4398,15 +4417,15 @@ function admPlans() {
   const st = svState(e, 'тарифов');
   if (st) return st;
   const d = e.data, tech = Api.perm('plans_edit');
-  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b></span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
-  h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
-  h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
+  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b>' + (r.year ? ' · на год' : '') + '</span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
+  h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pg-year"> на год — по цене за год, 365 дней</label><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
+  h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + (s.year ? ' · год' : '') + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
   if (!tech) return h;
   // тарифы и скидки
   const roles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [] }).roles.filter(r => r.rank < 2);
   const roleSel = (id, cur) => '<select class="inp sm" id="' + id + '" aria-label="Роль">' + roles.map(r => '<option value="' + r.key + '"' + (r.key === cur ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>';
-  h += '<div class="sec"><span class="label">Тарифы: цены и состав</span>' + d.plans.map(p => '<div class="card sec plan-ed"><div class="nrow"><input class="inp" id="pe-name-' + p.id + '" value="' + esc(p.name) + '" maxlength="40" aria-label="Название"><input class="inp" id="pe-price-' + p.id + '" value="' + p.price + '" inputmode="numeric" aria-label="Цена" style="max-width:110px"><input class="inp" id="pe-days-' + p.id + '" value="' + p.days + '" inputmode="numeric" aria-label="Дней" style="max-width:80px"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-' + p.id, p.role) + '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pe-active-' + p.id + '"' + (p.active ? ' checked' : '') + '> показывать</label></div><textarea class="inp" id="pe-about-' + p.id + '" rows="' + Math.max(3, p.about.split('\n').length + 1) + '" maxlength="1000" aria-label="Что даёт">' + esc(p.about) + '</textarea><button class="mini" data-act="plan-save" data-v="' + p.id + '">Сохранить тариф</button></div>').join('');
-  h += '<div class="card sec plan-ed"><span class="label">Новый тариф</span><div class="nrow"><input class="inp" id="pe-name-new" placeholder="Название" maxlength="40"><input class="inp" id="pe-price-new" placeholder="Цена, ₽" inputmode="numeric" style="max-width:110px"><input class="inp" id="pe-days-new" value="30" inputmode="numeric" style="max-width:80px" aria-label="Дней"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-new', 'plus') + '</div><textarea class="inp" id="pe-about-new" rows="3" maxlength="1000" placeholder="Что даёт — по строке на пункт"></textarea><button class="mini go" data-act="plan-add">Добавить тариф</button><span class="meta">Нужна своя роль для тарифа — добавьте её во вкладке «Права ролей» и отметьте, что ей доступно.</span></div></div>';
+  h += '<div class="sec"><span class="label">Тарифы: цены и состав</span>' + d.plans.map(p => '<div class="card sec plan-ed"><div class="nrow"><input class="inp" id="pe-name-' + p.id + '" value="' + esc(p.name) + '" maxlength="40" aria-label="Название"><input class="inp" id="pe-price-' + p.id + '" value="' + p.price + '" inputmode="numeric" aria-label="Цена" style="max-width:110px"><input class="inp" id="pe-days-' + p.id + '" value="' + p.days + '" inputmode="numeric" aria-label="Дней" style="max-width:80px"><input class="inp" id="pe-year-' + p.id + '" value="' + (p.year == null ? '' : p.year) + '" inputmode="numeric" placeholder="за год" aria-label="Цена за год" title="Цена за год (пусто — только помесячно)" style="max-width:110px"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-' + p.id, p.role) + '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pe-active-' + p.id + '"' + (p.active ? ' checked' : '') + '> показывать</label></div><textarea class="inp" id="pe-about-' + p.id + '" rows="' + Math.max(3, p.about.split('\n').length + 1) + '" maxlength="1000" aria-label="Что даёт">' + esc(p.about) + '</textarea><button class="mini" data-act="plan-save" data-v="' + p.id + '">Сохранить тариф</button></div>').join('');
+  h += '<div class="card sec plan-ed"><span class="label">Новый тариф</span><div class="nrow"><input class="inp" id="pe-name-new" placeholder="Название" maxlength="40"><input class="inp" id="pe-price-new" placeholder="Цена, ₽" inputmode="numeric" style="max-width:110px"><input class="inp" id="pe-days-new" value="30" inputmode="numeric" style="max-width:80px" aria-label="Дней"><input class="inp" id="pe-year-new" placeholder="За год, ₽" inputmode="numeric" style="max-width:110px" aria-label="Цена за год"></div><div class="nrow"><span class="meta" style="align-self:center">Роль:</span>' + roleSel('pe-role-new', 'plus') + '</div><textarea class="inp" id="pe-about-new" rows="3" maxlength="1000" placeholder="Что даёт — по строке на пункт"></textarea><button class="mini go" data-act="plan-add">Добавить тариф</button><span class="meta">Нужна своя роль для тарифа — добавьте её во вкладке «Права ролей» и отметьте, что ей доступно.</span></div></div>';
   h += '<div class="panel"><span class="h2">Скидка за звание, %</span><div class="nrow">' + d.discountKeys.map(k => '<label class="field" style="flex:1"><span class="label">' + esc(k.name) + '</span><input class="inp" id="disc-' + k.k + '" inputmode="numeric" value="' + d.discounts[k.k] + '"></label>').join('') + '</div><button class="btn sm" data-act="disc-save">Сохранить скидки</button></div>';
   return h;
 }
@@ -4958,7 +4977,7 @@ const ACT_NAME = {
 function auditData(a) {
   const d = a.data || {};
   if (a.action === 'player.role') return roleName(d.from || '') + ' → ' + roleName(d.role);
-  if (a.action === 'discounts') return 'МС и выше −' + d.ms + '%, КМС −' + d.kms + '%, 1 разряд −' + d.r1 + '%';
+  if (a.action === 'discounts') return [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']].filter(([k]) => d[k] != null).map(([k, n]) => n + ' −' + d[k] + '%').join(', ');
   if (/^title\./.test(a.action)) return [d.title, d.order ? 'приказ ' + d.order : '', d.note].filter(Boolean).join(' · ');
   if (/^plan\./.test(a.action)) return [d.plan, d.days ? d.days + ' дн.' : '', d.price != null ? rub(d.price) : '', d.note].filter(Boolean).join(' · ');
   if (a.action === 'player.block') return d.blocked ? 'заблокирован' : 'разблокирован';
@@ -6022,7 +6041,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'paid': { const [tid, pid2, on] = v.split('|'); svDo(Api.patch('/api/tournaments/' + tid + '/paid', { playerId: pid2, paid: on === '1' }), svTourSet); break; }
-    case 'plan-req': svDo(Api.post('/api/plans/' + v + '/request'), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф.'); }); break;
+    case 'plan-per': S.planYear = v === 'y'; render(); break;
+    case 'plan-req': { const [pid, y] = v.split('|'); svDo(Api.post('/api/plans/' + pid + '/request', y ? { year: true } : {}), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф' + (y ? ' на год' : '') + '.'); }); break; }
     case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
     case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
     case 'plan-rej': {
@@ -6032,8 +6052,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'plan-grant': case 'ac-plan': {
-      const pl = $(a === 'ac-plan' ? 'ac-plan' : 'pg-plan'), dd = $('pg-days'), days = a === 'plan-grant' && dd && dd.value.trim() ? +dd.value.trim() : null;
-      const go2 = pid => Api.post('/api/admin/plans/grant', Object.assign({ playerId: pid, planId: pl ? pl.value : '' }, days ? { days } : {}));
+      const pl = $(a === 'ac-plan' ? 'ac-plan' : 'pg-plan'), dd = $('pg-days'), days = a === 'plan-grant' && dd && dd.value.trim() ? +dd.value.trim() : null, yr = a === 'plan-grant' && ($('pg-year') || {}).checked;
+      const go2 = pid => Api.post('/api/admin/plans/grant', Object.assign({ playerId: pid, planId: pl ? pl.value : '' }, yr ? { year: true } : days ? { days } : {}));
       let job;
       if (a === 'ac-plan') job = go2(v);
       else {
@@ -6053,7 +6073,7 @@ document.addEventListener('click', e => {
     case 'plan-end': if (confirm('Завершить тариф сейчас? Роль тарифа снимется.')) svDo(Api.post('/api/admin/plans/subs/' + v + '/end'), () => { svStale('aplans'); svStale('acplans:'); svStale('acard:'); svStale('admin:'); toast('Тариф завершён.'); }); break;
     case 'plan-save': case 'plan-add': {
       const id = a === 'plan-add' ? 'new' : v, g = k => { const el = $('pe-' + k + '-' + id); return el ? el.value : ''; };
-      const body = { name: g('name').trim(), price: +g('price'), days: +g('days'), role: g('role'), about: g('about') };
+      const yv = g('year').replace(/\D/g, ''), body = { name: g('name').trim(), price: +g('price'), days: +g('days'), role: g('role'), about: g('about'), yearPrice: yv ? +yv : null };
       if (a === 'plan-save') { const ac = $('pe-active-' + id); body.active = !!(ac && ac.checked); }
       if (!Number.isInteger(body.price) || !Number.isInteger(body.days)) { toast('Цена и срок — целые числа.'); break; }
       svDo(a === 'plan-add' ? Api.post('/api/admin/plans', body) : Api.patch('/api/admin/plans/' + id, body), () => { svStale('aplans'); svStale('plans'); toast(a === 'plan-add' ? 'Тариф добавлен.' : 'Тариф сохранён.'); });
@@ -6061,7 +6081,7 @@ document.addEventListener('click', e => {
     }
     case 'disc-save': {
       const g = k => +(($('disc-' + k) || {}).value || 0);
-      svDo(Api.put('/api/admin/discounts', { ms: g('ms'), kms: g('kms'), r1: g('r1') }), () => { svStale('aplans'); svStale('plans'); toast('Скидки сохранены.'); });
+      svDo(Api.put('/api/admin/discounts', Object.fromEntries(['zms', 'msmk', 'ms', 'kms', 'r1'].map(k => [k, g(k)]))), () => { svStale('aplans'); svStale('plans'); toast('Скидки сохранены.'); });
       break;
     }
     case 'role-add': { const el = $('role-new'); svDo(Api.post('/api/admin/roles', { name: el ? el.value.trim() : '' }), () => { svStale('aperms'); svStale('roles'); S.permEd = null; toast('Роль добавлена.'); }); break; }

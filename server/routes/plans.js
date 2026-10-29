@@ -12,11 +12,12 @@ const P = require('../plans');
 const needTech = req => { const me = needPlayer(req); if (me.role !== 'tech' || me.blocked) throw E.forbidden('Это может только тех. администратор'); return me; };
 const planJSON = (p, title) => {
   const d = P.discountFor(title || '');
-  return { id: p.id, name: p.name, price: p.price, days: p.days, role: p.role, about: p.about, active: p.active, sort: p.sort, discount: d.pct, why: d.why, final: P.priceWith(p.price, d.pct) };
+  return { id: p.id, name: p.name, price: p.price, days: p.days, role: p.role, about: p.about, active: p.active, sort: p.sort, discount: d.pct, why: d.why, final: P.priceWith(p.price, d.pct),
+    year: p.year_price == null ? null : p.year_price, yearFinal: p.year_price == null ? null : P.priceWith(p.year_price, d.pct) };
 };
 const subJSON = r => ({ id: +r.id, player: r.player_id ? { id: r.player_id, name: r.player_name, code: r.player_code, title: r.player_title || '' } : undefined, plan: { id: r.plan_id, name: r.plan_name, price: r.plan_price, days: r.plan_days },
-  status: r.status, price: r.price, discount: r.discount, starts: r.starts == null ? null : +r.starts, ends: r.ends == null ? null : +r.ends, note: r.note, created: +r.created_at, by: r.by_name || null });
-const SUB_SQL = `SELECT pp.*, pl.name AS plan_name, pl.price AS plan_price, pl.days AS plan_days, p.name AS player_name, p.code AS player_code, p.title AS player_title, g.name AS by_name
+  year: !!r.year, status: r.status, price: r.price, discount: r.discount, starts: r.starts == null ? null : +r.starts, ends: r.ends == null ? null : +r.ends, note: r.note, created: +r.created_at, by: r.by_name || null });
+const SUB_SQL = `SELECT pp.*, pl.name AS plan_name, pl.price AS plan_price, pl.year_price AS plan_year, pl.days AS plan_days, p.name AS player_name, p.code AS player_code, p.title AS player_title, g.name AS by_name
   FROM player_plans pp JOIN plans pl ON pl.id = pp.plan_id JOIN players p ON p.id = pp.player_id LEFT JOIN players g ON g.id = pp.granted_by`;
 
 function planFields(b, full) {
@@ -29,23 +30,26 @@ function planFields(b, full) {
     if (RANK[o.role] >= RANK.admin) throw E.bad('Тариф не может давать роль администратора', 'role');
   }
   if (full || b.about !== undefined) o.about = V.optStr(String(b.about == null ? '' : b.about).replace(/\r/g, ''), 'about', 1000);
+  if (b.yearPrice !== undefined) o.year_price = b.yearPrice == null || b.yearPrice === '' ? null : V.int(b.yearPrice, 'yearPrice', 0, 10000000);
   if (b.active !== undefined) o.active = V.bool(b.active, 'active');
   if (b.sort !== undefined) o.sort = V.int(b.sort, 'sort', 0, 1000);
   return o;
 }
-// подключить тариф: новый срок идёт с конца действующего такого же тарифа (продление) или с сейчас
-async function grant(c, me, pid, plan, days, note, reqId) {
+// подключить тариф: новый срок идёт с конца действующего такого же тарифа (продление) или с сейчас;
+// year — на год по цене за год (срок 365 дней)
+async function grant(c, me, pid, plan, days, note, reqId, year) {
+  if (year && plan.year_price == null) throw E.bad('У этого тарифа нет оплаты за год', 'year');
   const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p) throw E.notFound('Игрок не найден');
   const now = Date.now(), cur = await one(c, `SELECT * FROM player_plans WHERE player_id = $1 AND plan_id = $2 AND status = 'active' AND ends > $3 ORDER BY ends DESC LIMIT 1`, [pid, plan.id, now]);
-  const d = P.discountFor(p.title || ''), price = P.priceWith(plan.price, d.pct), dur = (days || plan.days) * 864e5;
+  const d = P.discountFor(p.title || ''), price = P.priceWith(year ? plan.year_price : plan.price, d.pct), dur = (year ? 365 : days || plan.days) * 864e5;
   let row;
   if (cur) row = await one(c, 'UPDATE player_plans SET ends = ends + $2, price = price + $3 WHERE id = $1 RETURNING *', [cur.id, dur, price]);
-  else row = await one(c, `INSERT INTO player_plans (player_id, plan_id, status, price, discount, starts, ends, note, granted_by, created_at) VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8, $5) RETURNING *`,
-    [pid, plan.id, price, d.pct, now, now + dur, note || '', me.id]);
+  else row = await one(c, `INSERT INTO player_plans (player_id, plan_id, status, price, discount, starts, ends, note, granted_by, created_at, year) VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8, $5, $9) RETURNING *`,
+    [pid, plan.id, price, d.pct, now, now + dur, note || '', me.id, !!year]);
   if (reqId) await c.query(`UPDATE player_plans SET status = 'cancelled', note = 'подключено' WHERE id = $1 AND status = 'requested'`, [reqId]);
   await P.syncPlanRole(c, pid);
-  await audit(c, me, cur ? 'plan.extend' : 'plan.grant', p, { plan: plan.name, days: days || plan.days, price, discount: d.pct });
+  await audit(c, me, cur ? 'plan.extend' : 'plan.grant', p, { plan: plan.name, days: year ? 365 : days || plan.days, price, discount: d.pct });
   return row;
 }
 
@@ -60,17 +64,18 @@ module.exports = async function (app) {
     return { plans, mine, request: rq ? subJSON(rq) : null, discounts: P.getDiscounts() };
   });
 
-  // заявка на тариф (онлайн-оплаты пока нет — подключает администратор)
+  // заявка на тариф (онлайн-оплаты пока нет — подключает администратор): { year: true } — на год
   app.post('/api/plans/:id/request', async (req, reply) => {
-    const me = needPlayer(req);
+    const me = needPlayer(req), year = (req.body || {}).year == null ? false : V.bool(req.body.year, 'year');
     const r = await tx(async c => {
       const plan = await one(c, 'SELECT * FROM plans WHERE id = $1 AND active', [req.params.id]);
       if (!plan) throw E.notFound('Тариф не найден');
+      if (year && plan.year_price == null) throw E.bad('У этого тарифа нет оплаты за год', 'year');
       if (await one(c, `SELECT 1 FROM player_plans WHERE player_id = $1 AND status = 'requested'`, [me.id])) throw E.conflict('conflict', 'Заявка на тариф уже отправлена — дождитесь подключения или отзовите её');
       const d = P.discountFor(me.title || '');
-      const row = await one(c, `INSERT INTO player_plans (player_id, plan_id, status, price, discount, note, created_at) VALUES ($1, $2, 'requested', $3, $4, $5, $6) RETURNING *`,
-        [me.id, plan.id, P.priceWith(plan.price, d.pct), d.pct, V.optStr((req.body || {}).note, 'note', 300), Date.now()]);
-      await audit(c, me, 'plan.request', me, { plan: plan.name });
+      const row = await one(c, `INSERT INTO player_plans (player_id, plan_id, status, price, discount, note, created_at, year) VALUES ($1, $2, 'requested', $3, $4, $5, $6, $7) RETURNING *`,
+        [me.id, plan.id, P.priceWith(year ? plan.year_price : plan.price, d.pct), d.pct, V.optStr((req.body || {}).note, 'note', 300), Date.now(), year]);
+      await audit(c, me, 'plan.request', me, { plan: plan.name, year });
       return one(c, SUB_SQL + ' WHERE pp.id = $1', [row.id]);
     });
     return reply.code(201).send({ request: subJSON(r) });
@@ -88,25 +93,27 @@ module.exports = async function (app) {
     const now = Date.now();
     return {
       plans: (await all(pool, 'SELECT * FROM plans ORDER BY sort, price')).map(p => planJSON(p, '')),
-      requests: (await all(pool, SUB_SQL + ` WHERE pp.status = 'requested' ORDER BY pp.created_at`)).map(r => Object.assign(subJSON(r), { final: P.priceWith(r.plan_price, P.discountFor(r.player_title || '').pct), discount: P.discountFor(r.player_title || '').pct })),
+      requests: (await all(pool, SUB_SQL + ` WHERE pp.status = 'requested' ORDER BY pp.created_at`)).map(r => Object.assign(subJSON(r), { final: P.priceWith(r.year && r.plan_year != null ? r.plan_year : r.plan_price, P.discountFor(r.player_title || '').pct), discount: P.discountFor(r.player_title || '').pct })),
       active: (await all(pool, SUB_SQL + ` WHERE pp.status = 'active' AND pp.ends > $1 ORDER BY pp.ends`, [now])).map(subJSON),
       discounts: P.getDiscounts(), discountKeys: P.DISC_KEYS.map(([k, name]) => ({ k, name }))
     };
   });
-  // подключить: { playerId, planId, days?, note?, requestId? }
+  // подключить: { playerId, planId, days?, year?, note?, requestId? } — year: на год по цене за год
   app.post('/api/admin/plans/grant', async req => {
     const me = needPerm(req, 'plans', 'Тарифы подключает администратор'), b = req.body || {};
     const days = b.days == null ? null : V.int(b.days, 'days', 1, 3660);
+    let year = b.year == null ? null : V.bool(b.year, 'year');
     const row = await tx(async c => {
       let pid = b.playerId == null ? null : V.id(b.playerId, 'playerId'), planId = b.planId, reqId = null;
       if (b.requestId != null) {
         const rq = await one(c, `SELECT * FROM player_plans WHERE id = $1 AND status = 'requested' FOR UPDATE`, [V.int(b.requestId, 'requestId', 1, 2 ** 31)]);
         if (!rq) throw E.notFound('Заявка не найдена');
         pid = rq.player_id; planId = planId || rq.plan_id; reqId = rq.id;
+        if (year == null) year = rq.year;
       }
       const plan = await one(c, 'SELECT * FROM plans WHERE id = $1', [String(planId || '')]);
       if (!plan || !pid) throw E.bad('Нужен игрок и тариф', 'planId');
-      return grant(c, me, pid, plan, days, V.optStr(b.note, 'note', 300), reqId);
+      return grant(c, me, pid, plan, days, V.optStr(b.note, 'note', 300), reqId, !!year);
     });
     clearCache();
     return { sub: subJSON(await one(pool, SUB_SQL + ' WHERE pp.id = $1', [row.id])) };
@@ -143,8 +150,8 @@ module.exports = async function (app) {
   const needEdit = req => needPerm(req, 'plans_edit', 'Цены и состав тарифов меняет тех. администратор');
   app.post('/api/admin/plans', async (req, reply) => {
     const me = needEdit(req), f = planFields(req.body || {}, true);
-    const row = await one(pool, 'INSERT INTO plans (name, price, days, role, about, active, sort, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [f.name, f.price, f.days, f.role, f.about, f.active !== false, f.sort || 0, Date.now()]);
+    const row = await one(pool, 'INSERT INTO plans (name, price, days, role, about, active, sort, created_at, year_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [f.name, f.price, f.days, f.role, f.about, f.active !== false, f.sort || 0, Date.now(), f.year_price == null ? null : f.year_price]);
     await audit(pool, me, 'plan.create', { id: row.id, name: row.name }, { price: row.price, days: row.days, role: row.role });
     return reply.code(201).send({ plan: planJSON(row, '') });
   });
