@@ -52,6 +52,7 @@ function build(row, ents, ms, qs) {
     players: ents.map(e => e.player_id), games: [], live: {}, version: row.version
   };
   if (row.ex) t.ex = row.ex;
+  if (row.ltw_by) t.ltwBy = row.ltw_by;
   if (row.split) t.split = row.split;
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
@@ -243,7 +244,7 @@ function tourCard(t, me) {
   const row = t._row, ch = champion(t), e = ch && t._ents.find(x => x.player_id === ch);
   return {
     id: t.id, name: t.name, official: t.official, org: orgOf(row, t), city: t.city, venue: t.venue, start: t.start, regUntil: t.regUntil,
-    status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, cap: t.cap, count: t.players.length,
+    status: t.status, format: t.format, mode: t.mode, ltw: t.ltw, ltwBy: t.ltwBy || null, cap: t.cap, count: t.players.length,
     ex: t.ex || null, qual: t.qual ? { ex: t.qual.ex, tries: t.qual.tries } : null, split: t.split || null, stage: t.stage || null, layout: t.layout || null, labels: t.labels || null,
     progress: t.status === 'reg' ? { done: 0, total: 0 } : t.stage === 'qual' ? { done: qualDone(t), total: t.players.length } : B.tProgress(t),
     champion: e ? { id: ch, name: e.name } : null, joined: !!me && t.players.includes(me.id), version: t.version,
