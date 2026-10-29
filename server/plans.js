@@ -5,8 +5,9 @@ const { all, one } = require('./db');
 const { KINDS } = require('./titles');
 const { RANK, permsOf } = require('./roles');
 
-// скидка за подтверждённое звание, % — у каждого звания своя (ЗМС в дартсе один на всю Россию, МСМК — 18, МС — 322)
-const DEF = { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 5 };
+// скидка за подтверждённое звание, % — у каждого звания своя (ЗМС в дартсе один на всю Россию, МСМК — 18, МС — 322);
+// 1 разряд — без скидки (таких много), но её можно включить в админке
+const DEF = { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 0 };
 let discounts = Object.assign({}, DEF);
 const DISC_KEYS = [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']];
 function setDiscounts(v) {
