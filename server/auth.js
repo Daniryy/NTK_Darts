@@ -195,7 +195,8 @@ function routes(app) {
     return meResp(pool, p);
   });
 
-  // вход по коду от ведущего: аккаунт для тех, у кого нет VK и кто не хочет SMS. Код одноразовый.
+  // вход по коду или QR-карточке от ведущего: аккаунт для тех, у кого нет VK и кто не хочет SMS.
+  // Карточка лайт-профиля (без своего входа) многоразовая — пожилой игрок входит ею на каждом турнире; у остальных код одноразовый.
   app.post('/api/auth/code', async (req, reply) => {
     const code = normCode((req.body || {}).code), keys = [['code:' + req.ip, 30, 10 * 6e4]];
     failCheck(keys);
@@ -204,7 +205,7 @@ function routes(app) {
       if (!t) { failAdd(keys); throw E.notFound('Код не найден — проверьте у ведущего'); }
       if (t.blocked) throw blockedErr();
       if (atLeast(t, 'admin')) throw adminPassErr();
-      await c.query('UPDATE players SET claim = NULL WHERE id = $1', [t.id]);
+      if (!t.lite) await c.query('UPDATE players SET claim = NULL WHERE id = $1', [t.id]);
       await startSession(reply, c, t.id, req.device);
       return t;
     });

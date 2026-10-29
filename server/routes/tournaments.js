@@ -10,6 +10,7 @@ const T = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards } = require('../cards');
 const { version, forget } = require('../versions');
+const { newClaim } = require('./admin');
 
 const LIST_MAX = 50;
 
@@ -291,6 +292,25 @@ module.exports = async function (app) {
       await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) VALUES ($1, $2, $3)', [t.id, pid, t.players.length + 1]);
       await bump(c, t.id);
       return tourResp(c, t.id, me);
+    });
+  });
+
+  // QR-карточки участников с лайт-профилем: игрок наводит камеру — входит и сразу видит турнир. Организатор получает
+  // карточки тех, кого завёл сам (или его клуб); с правом players — всех. Кода ещё нет — выдаётся.
+  app.post('/api/tournaments/:id/cards', async req => {
+    const me = needPlayer(req);
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, false);
+      needOwner(t, me);
+      const rows = await all(c, `SELECT p.* FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = $1 AND p.lite AND NOT p.blocked
+        ORDER BY e.seed_no FOR UPDATE OF p`, [t.id]);
+      const mine = p => can(me, 'players') || p.owner_id === me.id || !!(t._club && t._club.hosts.has(p.owner_id));
+      const out = [];
+      for (const p of rows.filter(mine)) {
+        const claim = p.claim || (await one(c, 'UPDATE players SET claim = $2 WHERE id = $1 RETURNING claim', [p.id, await newClaim(c)])).claim;
+        out.push({ id: p.id, name: p.name, code: p.code, city: p.city, claim });
+      }
+      return { cards: out, others: rows.length - out.length };
     });
   });
 
