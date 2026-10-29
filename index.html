@@ -565,6 +565,8 @@ a.mini { text-decoration: none; }
 .gb.void { min-height: 30px; place-items: center; background: transparent; border: 1px dashed var(--line); box-shadow: none; color: var(--muted); opacity: .55; }
 .gb-h { display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; line-height: 1.5; color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .gb-h .go { color: var(--green); white-space: nowrap; }
+.rf { margin-left: 6px; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.gno .rf { margin-left: 0; font-size: 11px; }
 .gb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto 1.6em; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; min-height: 26px; }
 .gb-r > span:first-child:not(.src) { min-width: 0; display: flex; }
 .gb-r .num { text-align: right; font-size: 17px; }
@@ -1680,6 +1682,9 @@ const boardOf = (t, r, i) => boardNo(t, boardIdx(t, r, i)) || null;
 // мишень игрока на квалификации (бросают по двое) и кто с ним на этой мишени
 const qBoard = (t, id) => t.stage === 'qual' && t.boards && t.boards.q && t.boards.q[id] ? boardNo(t, t.boards.q[id]) : null;
 const qMates = (t, id) => { const q = t.boards && t.boards.q; return q && q[id] ? Object.keys(q).filter(x => x !== id && q[x] === q[id]) : []; };
+// судья матча — в шапке пары в сетке и в списке матчей
+const refOf = (t, r, i) => (t.refs && t.refs.at && t.refs.at[r + ':' + i]) || '';
+const refTag = (t, r, i) => { const n = refOf(t, r, i); return n ? '<span class="rf" title="Судья: ' + esc(n) + '">⚖ ' + esc(n) + '</span>' : ''; };
 const boardTag = (t, r, i) => { const b = boardOf(t, r, i); return b ? '<span class="bd" title="Мишень ' + b + '">М' + b + '</span>' : ''; };
 // убрать результат можно, если дальше нет зависящих матчей и это не идущая сейчас игра
 function canClearResult(t, g) {
@@ -2492,7 +2497,7 @@ function gameBox(t, g, cx) {
     : lm ? ' role="button" tabindex="0" data-act="mview" data-v="' + lm + '"'
     : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live || !cx.staff ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
   const row = (id, side) => '<div class="gb-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : lm ? liveLegs(t, lm, side) : '') + '</span></div>';
-  return '<div class="gb' + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="gb-h"><span>' + gName(t, g, n) + (ready ? ' ' + boardTag(t, g.r, g.i) : '') + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + '</div>' + row(a, 0) + row(b, 1) + '</div>';
+  return '<div class="gb' + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="gb-h"><span class="ell">' + gName(t, g, n) + (ready ? ' ' + boardTag(t, g.r, g.i) : '') + refTag(t, g.r, g.i) + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + '</div>' + row(a, 0) + row(b, 1) + '</div>';
 }
 function treeHTML(t, cx, cols) {
   const fold = colFold(t);
@@ -2599,7 +2604,7 @@ function gameRow(t, g, cx) {
   let acts = '';
   if (st === 'ready' && cx.live) acts = gameActs(t, g, st, true);
   const click = st === 'done' && protoOk(g.res.mid) ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"' : '';
-  return '<div class="grow' + (st === 'done' ? ' done' : '') + (live ? ' live' : '') + '"' + click + '><span class="gno">' + gName(t, g, n) + (st === 'ready' && boardOf(t, g.r, g.i) ? '<br>' + boardTag(t, g.r, g.i) : '') + '</span><div class="gpl">' + line(a, 0) + line(b, 1) + '</div>' + (acts ? '<div class="gacts">' + acts + '</div>' : '<span></span>') + '</div>';
+  return '<div class="grow' + (st === 'done' ? ' done' : '') + (live ? ' live' : '') + '"' + click + '><span class="gno">' + gName(t, g, n) + (st === 'ready' && boardOf(t, g.r, g.i) ? '<br>' + boardTag(t, g.r, g.i) : '') + (refOf(t, g.r, g.i) ? '<br>' + refTag(t, g.r, g.i) : '') + '</span><div class="gpl">' + line(a, 0) + line(b, 1) + '</div>' + (acts ? '<div class="gacts">' + acts + '</div>' : '<span></span>') + '</div>';
 }
 function gamesList(t) {
   const cx = bctx(t), f = S.gf, num = g => cx.nums.get(g.r + ':' + g.i) || 0;
@@ -2680,6 +2685,7 @@ function tourView(id) {
     : inQual ? [['qual', 'Квалификация'], ['people', 'Участники']].concat(SRV ? [['time', 'Время']] : [])
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']] : [['table', 'Таблица'], ['games', 'Матчи']])
       .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : [], SRV ? [['time', 'Время']] : [], fees);
+  if (SRV && (canDo(t, 'org') || t.refs)) tabs.push(['refs', 'Судьи']);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -2730,11 +2736,34 @@ function tourView(id) {
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
   else if (tab === 'fees') h += feesView(t);
   else if (tab === 'time') h += timeView(t);
+  else if (tab === 'refs') h += refsView(t);
   else if (st !== 'reg') h += cardsBtn(t) + numsView(t);
   else {
     h += cardsBtn(t) + '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
   }
   return h + bannerHTML('tour', t.id);
+}
+// судьи: главный (в протокол), список судей турнира, кто судит матчи
+function refsView(t) {
+  const rf = t.refs || {}, pool = rf.pool || [], at = rf.at || {}, org = canDo(t, 'org'), staff = canDo(t, 'staff');
+  let h = '<div class="card sec"><span class="label">Главный судья</span>';
+  if (org) h += '<div class="nrow"><input class="inp" id="rf-chief" maxlength="60" value="' + esc(rf.chief ? rf.chief.name : '') + '" placeholder="Фамилия Имя Отчество" aria-label="Главный судья"><input class="inp" id="rf-city" maxlength="40" value="' + esc(rf.chief ? rf.chief.city || '' : '') + '" placeholder="Город" aria-label="Город главного судьи"></div><div class="row"><button class="mini go" data-act="rf-chief" data-v="' + t.id + '">Сохранить</button><span class="meta">Попадёт в протокол результатов.</span></div>';
+  else h += rf.chief ? '<div><b>' + esc(rf.chief.name) + '</b>' + (rf.chief.city ? ' <span class="meta">· ' + esc(rf.chief.city) + '</span>' : '') + '</div>' : '<span class="meta">Не назначен.</span>';
+  h += '</div><div class="card sec"><span class="label">Судьи матчей · ' + pool.length + '</span>';
+  h += pool.length ? '<div class="selchips">' + pool.map((n, k) => '<span class="selchip"><span>' + esc(n) + '</span>' + (org ? '<button class="lnk" data-act="rf-del" data-v="' + t.id + '|' + k + '" aria-label="Убрать судью ' + esc(n) + '">✕</button>' : '') + '</span>').join('') + '</div>' : '<p class="meta">' + (org ? 'Добавьте тех, кто будет судить матчи: судей, свободных игроков, помощников.' : 'Пока никого.') + '</p>';
+  if (org) h += '<div class="nrow"><input class="inp" id="rf-add" maxlength="60" placeholder="Фамилия И." aria-label="Добавить судью"><button class="mini" data-act="rf-add" data-v="' + t.id + '">Добавить</button></div>';
+  h += '</div>';
+  if (t.status === 'reg' || !t.games.length) return h + (pool.length ? '<p class="meta">Судей матчам можно назначить после старта.</p>' : '');
+  const rv = resolver(t), nums = gameNums(t, rv), nm = id => P[id] ? P[id].name : '—';
+  const games = t.games.filter(g => { const s = gameState(t, g, rv).st; return s === 'ready' || (s === 'done' && at[g.r + ':' + g.i]); });
+  h += '<div class="card sec"><div class="tstat"><span class="label">Кто судит</span>' + (staff && pool.length ? '<button class="mini" data-act="rf-auto" data-v="' + t.id + '">Раздать по очереди</button>' : '') + '</div>';
+  if (!games.length) h += '<p class="meta">Сейчас нет матчей, которые можно играть.</p>';
+  h += games.map(g => {
+    const gs = gameState(t, g, rv), k = g.r + ':' + g.i, cur = at[k] || '', done = gs.st === 'done';
+    const pick = staff && pool.length && !done ? '<select class="inp sm" data-ref-of="' + t.id + '|' + g.r + '|' + g.i + '" aria-label="Судья матча"><option value="">— без судьи —</option>' + pool.map(n => '<option' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>').join('') + '</select>' : '<span class="meta">' + (cur ? '⚖ ' + esc(cur) : 'без судьи') + '</span>';
+    return '<div class="lrow"><span><b>' + esc(nm(gs.a)) + ' — ' + esc(nm(gs.b)) + '</b><br><span class="meta">' + esc(gName(t, g, nums.get(k)) || '') + (done ? ' · сыгран' : '') + '</span></span>' + pick + '</div>';
+  }).join('');
+  return h + (staff && pool.length ? '<p class="meta">«По очереди» — матчам без судьи, кто судил меньше; игрок свой матч не судит.</p>' : '') + '</div>';
 }
 const cardsBtn = t => SRV && canDo(t, 'org') ? '<div class="row"><button class="mini" data-act="cards-show" data-v="' + t.id + '">QR-карточки игроков</button><span class="meta">вход для тех, у кого нет своего</span></div>' : '';
 function deleteTour(tid) {
@@ -6876,6 +6905,10 @@ document.addEventListener('click', e => {
     case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); if (v === 'voice' && o.voice) say('Озвучка табло включена'); render(); break; }
     case 'tvo-show': S.tvoOpen = !S.tvoOpen; render(); break;
     case 'qr-show': closeModals(); S.qr = v; loadQr(); render(); break;
+    case 'rf-chief': { const g = id => { const el = $(id); return el ? el.value.trim() : ''; }; svDo(Api.patch('/api/tournaments/' + v + '/refs', { chief: g('rf-chief') ? { name: g('rf-chief'), city: g('rf-city') } : null }), r => { svTourSet(r); toast('Главный судья сохранён.'); }); break; }
+    case 'rf-add': { const el = $('rf-add'), n = el ? el.value.trim() : '', t = TBY[v]; if (!n || !t) break; svDo(Api.patch('/api/tournaments/' + v + '/refs', { pool: ((t.refs && t.refs.pool) || []).concat(n) }), r => { svTourSet(r); setTimeout(() => { const x = $('rf-add'); if (x) x.focus(); }, 30); }); break; }
+    case 'rf-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (!t || !t.refs) break; svDo(Api.patch('/api/tournaments/' + tid + '/refs', { pool: t.refs.pool.filter((_, j) => j !== +k) }), r => svTourSet(r)); break; }
+    case 'rf-auto': svDo(Api.patch('/api/tournaments/' + v + '/refs', { auto: true }), r => { svTourSet(r); toast('Судьи расставлены.'); }); break;
     case 'cards-show': closeModals(); S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
     case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
     case 'card-print': if (CARDS[v]) printCards([CARDS[v]], ''); break;
@@ -6996,6 +7029,11 @@ document.addEventListener('change', e => {
   if (t.dataset && t.dataset.rregion) { S.rregion = t.value; S.rpage = 0; render(); return; }
   // путь игрока: подсветить и прокрутить сетку к его последнему матчу
   if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); if (S.hp) showPath(S.hp); return; }
+  if (t.dataset && t.dataset.refOf) {
+    const [tid, r, i] = t.dataset.refOf.split('|');
+    svDo(Api.patch('/api/tournaments/' + tid + '/refs', { r: +r, i: +i, ref: t.value || null }), x => svTourSet(x));
+    return;
+  }
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
     svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + roleName(role) + '.'); });
