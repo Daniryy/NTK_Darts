@@ -18,9 +18,16 @@ const MATCH_SQL = 'SELECT m.*, lp.name AS lock_name FROM matches m LEFT JOIN pla
 const matchJSON = (m, req, card) => ({
   id: m.id, status: m.status, tid: m.tournament_id, r: m.r, i: m.i, mode: m.mode, ltw: m.ltw, dbl: m.dbl, starter: m.starter,
   ex: m.ex || null, q: m.q_player ? { id: m.q_player, k: m.q_try } : null,
-  players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished,
+  players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished, duo: !!m.duo,
   lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || null, until: m.lock_until }, card: card || null
 });
+// повтор события совпадает с записанным: тот же тип, для подхода — тот же игрок, лег и очки
+function sameEvent(row, ev) {
+  if (row.type !== ev.type) return false;
+  if (ev.type !== 'visit' && ev.type !== 'bull') return true;
+  const d = row.data || {};
+  return d.p === ev.p && d.leg === ev.leg && (ev.type === 'bull' || (d.pts === ev.pts && JSON.stringify(d.v == null ? null : d.v) === JSON.stringify(ev.v == null ? null : ev.v)));
+}
 const eventJSON = e => Object.assign({ seq: e.seq, type: e.type }, e.data, { t: e.t });
 
 
@@ -157,6 +164,8 @@ module.exports = async function (app) {
         const id = 'g' + require('node:crypto').randomBytes(10).toString('hex');
         const nm = pid => t._ents.find(e => e.player_id === pid).name;
         await insertMatch(c, req, me, { id, tid: t.id, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter: 0, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+        // оба отметились со своих телефонов — каждый вносит свои подходы сам
+        await c.query('UPDATE matches SET duo = true WHERE id = $1', [id]);
         match = matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]), req);
       } else if (Object.keys(cur).length) all[key] = cur; else delete all[key];
       await c.query('UPDATE tournaments SET ready = $2, version = version + 1 WHERE id = $1', [t.id, Object.keys(all).length ? JSON.stringify(all) : null]);
@@ -192,29 +201,39 @@ module.exports = async function (app) {
   });
 
   app.post('/api/matches/:id/events', async req => {
-    needPlayer(req);
+    const me = needPlayer(req);
     const evs = (req.body || {}).events;
     if (!Array.isArray(evs) || evs.length < 1 || evs.length > 50) throw E.bad('events: от 1 до 50 событий', 'events');
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
-      if (m.lock_device !== req.device) throw E.locked(m.lock_name, m.lock_until);
+      // «каждый за себя»: игрок пары вносит со своего телефона только свои подходы (и отменяет только свой последний)
+      const own = m.duo ? m.players.findIndex(p => p.id === me.id) : -1;
+      if (own < 0 && m.lock_device !== req.device) throw E.locked(m.lock_name, m.lock_until);
       const rows = await all(c, 'SELECT seq, type, data FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]);
-      const visits = activeVisits(rows), now = Date.now(), add = [];
+      const visits = activeVisits(rows), now = Date.now(), add = [], byseq = new Map(rows.map(r => [r.seq, r]));
       let seq = m.last_seq, ver = m.version, done = m.status === 'done', fin = null;
       for (const ev of evs) {
         if (!ev || !Number.isInteger(ev.seq) || ev.seq < 1) throw E.bad('seq: целое число от 1', 'events');
-        if (ev.seq <= seq) continue; // уже принято: повтор безопасен
+        if (ev.seq <= seq) {
+          // уже принято: повтор безопасен. Но если под этим номером записано другое (второй телефон успел раньше) —
+          // телефон отстал: пусть заберёт счёт с сервера
+          const was = byseq.get(ev.seq);
+          if (was && !sameEvent(was, ev)) throw E.conflict('stale', 'Счёт изменился на другом телефоне — обновляем', { expectSeq: seq + 1 });
+          continue;
+        }
         if (ev.seq !== seq + 1) throw E.conflict('seq_gap', 'Ожидается событие №' + (seq + 1), { expectSeq: seq + 1 });
         if (done) throw E.conflict('bad_state', 'Матч завершён');
         let data;
         if (ev.type === 'visit' || ev.type === 'bull') {
           const v = visitOf(m, ev);
+          if (own >= 0 && !v.tb && v.p !== own) throw E.badEvent('Подход соперника он вносит сам со своего телефона', ev.seq);
           const err = checkVisit(m, visits, v);
           if (err) throw E.badEvent(err, ev.seq);
           visits.push(v);
           data = ev.type === 'bull' ? { leg: v.leg, p: v.p } : v;
         } else if (ev.type === 'undo') {
           if (!visits.length) throw E.badEvent('Нечего отменять', ev.seq);
+          if (own >= 0 && !visits[visits.length - 1].tb && visits[visits.length - 1].p !== own) throw E.badEvent('Отменить можно только свой последний подход — соперник уже бросил', ev.seq);
           visits.pop();
           data = {};
         } else if (ev.type === 'finish') {
@@ -249,7 +268,8 @@ module.exports = async function (app) {
       const inMatch = m.players.some(p => p.id === me.id);
       const ok = m.tournament_id ? inMatch || isStaff(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || can(me, 'any_tour');
       if (!ok) throw E.forbidden('Забрать счёт может организатор или игрок этого матча');
-      await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, version = version + 1 WHERE id = $1', [m.id, req.device, me.id, Date.now() + LOCK_MS]);
+      // забрать ведение — дальше счёт за обоих с этого телефона
+      await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, duo = false, version = version + 1 WHERE id = $1', [m.id, req.device, me.id, Date.now() + LOCK_MS]);
       forget('m', m.id);
       const rows = await all(c, 'SELECT * FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]);
       return { match: matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [m.id]), req), events: rows.map(eventJSON) };
@@ -257,10 +277,15 @@ module.exports = async function (app) {
   });
 
   app.post('/api/matches/:id/reopen', async req => {
-    needPlayer(req);
+    const me = needPlayer(req);
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
-      if (m.lock_device !== req.device) throw E.locked(m.lock_name, m.lock_until);
+      // «каждый за себя»: вернуть матч может тот, кто бросил последний (закрывающий) подход
+      const own = m.duo ? m.players.findIndex(p => p.id === me.id) : -1;
+      if (own >= 0) {
+        const vs = activeVisits(await all(c, 'SELECT seq, type, data FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]));
+        if (!vs.length || vs[vs.length - 1].p !== own) throw E.forbidden('Вернуть матч может тот, кто бросил закрывающий подход');
+      } else if (m.lock_device !== req.device) throw E.locked(m.lock_name, m.lock_until);
       if (m.status !== 'done' || m.quick) throw E.conflict('bad_state', 'Матч не завершён в счётчике');
       if (m.tournament_id) await checkClear(c, await tourOf(c, m.tournament_id, true), m);
       const now = Date.now();

@@ -374,6 +374,12 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .ndot { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; margin-left: 5px; border-radius: 9px; background: var(--red, #e5484d); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; vertical-align: 1px; }
 .tabs button { position: relative; }
 .tabs .ndot { position: absolute; top: 2px; left: calc(50% + 4px); margin: 0; }
+.duo-off .visit, .duo-off .pad, .duo-off .ask { opacity: .22; pointer-events: none; filter: saturate(.4); }
+.duo-wait { position: absolute; z-index: 3; inset: 12px 8px auto; display: grid; gap: 8px; justify-items: center; text-align: center; padding: 18px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-bright); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.duo-wait b { font-size: 18px; }
+.duo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: duoPulse 1.2s ease-in-out infinite; }
+@keyframes duoPulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.g-pad-area.duo-off { position: relative; min-height: 220px; }
 .conf-note { text-align: left; cursor: pointer; width: 100%; color: var(--fg); }
 .conf-note:hover { border-color: var(--green); }
 .consent { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.45; }
@@ -2373,12 +2379,15 @@ function yourMatch(t, link) {
   const mine = liveCtxIs(t.id, m.g.r, m.g.i), other = !mine && otherLive(t, m.g), going = mine || !!other;
   // вызов к мишени — один раз; игра началась на телефоне соперника — тоже скажем
   if (!going && seenOnce(key + (b ? ':b' + b : ''))) callAlert(b ? 'Ваш матч: пройдите к мишени ' + b + ', соперник — ' + opp : 'Ваш матч готов, соперник — ' + opp);
-  if (other && seenOnce(key + ':go')) callAlert('Игра началась — счёт ведёт ' + opp);
+  // игра началась на телефоне соперника: «каждый за себя» — сразу в счётчик со своими подходами, иначе — сказать
+  if (other && seenOnce(key + ':go')) duoJoin(other, true).then(j => { if (!j) callAlert('Игра началась — счёт ведёт ' + opp); });
   // «Готов»: на сервере, игрокам пары (организатор ведёт счёт как раньше)
   const rd = SRV && t.ready && t.ready[m.g.r + ':' + m.g.i] || {}, meR = !!rd[ME], oppR = !!rd[m.opp];
   const readyOn = SRV && !going && t.players.includes(ME);
-  let status = going ? (mine ? 'Вы ведёте счёт' : 'Счёт ведёт соперник') : readyOn ? (meR && oppR ? 'Оба готовы — начинаем…' : meR ? 'Вы готовы — ждём соперника' : oppR ? 'Соперник уже у мишени и готов' : 'Подойдите к мишени и нажмите «Готов» — игра начнётся, когда готовы оба') : '';
-  const acts = going ? gameActs(t, m.g, 'ready', true)
+  // матч соперника «каждый за себя» — вернуться к своим подходам
+  const om = other ? lz('m1:' + other, () => Api.get('/api/matches/' + encodeURIComponent(other)), 15000) : null, duo = !!(om && om.data && om.data.match.duo);
+  let status = going ? (mine ? 'Вы ведёте счёт' : duo ? 'Каждый вносит свои подходы' : 'Счёт ведёт соперник') : readyOn ? (meR && oppR ? 'Оба готовы — начинаем…' : meR ? 'Вы готовы — ждём соперника' : oppR ? 'Соперник уже у мишени и готов' : 'Подойдите к мишени и нажмите «Готов» — игра начнётся, когда готовы оба') : '';
+  const acts = going ? (duo ? '<button class="mini go" data-act="duo-join" data-v="' + esc(other) + '">Вносить свои подходы</button>' : gameActs(t, m.g, 'ready', true))
     : readyOn ? (meR ? '<button class="mini" data-act="gready" data-v="' + t.id + '|' + m.g.r + '|' + m.g.i + '|0">Не готов</button>' : '<button class="mini go" data-act="gready" data-v="' + t.id + '|' + m.g.r + '|' + m.g.i + '|1">Готов</button>') + (canDo(t, 'score') ? '<button class="mini" data-act="tplay" data-v="' + gref(t, m.g) + '" title="Начать сразу и вести счёт с этого телефона">Вести счёт</button>' : '')
     : gameActs(t, m.g, 'ready', true);
   return '<div class="card yourm' + (b && !going ? ' call' : '') + '" role="status"><div class="ym-t"><span class="label">' + (going ? 'Ваш матч идёт' : 'Ваш матч') + (gName(t, m.g, m.n) ? ' · ' + gName(t, m.g, m.n) : '') + '</span>' +
@@ -3689,7 +3698,7 @@ function gameView() {
   h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div>' + (t ? ghTour(t, g.players.map(q => q.id)) : '') + '</div>';
   h += obBar();
 
-  const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && n > 1;
+  const canSwap = !g.over && g.ask == null && g.legNo === 1 && !g.log.length && !g.visit.length && n > 1 && !g.duo;
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
   g.players.forEach((q, i) => {
     const act = i === g.cur, rem = act ? q.score - vs : q.score;
@@ -3704,7 +3713,8 @@ function gameView() {
 
   const remNow = p.score - vs;
   const r = darts ? routeFor(remNow, 3 - g.visit.length, g.dbl) : null, next = r ? r[0] : null;
-  h += '<div class="col g-pad-area"><div class="visit">';
+  const dw = duoWait();
+  h += '<div class="col g-pad-area' + (dw ? ' duo-off' : '') + '">' + (dw ? duoBox() : '') + '<div class="visit">';
   const pv = g.prev;
   if (pv && g.players[pv.i]) h += '<div class="prev">Пред. (' + esc(g.players[pv.i].name) + '): ' + (pv.bust ? (pv.d && pv.d.length ? esc(pv.d.join(' · ')) + ' <b class="bust">= ' : '<b class="bust">') + 'перебор</b>'
     : '<b>' + (pv.d && pv.d.length ? esc(pv.d.join(' · ')) + ' = ' : '') + pv.pts + '</b>') + '</div>';
@@ -3752,7 +3762,7 @@ function gameView() {
   if (g.tb && !g.over) h += tbOverlay(g.tb);
   if (g.over) {
     const w = g.players[g.winner], leg = g.over === 'leg';
-    h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (leg ? 'Лег ' + g.legNo + ' выигран' : 'Победитель матча') + '</span><button class="ghost sm" data-act="undo">Отменить последний бросок</button></div>' +
+    h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (leg ? 'Лег ' + g.legNo + ' выигран' : 'Победитель матча') + '</span>' + (G.duo && !undo.length ? '' : '<button class="ghost sm" data-act="undo">Отменить последний бросок</button>') + '</div>' +
       '<h2>' + esc(w.name) + '</h2><div class="score">' + g.players.map(q => '<span>' + esc(q.name) + ' <b>' + q.legs + '</b></span>').join('') + '</div>';
     if (leg) {
       const L = g.log.filter(e => e.leg === g.legNo && e.p === g.winner), lp = L.reduce((a, e) => a + e.pts, 0), ld = L.reduce((a, e) => a + e.n, 0);
@@ -3809,6 +3819,55 @@ function syncGame() {
   it.view = cur;
   if (evs.length) Api.ob.push(G.id, evs); else Api.ob.save();
 }
+/* «Каждый за себя»: оба игрока нажали «Готов» со своих телефонов — каждый вносит только свои подходы,
+   подходы соперника приходят с сервера (опрос раз в 1,5 с). «Вести счёт за обоих» — забрать ведение на этот телефон */
+const duoCur = () => G.kind === 'ex' ? exSt().cur : G.cur;
+const duoTb = () => G.kind === 'ex' ? exSt().need === 'tb' : G.tb != null;
+const duoWait = () => !!(SRV && G && G.srv && G.duo && G.me >= 0 && !G.over && G.ask == null && !duoTb() && duoCur() !== G.me);
+function duoBox() {
+  const p = G.players[duoCur()];
+  // свой последний подход можно отменить, пока соперник не бросил
+  const last = G.log[G.log.length - 1], mine = undo.length && last && !last.tb && last.p === G.me;
+  return '<div class="duo-wait" role="status"><span class="duo-dot" aria-hidden="true"></span><b>Бросает ' + esc(p ? p.name : 'соперник') + '</b><span class="meta">Он вносит свой подход со своего телефона — счёт здесь обновится сам.</span>' +
+    (mine ? '<button class="btn sm alt" data-act="undo">Отменить мой подход</button>' : '') +
+    (S.duoAll ? '<span class="meta">Соперник больше не сможет вносить сам — весь счёт будет на этом телефоне.</span><div class="row2"><button class="btn sm" data-act="duo-all">Да, вести за обоих</button><button class="ghost sm" data-act="duo-all-no">Отмена</button></div>'
+      : '<button class="ghost sm" data-act="duo-ask">Вести счёт за обоих</button>') + '</div>';
+}
+let duoBusy = false;
+async function duoPoll() {
+  if (!(SRV && G && G.srv && G.duo) || duoBusy || document.hidden || G.over === 'match') return;
+  const it = Api.ob.get(G.id);
+  if (!it || (Api.ob.pending(G.id) && !it.stop)) return;
+  duoBusy = true;
+  try {
+    const id = G.id, r = await Api.get('/api/matches/' + encodeURIComponent(id)), m = r.match;
+    if (!G || G.id !== id) return;
+    // соперник забрал ведение — смотрим матч
+    if (!m.duo && !m.lock.mine) { Api.ob.drop(id); G = null; undo = []; S.inGame = false; S.buf = ''; saveGame(); toast('Счёт за обоих ведёт соперник — смотрите матч.'); go('m.' + id); return; }
+    const known = it.ev.length ? it.ev[it.ev.length - 1].seq : it.base || 0;
+    if (it.stop || m.lastSeq !== known) {
+      const stale = !!it.stop, mine = G.me;
+      restoreGame(m, r.events); S.buf = ''; S.duoAll = false;
+      if (stale) toast('Счёт обновлён с сервера — проверьте свой подход.');
+      else if (!G.over && mine >= 0 && duoCur() === mine) playSfx('dart');
+      render();
+    }
+  } catch (e) { /* нет сети — повторим */ } finally { duoBusy = false; }
+}
+setInterval(duoPoll, 1500);
+// войти в матч «каждый за себя», который начался на телефоне соперника
+async function duoJoin(mid, quiet) {
+  if (!SRV || !ME) return svLogin();
+  try {
+    const r = await Api.get('/api/matches/' + encodeURIComponent(mid)), m = r.match;
+    if (!m.duo || m.status !== 'live' || !m.players.some(p => p.id === ME)) { if (!quiet) go('m.' + mid); return false; }
+    if (hasLiveGame() && !(G && G.id === mid)) { if (!quiet) toast('Сначала закончите текущую игру.'); return false; }
+    restoreGame(m, r.events);
+    S.inGame = true; go('play');
+    toast('Игра началась! Вносите свои подходы — соперник вносит свои.');
+    return true;
+  } catch (e) { if (!quiet) toast(e.net ? 'Нет связи с сервером.' : e.message); return false; }
+}
 // бросить матч на сервере (освободить игру сетки)
 function dropServerGame() {
   if (!SRV || !G || !G.srv) return;
@@ -3844,7 +3903,7 @@ async function gameReady(v) {
       if (hasLiveGame()) { toast('Игра началась. Сначала закончите текущую игру — потом заберите счёт этого матча.'); return render(); }
       restoreGame(res.match, []);
       seenOnce(tid + ':' + r + ':' + i + ':go');
-      toast('Оба готовы — игра началась! Счёт ведёте вы.');
+      toast(res.match.duo ? 'Оба готовы — игра началась! Вносите свои подходы, соперник — свои.' : 'Оба готовы — игра началась! Счёт ведёте вы.');
       S.inGame = true; go('play');
     } else { toast(on === '1' ? 'Отметили: вы готовы. Ждём соперника.' : 'Отметка «Готов» снята.'); render(); }
   } catch (e) { svStale('tour:' + tid); toast(e.net ? 'Нет связи с сервером.' : e.message); render(); }
@@ -3868,6 +3927,8 @@ function restoreGame(m, events) {
   const ctx = m.q ? { tid: m.tid, q: { id: m.q.id, k: m.q.k } } : m.tid ? { tid: m.tid, r: m.r, i: m.i } : null;
   newGame(m.players.map(p => ({ id: p.id, name: p.name })), { legsToWin: m.ltw, ex }, ctx, m.starter);
   G.id = m.id; G.srv = true;
+  // «каждый за себя»: мой номер в матче — вношу только свои подходы
+  G.duo = !!m.duo; G.me = m.players.findIndex(p => p.id === ME);
   if (G.kind === 'ex') {
     G.log = vis.map(v => v.tb ? { leg: v.leg, p: v.p, tb: 1 } : { leg: v.leg, p: v.p, v: v.v, d: v.d || null });
     const st = exSt();
@@ -5728,7 +5789,7 @@ function exGameView() {
   let h = '<div class="game"><div class="ghead g-head-area"><div class="gh-t">' + title + '</div>';
   h += '<div class="ghead-acts"><button class="icon-btn" data-act="sfx" title="' + (S.sfx ? 'Звук включён' : 'Звук выключен') + '" aria-label="Звук" aria-pressed="' + S.sfx + '">' + (S.sfx ? I.volOn : I.volOff) + '</button><button class="ghost" data-act="menu">' + I.back + 'Меню</button></div>' + (t && !g.ctx.q ? ghTour(t, g.players.map(q => q.id)) : '') + '</div>';
   h += obBar();
-  const canSwap = !g.over && st.leg === 1 && !g.log.length && !g.visit.length && n > 1;
+  const canSwap = !g.over && st.leg === 1 && !g.log.length && !g.visit.length && n > 1 && !g.duo;
   h += '<div class="col g-players-area"><div class="players' + (n === 2 ? ' two' : '') + '">';
   g.players.forEach((q, i) => {
     const act = i === cur, done = Math.min(N, st.vis[i]), av = Games.avg(st.pts[i], st.darts[i]);
@@ -5738,7 +5799,8 @@ function exGameView() {
   });
   h += '</div>' + (canSwap ? '<button class="ghost sm swap" data-act="swap-start">Начинает другой</button>' : '') + '</div>';
 
-  h += '<div class="col g-pad-area"><div class="visit">';
+  const dw = duoWait();
+  h += '<div class="col g-pad-area' + (dw ? ' duo-off' : '') + '">' + (dw ? duoBox() : '') + '<div class="visit">';
   const last = st.last && !st.last.tb ? st.last : null;
   if (last && g.players[last.p]) h += '<div class="prev">Пред. (' + esc(g.players[last.p].name) + '): <b>' + (last.d && last.d.length ? esc(last.d.map(l => l === '0' ? 'мимо' : l).join(' · ')) + (ex.k === 'cricket' ? '' : ' = ') : '') + (ex.k === 'cricket' ? '' : last.v + (ex.k === 'score' ? '' : ' попад.')) + '</b></div>';
   const tg = cur != null ? Games.target(ex, st.vis[cur]) : null;
@@ -5792,7 +5854,7 @@ function exGameView() {
   if (g.over) {
     const w = g.players[g.winner], leg = g.over === 'leg', L = st.legsLog[st.legsLog.length - 1];
     const solo = n === 1;
-    h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (solo ? 'Результат' : leg ? 'Лег ' + L.leg + ' выигран' : 'Победитель матча') + '</span><button class="ghost sm" data-act="undo">Отменить последний подход</button></div>';
+    h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (solo ? 'Результат' : leg ? 'Лег ' + L.leg + ' выигран' : 'Победитель матча') + '</span>' + (G.duo && !undo.length ? '' : '<button class="ghost sm" data-act="undo">Отменить последний подход</button>') + '</div>';
     if (solo) h += '<h2>' + L.tot[0] + ' ' + u.tot + '</h2><p class="meta">' + esc(w.name) + ' · ' + esc(Games.label(ex)) + ' · ' + u.avg + ' ' + (Games.avg(st.pts[0], st.darts[0]) || 0).toFixed(1) + '</p>';
     else h += '<h2>' + esc(w.name) + '</h2><div class="score">' + g.players.map((q, i) => '<span>' + esc(q.name) + ' <b>' + st.legs[i] + '</b></span>').join('') + '</div><p class="meta">Лег ' + L.leg + ': ' + g.players.map((q, i) => esc(q.name.split(' ').pop()) + ' ' + L.tot[i]).join(' — ') + (st.last && st.last.tb ? ' · решил бросок в булл' : '') + '</p>';
     if (leg) h += '<button class="btn" data-act="next">Лег ' + (L.leg + 1) + ' · начинает ' + esc(g.players[(g.mstart + L.leg) % n].name) + '</button>';
@@ -5807,7 +5869,7 @@ function exGameView() {
 }
 // ничья в леге: кто выиграл бросок в булл
 function tbOverlay(tie) {
-  return '<div class="over" role="dialog" aria-modal="true" aria-label="Бросок в булл"><div class="ocard center"><div class="ohead"><span class="label">Ничья в леге</span><button class="ghost sm" data-act="undo">Отменить последний подход</button></div><h2>Бросок в булл</h2><p class="meta">Каждый бросает один дротик в булл, ближе к центру — выигрывает лег.</p><div class="row2">' +
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Бросок в булл"><div class="ocard center"><div class="ohead"><span class="label">Ничья в леге</span>' + (G.duo && !undo.length ? '' : '<button class="ghost sm" data-act="undo">Отменить последний подход</button>') + '</div><h2>Бросок в булл</h2><p class="meta">Каждый бросает один дротик в булл, ближе к центру — выигрывает лег.</p><div class="row2">' +
     tie.map(i => '<button class="btn" data-act="bull" data-v="' + i + '">' + esc(G.players[i].name) + '</button>').join('') + '</div></div></div>';
 }
 
@@ -6076,6 +6138,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b || b.disabled) return;
   const a = b.dataset.act, v = b.dataset.v;
+  // ход соперника: свои подходы он вносит сам
+  if (/^(dart|tdig|tdel|preset|tok|ask|mult|xdart|xhits|swap-start)$/.test(a) && duoWait()) { toast('Сейчас бросает соперник — он вносит свой подход сам.'); return; }
   const su = S.setup;
   const saveSu = () => lsSet('oche2.setup', su);
   switch (a) {
@@ -6589,6 +6653,10 @@ document.addEventListener('click', e => {
     case 'ob-resume': if (G) { Api.ob.resume(G.id); render(); } break;
     case 'takeover': takeover(v || (G && G.id)); break;
     case 'mview': closeModals(); go('m.' + v); break;
+    case 'duo-join': duoJoin(v); break;
+    case 'duo-ask': S.duoAll = true; render(); break;
+    case 'duo-all-no': S.duoAll = false; render(); break;
+    case 'duo-all': S.duoAll = false; if (G && G.srv) takeover(G.id); break;
     case 'take-ask': S.confirmTake = v; render(); break;
     case 'photo-pick': { const [k, id] = v.split('|'); photoPick(k, id); break; }
     case 'photo-del-av': photoDelete('avatar', v); break;
@@ -6780,6 +6848,7 @@ document.addEventListener('keydown', e => {
   if (!inInput && !anyModal() && !e.ctrlKey && !e.metaKey && !e.altKey && R === 'play' && S.inGame && G) {
     if (G.over === 'leg' && e.key === 'Enter') { e.preventDefault(); if (Date.now() >= tapLock) nextLeg(); return; }
     if (G.over) return;
+    if (duoWait()) return;
     if (G.ask != null) { if (/^[123]$/.test(e.key)) finishAsk(+e.key); return; }
     if (G.kind === 'ex' && G.ex.k !== 'score') {
       if (G.entry === 'total' && /^[0-9]$/.test(e.key)) exSubmit({ v: +e.key });
