@@ -44,7 +44,7 @@ test('тарифы и цена со скидкой за звание', async () 
   const v = async u => ok(await call(u, 'GET', '/api/plans')).plans.find(p => p.role === 'host');
   assert.deepEqual([(await v(MS)).discount, (await v(MS)).final, (await v(MS)).yearFinal], [40, 479, 4794]);
   assert.deepEqual([(await v(KMS)).discount, (await v(KMS)).final], [10, 719]);
-  assert.equal((await v(await login('p7'))).final, 759);
+  assert.equal((await v(await login('p7'))).final, 799, '1 разряд — без скидки');
   assert.equal((await v(PL)).discount, 0);
   assert.ok(host());
 });
@@ -138,9 +138,9 @@ test('Pro и «Ведущий» сразу: роль ведущего, даже 
 
 test('скидка за каждое звание своя; на год — по цене за год и на 365 дней', async () => {
   const host = plans.find(p => p.role === 'host'), plus = plans.find(p => p.role === 'plus');
-  ok(await call(TECH, 'PUT', '/api/admin/discounts', { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 5 }));
+  ok(await call(TECH, 'PUT', '/api/admin/discounts', { zms: 90, msmk: 70, ms: 40, kms: 10 }));
   const disc = ok(await call(null, 'GET', '/api/plans')).discounts;
-  assert.deepEqual(disc, { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 5 });
+  assert.deepEqual(disc, { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 0 });
   await pool.query(`UPDATE players SET title = 'ЗМС' WHERE id = 'p11'`);
   await pool.query(`UPDATE players SET title = 'МСМК' WHERE id = 'p12'`);
   const fin = async id => ok(await call(await login(id), 'GET', '/api/plans')).plans.find(p => p.role === 'host');
