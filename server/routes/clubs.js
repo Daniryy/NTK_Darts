@@ -150,8 +150,8 @@ module.exports = async function (app) {
     if (!f.title && !f.image) throw E.bad('Нужен заголовок или картинка', 'title');
     const club = await clubOf(pool, req.params.id, me, true);
     if ((await one(pool, 'SELECT count(*)::int AS n FROM banners WHERE club_id = $1', [club.id])).n >= 10) throw E.conflict('conflict', 'У клуба не больше 10 баннеров');
-    const row = await one(pool, `INSERT INTO banners (place, title, body, image, link, active, starts, ends, created_by, created_at, club_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`, [f.place, f.title, f.body, f.image, f.link, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now(), club.id]);
+    const row = await one(pool, `INSERT INTO banners (place, title, body, image, link, active, starts, ends, created_by, created_at, club_id, cta)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`, [f.place, f.title, f.body, f.image, f.link, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now(), club.id, f.cta]);
     await audit(pool, me, 'banner.create', { id: row.id, name: row.title }, { place: row.place, club: club.name });
     return reply.code(201).send({ banner: { id: row.id } });
   });

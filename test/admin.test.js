@@ -231,3 +231,20 @@ test('кривые параметры журнала и нулевой байт 
   err(await call(TECH, 'GET', '/api/admin/players?q=a%00b'), 400);
   ok(await call(TECH, 'GET', '/api/admin/audit?before=' + Date.now()));
 });
+
+test('баннеры: ссылка на страницу сайта, кнопка, сразу на несколько мест, копия', async () => {
+  err(await call(TECH, 'POST', '/api/admin/banners', { places: ['feed', 'feed'], title: 'x' }), 400);
+  err(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'x', link: 'javascript:alert(1)' }), 400);
+  err(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'x', link: '#plans<script>' }), 400);
+  const r = ok(await call(TECH, 'POST', '/api/admin/banners', { places: ['feed', 'tour'], title: 'Скидка на тарифы −50%', body: 'До конца месяца', link: '#plans', cta: 'Подключить →' }), 201);
+  assert.deepEqual(r.banners.map(b => [b.place, b.link, b.cta]), [['feed', '#plans', 'Подключить →'], ['tour', '#plans', 'Подключить →']]);
+  const pub = ok(await call(null, 'GET', '/api/banners?place=tour')).banners.find(b => b.id === r.banners[1].id);
+  assert.equal(pub.cta, 'Подключить →');
+  const cp = ok(await call(TECH, 'POST', '/api/admin/banners/' + r.banner.id + '/copy', { places: ['tv'] }), 201).banners;
+  assert.deepEqual(cp.map(b => [b.place, b.title, b.link]), [['tv', 'Скидка на тарифы −50%', '#plans']]);
+  // обычный игрок (новый: прежних могла удалить очистка в тесте выше)
+  const U = anon(), reg = ok(await call(U, 'POST', '/api/auth/register', { name: 'Без Прав', email: 'noperm@mail.ru', password: 'darts-2026' }));
+  if (reg.devCode) ok(await call(U, 'POST', '/api/auth/email/verify', { email: 'noperm@mail.ru', purpose: 'reg', code: reg.devCode }));
+  err(await call(U, 'POST', '/api/admin/banners/' + r.banner.id + '/copy', { places: ['tv'] }), 403);
+  for (const b of r.banners.concat(cp)) ok(await call(TECH, 'DELETE', '/api/admin/banners/' + b.id));
+});

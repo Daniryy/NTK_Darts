@@ -10,12 +10,14 @@ const rolesWith = k => ROLES.filter(r => can({ role: r }, k));
 const { audit } = require('../audit');
 
 const PLACES = ['feed', 'tour', 'tv'];
-const pub = b => ({ id: b.id, place: b.place, title: b.title, body: b.body, image: b.image, link: b.link });
+const pub = b => ({ id: b.id, place: b.place, title: b.title, body: b.body, image: b.image, link: b.link, cta: b.cta || null });
 const full = b => Object.assign(pub(b), { active: b.active, starts: b.starts, ends: b.ends, clicks: b.clicks, created: b.created_at });
-function url(v, field, uploads) {
+// inner — можно и страницу сайта: «#plans», «#tours», «#t.t12»
+function url(v, field, uploads, inner) {
   if (v == null || v === '') return null;
   const s = V.str(v, field, 1, 500);
   if (uploads && /^\/uploads\/[\w.-]+$/.test(s)) return s;
+  if (inner && /^#[\w.-]{1,60}$/.test(s)) return s;
   let u;
   try { u = new URL(s); } catch (e) { throw E.bad('Поле ' + field + ': нужна ссылка https', field); }
   if (u.protocol !== 'https:') throw E.bad('Поле ' + field + ': нужна ссылка https', field);
@@ -27,7 +29,8 @@ function fields(b, all) {
   if (all || b.title !== undefined) o.title = V.optStr(b.title, 'title', 80);
   if (all || b.body !== undefined) o.body = V.optStr(b.body, 'body', 200);
   if (all || b.image !== undefined) o.image = url(b.image, 'image', true);
-  if (all || b.link !== undefined) o.link = url(b.link, 'link');
+  if (all || b.link !== undefined) o.link = url(b.link, 'link', false, true);
+  if (all || b.cta !== undefined) o.cta = V.optStr(b.cta, 'cta', 30) || null;
   if (b.active !== undefined) o.active = V.bool(b.active, 'active');
   if (b.starts !== undefined) o.starts = V.optTime(b.starts, 'starts');
   if (b.ends !== undefined) o.ends = V.optTime(b.ends, 'ends');
@@ -62,14 +65,44 @@ module.exports = async function (app) {
     need(req);
     return { banners: (await all(pool, 'SELECT * FROM banners WHERE club_id IS NULL ORDER BY created_at DESC')).map(full) };
   });
+  // новый баннер: { place } или { places: [...] } — один и тот же сразу на несколько мест
   app.post('/api/admin/banners', async (req, reply) => {
-    const me = need(req), f = fields(req.body || {}, true);
+    const me = need(req), b = req.body || {};
+    const places = b.places != null ? b.places : [b.place];
+    if (!Array.isArray(places) || !places.length || new Set(places).size !== places.length) throw E.bad('places: места баннера без повторов', 'places');
+    const f = fields(Object.assign({}, b, { place: places[0] }), true);
+    places.forEach(p => V.oneOf(p, 'places', PLACES));
     if (!f.title && !f.image) throw E.bad('Нужен заголовок или картинка', 'title');
-    const row = await one(pool, `INSERT INTO banners (place, title, body, image, link, active, starts, ends, created_by, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [f.place, f.title, f.body, f.image, f.link, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now()]);
-    await audit(pool, me, 'banner.create', { id: row.id, name: row.title }, { place: row.place });
-    return reply.code(201).send({ banner: full(row) });
+    const rows = await tx(async c => {
+      const out = [];
+      for (const place of places) {
+        out.push(await one(c, `INSERT INTO banners (place, title, body, image, link, cta, active, starts, ends, created_by, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [place, f.title, f.body, f.image, f.link, f.cta, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now()]));
+      }
+      await audit(c, me, 'banner.create', { id: out[0].id, name: out[0].title }, { places });
+      return out;
+    });
+    return reply.code(201).send({ banner: full(rows[0]), banners: rows.map(full) });
+  });
+  // копия баннера на другие места: { places: [...] }
+  app.post('/api/admin/banners/:id/copy', async (req, reply) => {
+    const me = need(req), places = (req.body || {}).places;
+    if (!Array.isArray(places) || !places.length || new Set(places).size !== places.length) throw E.bad('places: куда скопировать', 'places');
+    places.forEach(p => V.oneOf(p, 'places', PLACES));
+    const rows = await tx(async c => {
+      const src = await one(c, 'SELECT * FROM banners WHERE id = $1 AND club_id IS NULL', [req.params.id]);
+      if (!src) throw E.notFound('Баннер не найден');
+      const out = [];
+      for (const place of places) {
+        out.push(await one(c, `INSERT INTO banners (place, title, body, image, link, cta, active, starts, ends, created_by, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [place, src.title, src.body, src.image, src.link, src.cta, src.active, src.starts, src.ends, me.id, Date.now()]));
+      }
+      await audit(c, me, 'banner.copy', { id: src.id, name: src.title }, { places });
+      return out;
+    });
+    return reply.code(201).send({ banners: rows.map(full) });
   });
   app.patch('/api/admin/banners/:id', async req => {
     const me = need(req);

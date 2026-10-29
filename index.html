@@ -889,6 +889,13 @@ button.banner:hover { border-color: var(--line-bright); }
 .banner img { flex: none; }
 .banner .bn-t span { color: var(--muted); font-size: 13px; }
 .banner .bn-ad { align-self: start; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); opacity: .7; }
+.banner .bn-cta { flex: none; padding: 7px 12px; border-radius: 9px; background: var(--green); color: var(--green-ink); font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px var(--green-glow); }
+.banner.own { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); background: linear-gradient(115deg, color-mix(in srgb, var(--green) 20%, var(--surface)), var(--surface) 75%); }
+.banner.own b { color: var(--fg); }
+@media (max-width: 480px) { .banner { flex-wrap: wrap; } .banner .bn-cta { margin-left: auto; } }
+.bn-desk .banner, .side .banner { flex-wrap: wrap; } .bn-desk .bn-cta, .side .bn-cta { margin-left: 0; }
+.bn-tpl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bn-item .gacts { flex-wrap: wrap; }
 .stag { display: inline-block; min-width: 26px; margin-right: 5px; padding: 0 4px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line); font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: center; letter-spacing: .02em; }
 .pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
 .tchip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--green-ink); background: var(--green); margin-right: 6px; }
@@ -5216,25 +5223,55 @@ function admStats() {
   return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('Заявки на звания', d.titlesPending || 0, d.titlesPending ? '<button class="lnk" data-act="adm-tab" data-v="titles">проверить</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
 }
 const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', tv: 'Табло' };
+// страницы сайта, куда может вести баннер
+const BN_PAGES = [['#plans', 'Тарифы'], ['#tours', 'Турниры'], ['#play', 'Играть'], ['#rating', 'Рейтинг'], ['#clubs', 'Клубы'], ['#title', 'Подтвердить звание'], ['#feed', 'Лента'], ['#help', 'Как пользоваться']];
+const bnLinkName = l => !l ? 'без ссылки' : l[0] === '#' ? 'страница «' + ((BN_PAGES.find(x => x[0] === l) || [])[1] || l) + '»' : l.replace(/^https?:\/\//, '').slice(0, 40);
+// готовые баннеры: скидка на тарифы — с текущими процентом, ценами и сроком
+function bnTemplates() {
+  const pd = (lz('plans', () => Api.get('/api/plans'), 60000).data) || null, sale = pd && pd.sale;
+  const from = role => { const p = pd && pd.plans.find(x => x.role === role); return p ? rub(p.final) : ''; };
+  return [
+    ['sale', '🔥 Скидка на тарифы', sale ? { title: sale.title + ' −' + sale.pct + '%', body: 'Pro — ' + from('plus') + ' в месяц, «Ведущий» — ' + from('host') + (sale.until ? '. До ' + new Date(sale.until).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''), link: '#plans', cta: 'Смотреть тарифы →', ends: sale.until ? dateVal(sale.until) : '' } : null],
+    ['title', '🏅 Скидка за звание', { title: 'МС, МСМК, ЗМС — скидка на тарифы до 90%', body: 'Подтвердите звание документом — скидка применится сама', link: '#title', cta: 'Подтвердить →' }],
+    ['club', '🎯 Клуб в Oche', { title: 'Проводите турниры в своём клубе', body: 'Страница клуба, сетки, табло и спонсоры на экране', link: '#clubs', cta: 'Подробнее →' }],
+    ['play', '🏆 Турниры рядом', { title: 'Открыта запись на турниры', body: 'Выберите турнир и запишитесь в один клик', link: '#tours', cta: 'К турнирам →' }]
+  ].filter(x => x[2]);
+}
 function admBanners() {
   const e = lz('abanners', () => Api.get('/api/admin/banners'));
-  const b = S.bnr || (S.bnr = { place: 'feed', title: '', body: '', link: '', image: '' });
-  let h = '<div class="panel" id="bnr-form"><span class="h2">' + (b.id ? 'Изменить баннер' : 'Новый баннер') + '</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (b.place === v ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '">' + BN_PLACE[v] + '</button>').join('') + '</div>';
-  h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '"><input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link) + '">';
+  const b = S.bnr || (S.bnr = { places: ['feed'], title: '', body: '', link: '', lk: 'page', cta: '', image: '', starts: '', ends: '' });
+  const places = b.id ? [b.place] : b.places, lk = b.lk || (b.link && b.link[0] !== '#' ? 'url' : 'page');
+  let h = '<div class="panel" id="bnr-form"><span class="h2">' + (b.id ? 'Изменить баннер' : 'Новый баннер') + '</span>';
+  if (!b.id) h += '<div class="bn-tpl"><span class="meta">Готовые:</span>' + bnTemplates().map(([k, l]) => '<button class="mini" data-act="bnr-tpl" data-v="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
+  h += '<div class="field"><span class="label">' + (b.id ? 'Где показывать' : 'Где показывать — можно сразу в нескольких местах') + '</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (places.includes(v) ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '" aria-pressed="' + places.includes(v) + '">' + BN_PLACE[v] + '</button>').join('') + '</div></div>';
+  h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '">';
+  h += '<div class="field"><span class="label">Куда ведёт</span><div class="seg2" role="tablist"><button role="tab" class="' + (lk === 'page' ? 'on' : '') + '" data-act="bnr-lk" data-v="page">Страница сайта</button><button role="tab" class="' + (lk === 'url' ? 'on' : '') + '" data-act="bnr-lk" data-v="url">Своя ссылка</button><button role="tab" class="' + (lk === 'none' ? 'on' : '') + '" data-act="bnr-lk" data-v="none">Никуда</button></div>' +
+    (lk === 'page' ? '<div class="chips">' + BN_PAGES.map(([v, l]) => '<button class="chip txt' + (b.link === v ? ' on' : '') + '" data-act="bnr-page" data-v="' + v + '">' + l + '</button>').join('') + '</div>' : lk === 'url' ? '<input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link && b.link[0] !== '#' ? b.link : '') + '">' : '') + '</div>';
+  if (lk !== 'none') h += '<input class="inp" data-bnr="cta" maxlength="30" placeholder="Текст кнопки, например «Подключить →» (необязательно)" aria-label="Текст кнопки" value="' + esc(b.cta || '') + '">';
   h += '<div class="nrow"><input class="inp" data-bnr="image" placeholder="Картинка: ссылка https://… или загрузите" aria-label="Картинка" value="' + esc(b.image) + '"><label class="mini" style="cursor:pointer">Загрузить<input type="file" id="bnr-file" accept="image/jpeg,image/png,image/webp" hidden></label></div>';
-  if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b), true);
-  h += b.id ? '<div class="row2"><button class="btn sm" data-act="bnr-add">Сохранить</button><button class="btn sm alt" data-act="bnr-cancel">Отмена</button></div></div>' : '<button class="btn sm" data-act="bnr-add">Добавить баннер</button></div>';
+  h += '<div class="nrow sale-f"><label><span class="meta">Показывать с</span><input class="inp" type="date" data-bnr="starts" value="' + esc(b.starts || '') + '"></label><label><span class="meta">по (включительно)</span><input class="inp" type="date" data-bnr="ends" value="' + esc(b.ends || '') + '"></label><span class="meta" style="align-self:end;padding-bottom:10px">пусто — без срока</span></div>';
+  if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b, { link: lk === 'none' ? '' : b.link }), true);
+  h += b.id ? '<div class="row2"><button class="btn sm" data-act="bnr-add">Сохранить</button><button class="btn sm alt" data-act="bnr-cancel">Отмена</button></div></div>' : '<button class="btn sm" data-act="bnr-add">' + (places.length > 1 ? 'Добавить в ' + places.length + ' места' : 'Добавить баннер') + '</button></div>';
   const st = svState(e, 'баннеров');
   if (st) return h + st;
-  return h + (e.data.banners.length ? e.data.banners.map(x => '<div class="card sec">' + bannerBox(x, true) + '<div class="tstat"><span class="meta">' + BN_PLACE[x.place] + ' · переходов: ' + x.clicks + (x.ends ? ' · до ' + fmtDate(x.ends) : '') + '</span><div class="gacts"><button class="mini" data-act="bnr-edit" data-v="' + x.id + '">Изменить</button><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>').join('') : '<div class="note-box">Баннеров пока нет.</div>');
+  const list = e.data.banners, now = Date.now();
+  return h + (list.length ? list.map(x => {
+    const missing = Object.keys(BN_PLACE).filter(pl => pl !== x.place && !list.some(y => y.place === pl && y.title === x.title && y.body === x.body && y.link === x.link));
+    const when = x.starts && x.starts > now ? 'с ' + fmtDate(x.starts) : x.ends ? (x.ends <= now ? 'срок кончился' : 'до ' + fmtDate(x.ends - 1)) : '';
+    return '<div class="card sec bn-item">' + bannerBox(x, true) + '<div class="tstat"><span class="meta"><b>' + BN_PLACE[x.place] + '</b> · ' + esc(bnLinkName(x.link)) + ' · переходов: ' + x.clicks + (when ? ' · ' + when : '') + '</span><div class="gacts">' +
+      missing.map(pl => '<button class="mini" data-act="bnr-copy" data-v="' + x.id + '|' + pl + '" title="Такой же баннер — ещё и здесь">+ ' + BN_PLACE[pl] + '</button>').join('') +
+      '<button class="mini" data-act="bnr-edit" data-v="' + x.id + '">Изменить</button><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>';
+  }).join('') : '<div class="note-box">Баннеров пока нет. Начните с готового — например, «Скидка на тарифы».</div>');
 }
 
 /* Баннеры: лента, страница турнира, табло. Переход считается на сервере. */
 const BANNERS = {};
 function bannerBox(b, preview) {
   BANNERS[b.id] = b;
-  const tag = b.link && !preview ? 'button' : 'div';
-  return '<' + tag + ' class="banner"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span><span class="bn-ad">реклама</span></' + tag + '>';
+  const tag = b.link && !preview ? 'button' : 'div', own = b.link && b.link[0] === '#';
+  // свои страницы (тарифы, турниры) — без пометки «реклама», с кнопкой
+  return '<' + tag + ' class="banner' + (own ? ' own' : '') + '"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span>' +
+    (b.cta && b.link ? '<span class="bn-cta">' + esc(b.cta) + '</span>' : '') + (own ? '' : '<span class="bn-ad">реклама</span>') + '</' + tag + '>';
 }
 // tid — турнир: у клуба с тарифом «Ведущий» там его спонсоры
 function bannerHTML(place, tid) {
@@ -6293,23 +6330,41 @@ document.addEventListener('click', e => {
       break;
     }
     case 'club-host-rm': { const [cid, pid2] = v.split('|'); svDo(Api.del('/api/admin/clubs/' + cid + '/hosts/' + pid2), () => { svStale('aclubs:'); toast('Ведущий убран.'); }); break; }
-    case 'bnr-place': S.bnr.place = v; render(); break;
+    case 'bnr-place': {
+      const b = S.bnr;
+      if (b.id) b.place = v;
+      else { b.places = b.places.includes(v) ? b.places.filter(x => x !== v) : b.places.concat(v); if (!b.places.length) b.places = [v]; }
+      render(); break;
+    }
+    case 'bnr-lk': S.bnr.lk = v; if (v === 'page' && !(S.bnr.link || '').startsWith('#')) S.bnr.link = '#plans'; if (v === 'url' && (S.bnr.link || '').startsWith('#')) S.bnr.link = ''; render(); break;
+    case 'bnr-page': S.bnr.link = v; S.bnr.lk = 'page'; render(); break;
+    case 'bnr-tpl': { const tp = bnTemplates().find(x => x[0] === v); if (tp) { Object.assign(S.bnr, tp[2], { lk: 'page' }); if (v === 'sale') S.bnr.places = Object.keys(BN_PLACE); render(); } break; }
+    case 'bnr-copy': { const [id, pl] = v.split('|'); svDo(Api.post('/api/admin/banners/' + id + '/copy', { places: [pl] }), () => { svStale('abanners'); svStale('banners:'); toast('Баннер добавлен: ' + BN_PLACE[pl] + '.'); }); break; }
     case 'bnr-add': {
-      const b = S.bnr, body = { place: b.place, title: b.title.trim(), body: b.body.trim(), link: b.link.trim() || null, image: b.image.trim() || null };
-      svDo(b.id ? Api.patch('/api/admin/banners/' + b.id, body) : Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast(b.id ? 'Баннер сохранён.' : 'Баннер добавлен.'); });
+      const b = S.bnr, lk = b.lk || (b.link && b.link[0] !== '#' ? 'url' : 'page'), day = v2 => v2 ? new Date(v2 + 'T00:00:00').getTime() : null;
+      const body = { title: b.title.trim(), body: b.body.trim(), link: lk === 'none' ? null : (b.link || '').trim() || null, cta: lk === 'none' ? null : (b.cta || '').trim() || null, image: b.image.trim() || null, starts: day(b.starts), ends: b.ends ? day(b.ends) + 864e5 : null };
+      if (b.id) body.place = b.place; else body.places = b.places;
+      svDo(b.id ? Api.patch('/api/admin/banners/' + b.id, body) : Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast(b.id ? 'Баннер сохранён.' : body.places.length > 1 ? 'Баннер добавлен в ' + body.places.length + ' места.' : 'Баннер добавлен.'); });
       break;
     }
     case 'bnr-edit': {
       const e = SVC.abanners, x = e && e.data && e.data.banners.find(y => String(y.id) === v);
       if (!x) break;
-      S.bnr = { id: x.id, place: x.place, title: x.title || '', body: x.body || '', link: x.link || '', image: x.image || '' };
+      S.bnr = { id: x.id, place: x.place, title: x.title || '', body: x.body || '', link: x.link || '', lk: !x.link ? 'none' : x.link[0] === '#' ? 'page' : 'url', cta: x.cta || '', image: x.image || '', starts: x.starts ? dateVal(x.starts) : '', ends: x.ends ? dateVal(x.ends - 1) : '' };
       render(); const f = $('bnr-form'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
       break;
     }
     case 'bnr-cancel': S.bnr = null; render(); break;
     case 'bnr-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/banners/' + id, { active: on === '1' }), () => { svStale('abanners'); svStale('banners:'); }); break; }
     case 'bnr-del': svDo(Api.del('/api/admin/banners/' + v), () => { svStale('abanners'); svStale('banners:'); toast('Баннер удалён.'); }); break;
-    case 'banner': { const b = BANNERS[v]; if (b && b.link) { Api.post('/api/banners/' + v + '/click').catch(() => {}); window.open(b.link, '_blank', 'noopener'); } break; }
+    case 'banner': {
+      const b = BANNERS[v];
+      if (!b || !b.link) break;
+      Api.post('/api/banners/' + v + '/click').catch(() => {});
+      // своя страница — переход внутри сайта, чужая — в новой вкладке
+      if (b.link[0] === '#') { const r = b.link.slice(1); if (validRoute(r)) go(r); } else window.open(b.link, '_blank', 'noopener');
+      break;
+    }
     case 'nt-club': if (S.nt) { S.nt.club = v; render(); } break;
     case 'nt-feeon': if (S.nt) { S.nt.feeOn = v === '1'; render(); } break;
     case 't-labels': {
