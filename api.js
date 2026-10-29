@@ -100,6 +100,8 @@
     setMe(r) {
       Api.me = r.player || r.me || null; Api.admin = !!r.admin; Api.role = Api.me ? r.role || Api.me.role || 'player' : null; Api.clubs = r.clubs || [];
       Api.perms = Api.me ? r.perms || [] : [];
+      // чужие дружеские матчи, ждущие моего подтверждения
+      Api.confirms = Api.me ? r.confirms || 0 : 0;
       if (Api.mode === 'server') ls.set('oche.lastMe', Api.me ? { player: Api.me, admin: Api.admin, role: Api.role, perms: Api.perms, clubs: Api.clubs, config: Api.config } : null);
       return r;
     },

@@ -5,7 +5,7 @@ const { needPlayer } = require('../auth');
 const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, lineStats, activeVisits } = require('../darts');
 const Games = require('../../shared/games.js');
 const { TOUR_SQL, loadTours, readyPair, canScoreGame, isStaff, canClear, refreshTour } = require('../tour');
-const { eloAdd, eloAll, refreshStats } = require('../stats');
+const { eloAdd, eloAll, refreshStats, PENDING } = require('../stats');
 const { matchCards, lineJSON } = require('../cards');
 const { version, forget } = require('../versions');
 const B = require('../../shared/bracket.js');
@@ -293,6 +293,26 @@ module.exports = async function (app) {
       forget('m', m.id);
       return { ok: true };
     });
+  });
+
+  // чужие дружеские матчи со мной, ждущие ответа: «да, я играл» — матч идёт в мою статистику, «это не я» — нет
+  app.get('/api/me/confirms', async req => {
+    const me = needPlayer(req);
+    const ms = await all(pool, `SELECT m.*, cp.name AS by_name FROM match_lines l JOIN matches m ON m.id = l.match_id LEFT JOIN players cp ON cp.id = m.created_by
+      WHERE l.player_id = $1 AND ${PENDING('l', 'm')} ORDER BY m.finished DESC, m.id LIMIT 50`, [me.id]);
+    const cards = await matchCards(pool, ms);
+    return { matches: cards.map((x, k) => Object.assign(x, { by: ms[k].by_name || null })) };
+  });
+  app.post('/api/matches/:id/confirm', async req => {
+    const me = needPlayer(req), ok = V.bool((req.body || {}).ok, 'ok');
+    const left = await tx(async c => {
+      const l = await one(c, `SELECT l.idx FROM match_lines l JOIN matches m ON m.id = l.match_id WHERE l.match_id = $1 AND l.player_id = $2 AND ${PENDING('l', 'm')} FOR UPDATE OF l`, [String(req.params.id), me.id]);
+      if (!l) throw E.notFound('Нет такого матча на подтверждение');
+      await c.query('UPDATE match_lines SET confirmed = $3 WHERE match_id = $1 AND idx = $2', [String(req.params.id), l.idx, ok]);
+      if (ok) await refreshStats(c, [me.id]);
+      return (await one(c, `SELECT count(*)::int AS n FROM match_lines l JOIN matches m ON m.id = l.match_id WHERE l.player_id = $1 AND ${PENDING('l', 'm')}`, [me.id])).n;
+    });
+    return { ok: true, left };
   });
 
   app.get('/api/matches/:id', async (req, reply) => {

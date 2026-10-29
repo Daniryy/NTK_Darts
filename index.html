@@ -371,6 +371,11 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .pill.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-glow); }
 .lnk { color: var(--fg); font-weight: 500; text-decoration: underline; text-decoration-color: var(--line-bright); text-underline-offset: 3px; }
 .lnk:hover { text-decoration-color: var(--green); color: var(--green); }
+.ndot { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; margin-left: 5px; border-radius: 9px; background: var(--red, #e5484d); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; vertical-align: 1px; }
+.tabs button { position: relative; }
+.tabs .ndot { position: absolute; top: 2px; left: calc(50% + 4px); margin: 0; }
+.conf-note { text-align: left; cursor: pointer; width: 100%; color: var(--fg); }
+.conf-note:hover { border-color: var(--green); }
 .consent { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.45; }
 .consent input { margin-top: 1px; }
 .pd-note { font-size: 12px; margin-top: 4px; }
@@ -2206,7 +2211,7 @@ function topView() {
   const c = curTab();
   const resume = hasLiveGame() && !(R === 'play' && S.inGame);
   return '<button class="brand" data-act="go" data-v="feed" aria-label="Oche — лента">' + LOGO + 'Oche</button>' +
-    '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + '</button>').join('') + '</nav>' +
+    '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + (r === 'p.me' && SRV && Api.confirms ? '<span class="ndot" title="Матчи на подтверждение">' + Api.confirms + '</span>' : '') + '</button>').join('') + '</nav>' +
     '<div class="top-actions">' +
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
     (SRV && Api.ob.total() ? '<span class="pill" title="Подходы сохранены на телефоне и будут отправлены">не отправлено: ' + Api.ob.total() + '</span>' : '') +
@@ -2225,7 +2230,7 @@ function roomSet(id) { const cur = lsGet('oche2.room'); if (id ? !(cur && cur.id
 const tabTo = r => { const rm = r === 'tours' && roomId(); return rm && R !== 't.' + rm ? 't.' + rm : r; };
 function tabsView() {
   const c = curTab();
-  return TABS.map(([r, l, ic]) => '<button class="' + (c === r ? 'on' : '') + (r === 'play' ? ' play' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + I[ic] + '<span>' + l + (r === 'play' && hasLiveGame() ? ' •' : '') + '</span></button>').join('');
+  return TABS.map(([r, l, ic]) => '<button class="' + (c === r ? 'on' : '') + (r === 'play' ? ' play' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + I[ic] + '<span>' + l + (r === 'play' && hasLiveGame() ? ' •' : '') + '</span>' + (r === 'p.me' && SRV && Api.confirms ? '<span class="ndot" title="Матчи на подтверждение">' + Api.confirms + '</span>' : '') + '</button>').join('');
 }
 
 function feedItems() {
@@ -3147,6 +3152,7 @@ function profileHTML(p, s, all, tours, ax) {
     if (isMe) h += '<div class="row"><button class="mini" data-act="editname">Изменить профиль</button></div>';
   }
   h += '</div></div>';
+  if (isMe && SRV && Api.confirms) h += confirmCard();
   if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
   h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   if (!s.n) {
@@ -4173,6 +4179,19 @@ function qrHTML(text) {
   return '<div class="qrbox" role="img" aria-label="QR-код ссылки">' + q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }) + '</div>';
 }
 
+/* Подтверждение матчей: дружеский матч, который записал другой игрок, идёт в мою статистику только после «Да, я играл» */
+function confirmCard() {
+  const e = lz('confirms', () => Api.get('/api/me/confirms'), 30000), list = e.data ? e.data.matches : [];
+  if (e.data && !list.length) return '';
+  let h = '<div class="card sec conf-c"><span class="label">Матчи на подтверждение · ' + (e.data ? list.length : Api.confirms) + '</span><p class="meta">Эти дружеские матчи с вами записал другой игрок. Подтвердите свои — они попадут в вашу статистику; чужие отклоните.</p>';
+  if (!e.data) return h + '<div class="meta">Загрузка…</div></div>';
+  h += list.map(m => {
+    const i = m.pl.findIndex(l => l.id === ME), op = m.pl.filter((_, k) => k !== i), mine = m.pl[i];
+    const score = (mine ? mine.legs : 0) + ':' + op.map(l => l.legs).join(':');
+    return '<div class="lrow"><span><b>' + esc(op.map(l => l.n).join(', ') || 'Соперник') + '</b> · ' + score + ' · ' + (m.w === i ? 'победа' : 'поражение') + '<br><span class="meta">' + fmtDate(m.t) + (m.by ? ' · записал ' + esc(m.by) : '') + ' · <button class="lnk" data-act="minfo" data-v="' + esc(m.id) + '">протокол</button></span></span><span class="lrow-a"><button class="mini go" data-act="mconf" data-v="' + esc(m.id) + '|1">Да, я играл</button><button class="mini" data-act="mconf" data-v="' + esc(m.id) + '|0">Не я</button></span></div>';
+  }).join('');
+  return h + '</div>';
+}
 /* Аккаунты: администратор создаёт игроков и выдаёт код; игрок привязывает аккаунт кодом в профиле */
 function claimBox() {
   return '<div class="card sec"><span class="label">Аккаунт от организатора</span><p class="meta">Организатор завёл вас заранее и дал код? Введите его — матчи и турниры того аккаунта станут вашими.</p><div class="nrow"><input class="inp" id="claim-code" maxlength="16" placeholder="Код, например K7MQ2XRA" autocomplete="off" style="text-transform:uppercase"><button class="mini go" data-act="claim">Привязать</button></div></div>';
@@ -5918,6 +5937,7 @@ function feedViewS() {
   const bn = bannerHTML('feed');
   let h = '<div class="phead"><h1 class="h1">Лента</h1></div><div class="fgrid"><div class="sec">';
   h += helpHint();
+  if (ME && Api.confirms) h += '<button class="note-box conf-note" data-act="go" data-v="p.me"><b>Матчей на подтверждение: ' + Api.confirms + '</b> — дружеские матчи с вами записал другой игрок. Подтвердите свои, и они попадут в вашу статистику →</button>';
   if (lv.data) h += lv.data.tournaments.filter(t => t.joined).slice(0, 3).map(c => { const e = tourE(c.id); return e.data ? yourMatch(TBY[c.id] || e.data, true) : ''; }).join('');
   if (lv.data && lv.data.tournaments.length) h += liveBlock(lv.data.tournaments, tourCardS);
   if (rg.data) h += invitesHTML(rg.data.tournaments.slice().sort((a, b) => a.start - b.start));
@@ -6088,6 +6108,14 @@ document.addEventListener('click', e => {
     case 'tfa-close': S.tfa = null; render(); break;
     case 'tfa-copy': copyText(S.tfa && S.tfa.backup ? S.tfa.backup.join('\n') : '', 'Коды скопированы.'); break;
     case 'staff-open': closeModals(); go('admin'); break;
+    case 'mconf': {
+      const [id, k] = v.split('|');
+      svDo(Api.post('/api/matches/' + encodeURIComponent(id) + '/confirm', { ok: k === '1' }), r => {
+        Api.confirms = r.left; svStale('confirms'); svStale('player:'); svStale('feed');
+        toast(k === '1' ? 'Матч засчитан в вашу статистику.' : 'Матч отклонён — в вашу статистику он не попадёт.');
+      });
+      break;
+    }
     case 'tfa-new': {
       const el = $('tfa-new-code');
       svDo(Api.post('/api/me/2fa/backup', { code: el ? el.value.trim() : '' }), r => { S.tfaNew = false; S.tfa = { backup: r.backup }; svStale('me'); Api.loadMe().then(render); });

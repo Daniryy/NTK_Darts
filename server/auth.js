@@ -60,7 +60,9 @@ const needPerm = (req, k, msg) => { const me = needPlayer(req); if (!can(me, k))
 // ответ «кто я»: игрок, роль, права и клубы, где он ведущий
 async function meResp(c, p) {
   const clubs = p ? await c.query(`SELECT c.id, c.name FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 AND c.status = 'active' ORDER BY c.name`, [p.id]) : { rows: [] };
-  return { player: meJSON(p), admin: isAdmin(p), role: p ? p.role : null, perms: permsOf(p), clubs: clubs.rows };
+  // чужие дружеские матчи, которые ждут подтверждения игрока
+  const pend = p ? (await c.query(`SELECT count(*)::int AS n FROM match_lines l JOIN matches m ON m.id = l.match_id WHERE l.player_id = $1 AND ${require('./stats').PENDING('l', 'm')}`, [p.id])).rows[0].n : 0;
+  return { player: meJSON(p), admin: isAdmin(p), role: p ? p.role : null, perms: permsOf(p), clubs: clubs.rows, confirms: pend };
 }
 // второй шаг входа администратора: пароль уже проверен, сеанс — только после кода из приложения.
 // Нет 2FA — сначала привязка: секрет и ссылка для QR-кода, вход после первого верного кода. Билет живёт 10 минут.

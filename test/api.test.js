@@ -381,4 +381,28 @@ test('статистику не подделать: итоги строк счи
   const feed = ok(await call(null, 'GET', '/api/feed?limit=50')).items;
   assert.ok(!feed.some(x => x.match && x.match.id === id1));
   assert.ok(feed.some(x => x.match && x.match.id === id0));
+  // игрок подтверждает: «да, я играл» — матч идёт в его статистику и профиль; «это не я» — нет
+  const U = await login(P1);
+  const me1 = ok(await call(U, 'GET', '/api/me'));
+  assert.ok(me1.confirms >= 1);
+  const list = ok(await call(U, 'GET', '/api/me/confirms')).matches;
+  const card = list.find(x => x.id === id1);
+  assert.ok(card && card.by && card.pl.length === 2);
+  assert.ok(!ok(await call(A, 'GET', '/api/me/confirms')).matches.some(x => x.id === id1), 'свой матч подтверждать не нужно');
+  err(await call(A, 'POST', '/api/matches/' + id1 + '/confirm', { ok: true }), 404);
+  err(await call(U, 'POST', '/api/matches/' + id1 + '/confirm', {}), 400);
+  const c1 = ok(await call(U, 'POST', '/api/matches/' + id1 + '/confirm', { ok: true }));
+  assert.equal(c1.left, me1.confirms - 1);
+  const s1 = await stat(P1);
+  assert.equal(s1.n, b1.n + 1);
+  assert.equal(s1.c180 - b1.c180, 1);
+  assert.ok(ok(await call(null, 'GET', '/api/players/' + P1)).matches.some(x => x.id === id1));
+  err(await call(U, 'POST', '/api/matches/' + id1 + '/confirm', { ok: false }), 404);
+  // «это не я»: не в статистике и больше не спрашивается
+  const id2 = mid();
+  const m2 = ok(await call(A, 'PUT', '/api/matches/' + id2, { mode: 301, ltw: 1, dbl: true, players: [{ id: P1 }, { name: 'Гость' }] }), 201).match;
+  ok(await call(A, 'POST', `/api/matches/${id2}/events`, { events: fin(m2, fake(P1)) }));
+  ok(await call(U, 'POST', '/api/matches/' + id2 + '/confirm', { ok: false }));
+  assert.deepEqual(await stat(P1), s1);
+  assert.ok(!ok(await call(U, 'GET', '/api/me/confirms')).matches.some(x => x.id === id2));
 });

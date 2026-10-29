@@ -33,9 +33,13 @@ async function eloAll(c) {
     [ids, ids.map(id => r.get(id)), ids.map(id => n.get(id))]);
 }
 
-// матч засчитан игроку: турнирный, или его вёл сам игрок, или игрок — гость того, кто вёл.
-// Дружеский матч с чужим аккаунтом может создать кто угодно — в статистику, профиль и ленту этого игрока он не идёт
-const TRUSTED = (l, m) => `(${m}.tournament_id IS NOT NULL OR ${m}.created_by = ${l}.player_id OR EXISTS (SELECT 1 FROM players tp WHERE tp.id = ${l}.player_id AND tp.owner_id = ${m}.created_by))`;
+// матч засчитан игроку: турнирный, или его вёл сам игрок, или игрок — гость того, кто вёл, или игрок сам подтвердил матч.
+// Дружеский матч с чужим аккаунтом может создать кто угодно — в статистику, профиль и ленту этого игрока он идёт
+// только после подтверждения («да, я играл»)
+const OWN = (l, m) => `(${m}.tournament_id IS NOT NULL OR ${m}.created_by = ${l}.player_id OR EXISTS (SELECT 1 FROM players tp WHERE tp.id = ${l}.player_id AND tp.owner_id = ${m}.created_by))`;
+const TRUSTED = (l, m) => `(${OWN(l, m)} OR ${l}.confirmed IS TRUE)`;
+// ждёт ответа игрока: чужой дружеский матч, на который он ещё не ответил
+const PENDING = (l, m) => `(${l}.player_id IS NOT NULL AND ${l}.confirmed IS NULL AND ${m}.status = 'done' AND NOT ${OWN(l, m)})`;
 
 const FIELDS = ['n', 'w', 'pts', 'darts', 'f9s', 'f9n', 'coh', 'coa', 'hco', 'hi', 'c180', 'c140', 'c100', 'bl'];
 
@@ -84,4 +88,4 @@ function statsJSON(o) {
   };
 }
 
-module.exports = { eloAdd, eloAll, refreshStats, statsJSON, TRUSTED };
+module.exports = { eloAdd, eloAll, refreshStats, statsJSON, TRUSTED, PENDING };
