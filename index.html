@@ -923,6 +923,11 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tfa-codes span { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; user-select: all; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
+.qrc { display: flex; gap: 14px; align-items: flex-start; }
+.qrc-q .qrbox { width: 120px; padding: 6px; border-radius: 8px; }
+.qrc-t { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.qrc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.qrc-list .qrc { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 .idchip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-bright); background: var(--surface2); font-size: 12.5px; color: var(--muted); }
 .idchip b { font-family: var(--display); letter-spacing: .08em; color: var(--fg); font-size: 14px; }
 .idchip:hover { border-color: var(--green); }
@@ -2012,8 +2017,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2048,6 +2053,8 @@ function go(r, fromHash) {
   if (!fromHash) try { if (location.hash.slice(1) !== r) location.hash = r; } catch (e) {}
 }
 window.addEventListener('hashchange', () => {
+  const qa = qrParse(location.hash);
+  if (qa) { qrStrip(qa); if (qa.t) go('t.' + qa.t, true); qrIn(qa); return; }
   const h = location.hash.slice(1);
   if (h && h !== R && validRoute(h)) go(h, true);
 });
@@ -2213,6 +2220,8 @@ function renderModals() {
     return h;
   }
   if (S.crop && cropImg) return cropModal();
+  if (S.qrAsk) return qrAskModal();
+  if (S.cardsT) return cardsModal();
   if (S.qr) {
     const t = TBY[S.qr], url = tourUrl(S.qr);
     return '<div class="over" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
@@ -2696,12 +2705,13 @@ function tourView(id) {
   else if (tab === 'qual') h += qualView(t) + (inQual ? tourDelLink(t) : '');
   else if (tab === 'fees') h += feesView(t);
   else if (tab === 'time') h += timeView(t);
-  else if (st !== 'reg') h += numsView(t);
+  else if (st !== 'reg') h += cardsBtn(t) + numsView(t);
   else {
-    h += '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
+    h += cardsBtn(t) + '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
   }
   return h + bannerHTML('tour', t.id);
 }
+const cardsBtn = t => SRV && canDo(t, 'org') ? '<div class="row"><button class="mini" data-act="cards-show" data-v="' + t.id + '">QR-карточки игроков</button><span class="meta">вход для тех, у кого нет своего</span></div>' : '';
 function deleteTour(tid) {
   const t = TBY[tid];
   if (SRV) return svDo(Api.del('/api/tournaments/' + tid), () => { delete TBY[tid]; delete SVC['tour:' + tid]; svStale('list:'); toast('Турнир удалён.'); go('tours'); });
@@ -3216,12 +3226,13 @@ function profileHTML(p, s, all, tours, ax) {
     if (p.walkon) h += '<div class="meta walkon" title="Выходная музыка — играет на табло, когда игрок выходит на матч">♪ ' + esc(p.walkon) + '</div>';
     if (p.code) h += '<div class="row"><button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b class="sel">' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
     const rated = RATING[id] && RATING[id].n;
-    h += '<div class="prate">' + (rated ? '<b>' + RATING[id].r + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге · ' : '') : '<span class="meta">В рейтинге — после первого турнирного матча · ') + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
+    h += '<div class="prate">' + (p.lite ? '<span class="meta" title="Аккаунт завёл ведущий; игрок входит по QR-карточке. Привяжет свой вход — попадёт в рейтинг">Лайт-профиль · вне общего рейтинга · ' : rated ? '<b>' + RATING[id].r + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге · ' : '') : '<span class="meta">В рейтинге — после первого турнирного матча · ') + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
     if (isMe) h += '<div class="row"><button class="mini" data-act="editname">Изменить профиль</button></div>';
   }
   h += '</div></div>';
   if (isMe && SRV && Api.confirms) h += confirmCard();
-  if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone)) h += claimBox();
+  if (isMe && SRV && Api.me && Api.me.lite) h += liteBox();
+  else if (isMe && SRV && !all.n && Api.me && (Api.me.vk || Api.me.phone || Api.me.email)) h += claimBox();
   h += '<div class="seg2">' + [['all', 'Все матчи'], ['off', 'Турнирные']].map(([v, l]) => '<button class="' + (S.pf === v ? 'on' : '') + '" data-act="pf" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   if (!s.n) {
     h += '<div class="note-box">' + (S.pf === 'off' ? 'Турнирных матчей пока нет.' : 'Матчей пока нет.') + '</div>';
@@ -4313,9 +4324,53 @@ function confirmCard() {
   }).join('');
   return h + '</div>';
 }
-/* Аккаунты: администратор создаёт игроков и выдаёт код; игрок привязывает аккаунт кодом в профиле */
+/* Аккаунты: ведущий заводит игрока (лайт-профиль) и выдаёт QR-карточку; игрок входит ею или переносит в свой аккаунт */
+// QR-вход: ссылка с кодом карточки; t — сразу открыть турнир
+const qrLoginUrl = (claim, tid) => location.origin + location.pathname + '#k=' + claim + (tid ? '&t=' + tid : '');
+const CARDS = {};
+// карточки на печать: по две в ряд на листе, QR + имя + код
+function printCards(list, title) {
+  if (!window.qrcode) { loadQr(); toast('QR-коды загружаются — нажмите ещё раз.'); return; }
+  const w = window.open('', '_blank');
+  if (!w) { toast('Браузер не дал открыть окно печати — разрешите всплывающие окна.'); return; }
+  const card = c => '<div class="c"><div class="q">' + qrHTML(qrLoginUrl(c.claim, c.t)) + '</div><div class="t"><b>' + esc(c.name) + '</b>' + (title ? '<span>' + esc(title) + '</span>' : '') + '<span>Наведите камеру телефона на QR — вход в Oche без пароля.</span><span>Код: <code>' + esc(c.claim) + '</code></span></div></div>';
+  w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>QR-карточки' + (title ? ' — ' + esc(title) : '') + '</title><style>body{font:13px/1.35 system-ui,sans-serif;margin:10mm;color:#000;background:#fff}.g{display:grid;grid-template-columns:1fr 1fr;gap:6mm}.c{display:flex;gap:4mm;border:1px dashed #888;border-radius:3mm;padding:4mm;break-inside:avoid}.q{width:34mm;flex:none}.q svg{width:100%;height:auto;display:block}.t{display:grid;gap:1.5mm;align-content:start}.t b{font-size:15px}code{font-size:14px;letter-spacing:.08em}</style></head><body><div class="g">' + list.map(card).join('') + '</div><script>onload=()=>print()<\/script></body></html>');
+  w.document.close();
+}
+// открыли ссылку с QR-карточки: не вошли или вошли лайт-профилем — входим сразу; вошли своим аккаунтом — спрашиваем
+function qrIn(a) {
+  if (!SRV) { toast('QR-карточка работает на сервере Oche.'); return; }
+  if (Api.me && !Api.me.lite) { closeModals(); S.qrAsk = a; render(); return; }
+  svDo(Api.codeLogin(a.code), () => { loggedIn(); if (a.t) go('t.' + a.t); });
+}
+const qrParse = h => { const m = /^#k=([A-Za-z0-9]{4,16})(?:&t=([\w-]+))?$/.exec(h); return m ? { code: m[1].toUpperCase(), t: m[2] || null } : null; };
+// код из адреса убираем: не остаётся в истории и не уходит дальше
+function qrStrip(a) { try { history.replaceState(null, '', location.pathname + location.search + (a.t ? '#t.' + a.t : '')); } catch (e) {} }
+function qrAskModal() {
+  const a = S.qrAsk;
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="QR-карточка"><div class="ocard"><div class="ohead"><span class="label">QR-карточка игрока</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div><p>Сейчас вы вошли как <b>' + esc(Api.me ? Api.me.name : '') + '</b>.</p>' +
+    '<p class="meta">Это карточка игрока от ведущего. <b>Войти по карточке</b> — выйти из своего аккаунта и играть за игрока с карточки (удобно, если телефон передают). <b>Это моя</b> — матчи и турниры с карточки перейдут в ваш аккаунт, сама карточка перестанет работать.</p>' +
+    '<button class="btn" data-act="qra-login">Войти по карточке</button><button class="btn alt" data-act="qra-claim">Это моя — перенести в мой аккаунт</button>' + (a && a.t ? '<button class="ghost sm" data-act="qra-tour">Просто открыть турнир</button>' : '<button class="ghost sm" data-act="close-modal">Отмена</button>') + '</div></div>';
+}
+// QR-карточки участников турнира без своего входа — для организатора
+function cardsModal() {
+  const tid = S.cardsT, e = lz('cards:' + tid, () => Api.post('/api/tournaments/' + tid + '/cards'), 60000);
+  let h = '<div class="over" role="dialog" aria-modal="true" aria-label="QR-карточки игроков"><div class="ocard acard"><div class="ohead"><span class="label">QR-карточки игроков</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  const st = svState(e, 'карточек');
+  if (st) return h + st + '</div></div>';
+  const { cards, others } = e.data;
+  h += '<p class="meta">Для участников без своего входа (лайт-профиль). Игрок наводит камеру на свою карточку — входит и сразу видит турнир: свои матчи, мишень, счёт. Карточка многоразовая — подойдёт и для следующих турниров.</p>';
+  if (!cards.length) return h + '<div class="note-box">' + (others ? 'Лайт-профили в этом турнире заводили другие ведущие — карточки у них.' : 'Все участники входят сами — карточки не нужны. Игроку без телефона и почты заведите аккаунт: «Управление» → «+ Новый аккаунт», и добавьте его в турнир.') + '</div></div></div>';
+  h += '<button class="btn" data-act="cards-print" data-v="' + esc(tid) + '">Печать всех (' + cards.length + ')</button><div class="qrc-list">' + cards.map(c => '<div class="qrc"><div class="qrc-q">' + qrHTML(qrLoginUrl(c.claim, tid)) + '</div><div class="qrc-t"><b>' + esc(c.name) + '</b><span class="meta">код <span class="code">' + esc(c.claim) + '</span></span></div></div>').join('') + '</div>';
+  return h + (others ? '<p class="meta">Ещё ' + others + ' — у ведущих, которые их заводили.</p>' : '') + '</div></div>';
+}
+// свой лайт-профиль: привязать вход — станет полным
+function liteBox() {
+  const c = Api.config || {};
+  return '<div class="card sec"><span class="label">Сделайте полный аккаунт</span><p class="meta">Вы вошли по QR-карточке от ведущего. Привяжите свой вход — профиль попадёт в общий рейтинг, а все матчи и турниры останутся при вас. Карточка после этого перестанет работать.</p><div class="row"><button class="mini go" data-act="link-email">Почта и пароль</button>' + (c.phone ? '<button class="mini" data-act="link-phone">Телефон</button>' : '') + (c.vk ? '<button class="mini" data-act="link-vk">VK ID</button>' : '') + '</div></div>';
+}
 function claimBox() {
-  return '<div class="card sec"><span class="label">Аккаунт от организатора</span><p class="meta">Организатор завёл вас заранее и дал код? Введите его — матчи и турниры того аккаунта станут вашими.</p><div class="nrow"><input class="inp" id="claim-code" maxlength="16" placeholder="Код, например K7MQ2XRA" autocomplete="off" style="text-transform:uppercase"><button class="mini go" data-act="claim">Привязать</button></div></div>';
+  return '<div class="card sec"><span class="label">Карточка от организатора</span><p class="meta">Ведущий заводил вас заранее и дал QR-карточку? Наведите на неё камеру или введите код — матчи и турниры с карточки станут вашими.</p><div class="nrow"><input class="inp" id="claim-code" maxlength="16" placeholder="Код, например K7MQ2XRA" autocomplete="off" style="text-transform:uppercase"><button class="mini go" data-act="claim">Привязать</button></div></div>';
 }
 /* ===== Вход и роли: игрок, ведущий (клуб подтверждён), администратор, тех. администратор ===== */
 const ROLE_NAME = { player: 'игрок', host: 'ведущий', admin: 'администратор', tech: 'тех. администратор' };
@@ -4352,7 +4407,7 @@ const devBox = () => Api.config && Api.config.dev ? '<details class="meta"><summ
 function loginModal() {
   const L = S.login, c = Api.config || {};
   if (Api.demo && !L.link) return demoLoginModal();
-  const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
+  const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'QR / код', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
   const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
   let h = '<div class="over" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
@@ -4370,7 +4425,7 @@ function loginModal() {
   } else if (L.tab === 'vk') {
     h += '<button class="btn" data-act="login-vk">Войти через VK ID</button><span class="meta">Откроется VK: подтвердите вход и вернётесь обратно.</span>';
   } else {
-    h += '<p class="meta">Ведущий завёл вам аккаунт и дал код из 8 букв и цифр? Введите его — вход сразу, без SMS и VK.</p><input class="inp big code-inp" id="login-code" data-lf="code" autocomplete="off" maxlength="16" placeholder="K7MQ2XRA" aria-label="Код от ведущего" value="' + esc(L.code) + '"><button class="btn" data-act="login-code"' + dis + '>Войти</button>';
+    h += '<p class="meta">Ведущий дал QR-карточку? Наведите на неё камеру телефона — вход сразу, без SMS и пароля. Камера не читает QR — введите код с карточки (8 букв и цифр):</p><input class="inp big code-inp" id="login-code" data-lf="code" autocomplete="off" maxlength="16" placeholder="K7MQ2XRA" aria-label="Код от ведущего" value="' + esc(L.code) + '"><button class="btn" data-act="login-code"' + dis + '>Войти</button>';
   }
   if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
   if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>. Новый аккаунт создаётся с этим согласием.</p>';
@@ -5262,11 +5317,16 @@ function adminView() {
   h += T === 'plans' ? admPlans() : T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'banners' ? admBanners() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : T === 'srv' ? admServer() : admAccounts();
   return h + '</div>';
 }
-const codeNote = p => '<div class="note-box"><b>' + esc(p.name) + '</b> · код входа: <span class="code">' + esc(p.claim) + '</span><br>Игрок открывает Oche → «Войти» → «Код от ведущего». Код одноразовый; потерял телефон — выдайте новый.</div>';
+const codeNote = p => {
+  CARDS[p.id] = { name: p.name, claim: p.claim };
+  return '<div class="note-box qrc"><div class="qrc-q">' + qrHTML(qrLoginUrl(p.claim)) + '</div><div class="qrc-t"><span><b>' + esc(p.name) + '</b> · код <span class="code">' + esc(p.claim) + '</span></span><span class="meta">' + (p.lite !== false
+    ? 'Игрок наводит камеру телефона на QR — и сразу входит. Карточка многоразовая: распечатайте или сфотографируйте. Привяжет свой телефон, почту или VK — карточка перестанет работать, матчи и турниры останутся. Потерял — выдайте новую.'
+    : 'Код одноразовый: игрок входит им один раз, дальше — по своему телефону или почте.') + '</span><span><button class="mini" data-act="card-print" data-v="' + p.id + '">Печать карточки</button></span></div></div>';
+};
 function admAccounts() {
   const full = Api.perm('players'), q = (S.admQ || '').trim(), f = full ? S.admF || '' : '';
   const e = lz('admin:' + f + ':' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '') + (f === 'blocked' ? '&blocked=1' : f === 'mine' ? '&mine=1' : f ? '&role=' + f : '')));
-  let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Игрок вводит код от вас и сразу играет со своего телефона, участвует в турнирах. Позже сможет привязать телефон или VK.</p>';
+  let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Получите QR-карточку: игрок наводит на неё камеру и сразу играет со своего телефона, участвует в турнирах. Это лайт-профиль — в общий рейтинг не входит, пока игрок не привяжет свой телефон, почту или VK; матчи при этом сохранятся.</p>';
   h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
   h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
   h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
@@ -5343,7 +5403,7 @@ function admCardModal() {
   if (p.title && Api.perm('titles')) acts.push('<button class="mini dng" data-act="ac-untitle" data-v="' + p.id + '">Снять звание ' + esc(p.title) + '</button>');
   if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
   // аккаунту с телефоном новый код выдаёт только администратор (игрок входит по номеру)
-  if (!p.vk && (full || mine && !p.phone && !p.login) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новый код входа' : 'Код входа') + '</button>');
+  if (!p.vk && (full || mine && !p.phone && !p.login) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новая QR-карточка' : 'QR-карточка') + '</button>');
   if (full && (!high || tech) && p.id !== ME) acts.push('<button class="mini" data-act="ac-logout" data-v="' + p.id + '">Завершить сеансы</button>');
   if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
@@ -6769,6 +6829,16 @@ document.addEventListener('click', e => {
     case 'tvo': { const o = tvo(); o[v] = !o[v]; lsSet('oche.tvopt', o); if (v === 'voice' && o.voice) say('Озвучка табло включена'); render(); break; }
     case 'tvo-show': S.tvoOpen = !S.tvoOpen; render(); break;
     case 'qr-show': closeModals(); S.qr = v; loadQr(); render(); break;
+    case 'cards-show': closeModals(); S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
+    case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
+    case 'card-print': if (CARDS[v]) printCards([CARDS[v]], ''); break;
+    case 'qra-tour': { const a = S.qrAsk; closeModals(); if (a && a.t) go('t.' + a.t); else render(); break; }
+    case 'qra-login': {
+      const a = S.qrAsk; closeModals();
+      Api.logout().catch(() => {}).then(() => { ME = null; Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); qrIn(a); });
+      break;
+    }
+    case 'qra-claim': { const a = S.qrAsk; closeModals(); svDo(Api.post('/api/me/claim', { code: a.code }), r => { Api.setMe(r); loggedIn('Готово: матчи и турниры с карточки теперь в вашем аккаунте.'); if (a.t) go('t.' + a.t); }); break; }
     case 'qr-copy': copyText(v, 'Ссылка скопирована.'); break;
     case 'claim': {
       const el = $('claim-code'), code = el ? el.value.trim() : '';
@@ -6781,10 +6851,10 @@ document.addEventListener('click', e => {
       if (val('name').length < 2) { toast('Введите имя игрока.'); break; }
       const n = val('n') ? +val('n') : null;
       if (n != null && !(Number.isInteger(n) && n >= 1 && n <= 9999)) { toast('Номер — от 1 до 9999.'); break; }
-      svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title'), phone: val('phone') || null, n }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); if (n) svStale('hostnums'); ['name', 'city', 'club', 'title', 'phone', 'n'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку код.'); });
+      svDo(Api.post('/api/admin/players', { name: val('name'), city: val('city'), club: val('club'), title: val('title'), phone: val('phone') || null, n }), r => { S.admNew = r.player; svPlayer(r.player); svStale('admin:'); if (n) svStale('hostnums'); ['name', 'city', 'club', 'title', 'phone', 'n'].forEach(k => { const el = $('adm-' + k); if (el) el.value = ''; }); toast('Аккаунт создан. Передайте игроку QR-карточку или код.'); });
       break;
     }
-    case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); svStale('acard:'); toast('Новый код готов.'); }); break;
+    case 'adm-code': svDo(Api.patch('/api/admin/players/' + v, { claim: true }), () => { svStale('admin:'); svStale('acard:'); toast('Новая карточка готова — старая больше не работает.'); }); break;
     case 'adm-ver': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/players/' + id, { ver: on === '1' }), () => { svStale('admin:'); svStale('acard:'); }); break; }
     case 'tv-full': try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} break;
     case 'desk-toggle': {
@@ -7094,11 +7164,14 @@ async function boot() {
       if (!x || !ids.includes(x.a) || !ids.includes(x.b)) G.ctx = null;
     }
   }
+  const qa = qrParse(location.hash);
+  if (qa) qrStrip(qa);
   const h = location.hash.slice(1);
   if (h && validRoute(h)) { R = h; if (h.startsWith('t.')) ROOM_LINK = h.slice(2); }
   // без адреса — в свой турнир, если он ещё идёт
   else if (!h && roomId() && validRoute('t.' + roomId())) R = 't.' + roomId();
   render();
+  if (qa) qrIn(qa);
 }
 boot();
 </script>

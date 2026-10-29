@@ -123,9 +123,11 @@ test('ведущий заводит аккаунт: вход по коду, то
   const me = ok(await call(g, 'POST', '/api/auth/code', { code: p.claim.toLowerCase() }));
   assert.equal(me.player.id, p.id);
   assert.equal(ok(await call(g, 'GET', '/api/me')).player.name, 'Валентина Петровна');
-  err(await call(anon(), 'POST', '/api/auth/code', { code: p.claim }), 404, 'not_found'); // одноразовый
-  // новый код выдаёт ведущий
+  // лайт-профиль: QR-карточка многоразовая — входит на любом телефоне
+  assert.equal(ok(await call(anon(), 'POST', '/api/auth/code', { code: p.claim })).player.id, p.id);
+  // потеряла карточку — ведущий выдаёт новую, старая больше не работает
   const c2 = ok(await call(HOST, 'PATCH', '/api/admin/players/' + p.id, { claim: true })).player.claim;
+  err(await call(anon(), 'POST', '/api/auth/code', { code: p.claim }), 404, 'not_found');
   ok(await call(anon(), 'POST', '/api/auth/code', { code: c2 }));
   // игрок привязал VK — аккаунт больше не правит ведущий
   await pool.query('UPDATE players SET vk_id = 900021 WHERE id = $1', [p.id]);

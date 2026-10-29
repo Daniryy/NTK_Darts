@@ -109,7 +109,7 @@ module.exports = async function (app) {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!cur) throw E.notFound('Игрок не найден');
       if (!full && cur.owner_id !== me.id) throw E.forbidden('Ведущий меняет только аккаунты, которые завёл сам');
-      if (!full && cur.vk_id != null) throw E.forbidden('Игрок привязал VK и ведёт аккаунт сам');
+      if (!full && (cur.vk_id != null || cur.email || cur.pass_hash)) throw E.forbidden('Игрок привязал свой вход и ведёт аккаунт сам');
       guardHigh(me, cur);
       const set = {};
       if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
@@ -321,3 +321,4 @@ module.exports = async function (app) {
 };
 
 module.exports.setNum = setNum;
+module.exports.newClaim = newClaim;

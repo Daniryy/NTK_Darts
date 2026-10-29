@@ -30,7 +30,7 @@ async function playerMatches(c, id, scope, bef, limit) {
 let geoCache = null;
 async function ratingGeo() {
   if (geoCache && geoCache.at > Date.now() - 60000) return geoCache;
-  const cityRows = await all(pool, `SELECT city, count(*)::int AS n FROM players WHERE rated > 0 AND city <> '' GROUP BY city ORDER BY city`);
+  const cityRows = await all(pool, `SELECT city, count(*)::int AS n FROM players WHERE rated > 0 AND NOT lite AND city <> '' GROUP BY city ORDER BY city`);
   // области, где есть игроки в рейтинге; по убыванию числа игроков
   const regs = new Map();
   cityRows.forEach(x => { const r = R.regionOf(x.city); if (r) regs.set(r, (regs.get(r) || 0) + x.n); });
@@ -64,7 +64,8 @@ module.exports = async function (app) {
     const p = await one(pool, 'SELECT * FROM players WHERE id = $1', [req.params.id]);
     if (!p) throw E.notFound('Игрок не найден');
     const st = await all(pool, 'SELECT * FROM player_stats WHERE player_id = $1', [p.id]);
-    const rank = p.rated > 0 ? (await one(pool, 'SELECT count(*) + 1 AS n FROM players WHERE rated > 0 AND rating > $1', [p.rating])).n : null;
+    // лайт-профиль в общий рейтинг не входит
+    const rank = p.rated > 0 && !p.lite ? (await one(pool, 'SELECT count(*) + 1 AS n FROM players WHERE rated > 0 AND NOT lite AND rating > $1', [p.rating])).n : null;
     // лучшее среднее за матч x01 (от 9 дротиков) — для достижений
     const best = await one(pool, `SELECT max(l.pts::float8 / l.darts * 3) AS a FROM match_lines l JOIN matches m ON m.id = l.match_id
       WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND (m.ex IS NULL OR m.ex->>'k' = 'x01') AND l.darts >= 9 AND ${TRUSTED('l', 'm')}`, [p.id]);
@@ -89,7 +90,7 @@ module.exports = async function (app) {
   app.get('/api/rating', async req => {
     const q = req.query, args = [], arg = v => { args.push(v); return '$' + args.length; };
     const sort = q.sort == null ? 'r' : V.oneOf(q.sort, 'sort', ['r', 'avg']);
-    const where = ['p.rated > 0'], city = R.citySql('p.city');
+    const where = ['p.rated > 0', 'NOT p.lite'], city = R.citySql('p.city');
     if (q.city) where.push('p.city = ' + arg(String(q.city)));
     // область: её города; поиск — по имени, ID, городу или области («свердл», «екатеринбург»)
     if (q.region) where.push(city + ' = ANY(' + arg(R.citiesOf(String(q.region))) + ')');

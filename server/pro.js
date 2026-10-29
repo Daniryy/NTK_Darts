@@ -98,7 +98,7 @@ async function peers(c, pid) {
   const me = await one(c, `SELECT p.rating, p.rated, s.pts, s.darts, s.coh, s.coa FROM players p LEFT JOIN player_stats s ON s.player_id = p.id AND s.scope = 'all' WHERE p.id = $1`, [pid]);
   if (!me || !me.rated || !me.darts) return null;
   const rows = await all(c, `SELECT s.pts, s.darts, s.coh, s.coa FROM player_stats s JOIN players p ON p.id = s.player_id
-    WHERE s.scope = 'all' AND s.darts >= 300 AND p.rated > 0 AND abs(p.rating - $1) <= 100 AND p.id <> $2`, [me.rating, pid]);
+    WHERE s.scope = 'all' AND s.darts >= 300 AND p.rated > 0 AND NOT p.lite AND abs(p.rating - $1) <= 100 AND p.id <> $2`, [me.rating, pid]);
   const avg = me.pts / me.darts * 3, co = me.coa ? me.coh / me.coa : 0;
   const below = f => rows.length ? Math.round(rows.filter(f).length / rows.length * 100) : null;
   return {
