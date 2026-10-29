@@ -57,6 +57,7 @@ function build(row, ents, ms, qs) {
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
   if (row.refs) t.refs = row.refs;
+  if (row.groups) t.groups = { n: row.groups.n, adv: row.groups.adv, ids: row.groups.ids || null, done: !!row.groups.done };
   if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
   if (row.layout) t.layout = row.layout;
@@ -77,16 +78,24 @@ function build(row, ents, ms, qs) {
   if (row.status === 'reg') return t;
   ms.forEach(m => { if (m.q_player != null && m.status === 'live') t.live['q:' + m.q_player + ':' + m.q_try] = m.id; });
   if (t.stage === 'qual') return t;
+  if (t.groups && t.groups.ids) t.groups.games = B.groupGames(t.groups.ids);
   if (B.isBracket(t)) {
     t.slots = row.slots;
     if (row.block) t.block = row.block;
     t.games = B.bracketGames(t.format, t.slots.length, t.block);
-  } else t.games = B.rrGames(t.players);
+  } else t.games = t.stage === 'groups' ? t.groups.games : B.rrGames(t.players);
+  const resOf = m => ({ la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id, avg: m.ln ? [avgOf(m.ln[0]), avgOf(m.ln[1])] : [null, null] });
   ms.forEach(m => {
+    // матчи закрытого группового этапа
+    if (m.r != null && m.r >= 64) {
+      const g = t.groups && t.groups.games && t.groups.games.find(x => x.r === m.r - 64 && x.i === m.i);
+      if (g && m.status === 'done') g.res = resOf(m);
+      return;
+    }
     const g = m.r == null ? null : B.gameAt(t, m.r, m.i);
     if (!g) return;
     if (m.status === 'live') t.live[m.r + ':' + m.i] = m.id;
-    else g.res = { la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id, avg: m.ln ? [avgOf(m.ln[0]), avgOf(m.ln[1])] : [null, null] };
+    else g.res = resOf(m);
   });
   return t;
 }
@@ -104,6 +113,8 @@ function standings(t) {
 
 function tStatus(t) {
   if (t.status === 'reg') return 'reg';
+  // квалификация или группы ещё идут — впереди сетка
+  if (t.stage) return 'live';
   const p = B.tProgress(t);
   return p.total && p.done === p.total ? 'done' : 'live';
 }
@@ -137,7 +148,7 @@ async function tourBest(c, tid) {
 
 // места всех участников: { id: [lo, hi] }
 function placesOf(t) {
-  if (t.status === 'reg' || t.stage === 'qual') return {};
+  if (t.status === 'reg' || t.stage) return {};
   const out = {};
   if (B.isBracket(t)) B.places(t).forEach(x => { out[x.id] = [x.lo, x.hi]; });
   else standings(t).forEach((x, k) => { out[x.id] = [k + 1, k + 1]; });
@@ -163,13 +174,14 @@ async function refreshTour(c, t) {
 // подписи как на странице (gameLabel)
 const koName = k => k === 1 ? 'финал' : k === 2 ? '1/2 финала' : k === 3 ? '1/4 финала' : '1/' + 2 ** (k - 1) + ' финала';
 function roundLabel(t, r) {
-  if (t.format === 'rr') return 'тур ' + (r + 1);
+  if (t.format === 'rr' || t.stage === 'groups') return 'тур ' + (r + 1);
   if (t.format === 'pl') return 'круг ' + (r + 1);
   return koName(B.bRounds(t) - r);
 }
 const placesTxt = (lo, hi) => lo === hi ? lo + '-е место' : lo + '–' + hi + ' места';
 function gameLabel(t, g, rv) {
   if (!g) return '';
+  if (t.stage === 'groups') return 'группа ' + B.groupName(g.grp) + ' · тур ' + (g.r + 1);
   if (t.format !== 'pl') return roundLabel(t, g.r);
   rv = rv || B.resolver(t);
   const { grp, lo } = B.plGroup(t, g.r, g.i), c = B.groupReal(t, rv, g.r, grp);
