@@ -5,6 +5,7 @@
 //   npm run admin -- password danil                         — сменить пароль
 //   npm run admin -- unlock danil                           — снять блокировку после неверных паролей
 //   npm run admin -- off danil                              — убрать вход по паролю
+//   npm run admin -- 2fa-off danil                          — сбросить двухфакторный вход (потерян телефон): при входе — привязка заново
 // Пароль спрашивается без показа на экране (или из переменной ADMIN_PASSWORD, если запуск не в терминале).
 const { pool, tx, one, all } = require('../server/db');
 const { migrate } = require('../db/migrate');
@@ -49,7 +50,7 @@ const who = p => p.name + ' (' + p.code + ', ' + p.role + (p.login ? ', логи
   if (cmd === 'list') {
     const rows = await all(pool, `SELECT * FROM players WHERE role IN ('admin', 'tech') ORDER BY role DESC, name`);
     if (!rows.length) console.log('Администраторов нет.');
-    rows.forEach(p => console.log((p.login && p.pass_hash ? '[пароль] ' : '[без пароля] ') + who(p) + (p.pass_lock_until > Date.now() ? ' — заблокирован до ' + new Date(+p.pass_lock_until).toLocaleTimeString('ru-RU') : '')));
+    rows.forEach(p => console.log((p.login && p.pass_hash ? '[пароль] ' : '[без пароля] ') + (p.totp_on ? '[2FA] ' : '[без 2FA] ') + who(p) + (p.pass_lock_until > Date.now() ? ' — заблокирован до ' + new Date(+p.pass_lock_until).toLocaleTimeString('ru-RU') : '')));
   } else if (cmd === 'new' || cmd === 'set') {
     const login = normLogin(opt('login')), role = opt('role') || 'tech';
     if (!LOGIN_RE.test(login)) fail('--login: 3–32 символа, латиница, цифры, точка, дефис, подчёркивание');
@@ -72,15 +73,16 @@ const who = p => p.name + ' (' + p.code + ', ' + p.role + (p.login ? ', логи
       return out;
     });
     console.log('Готово: ' + who(p) + '. Вход: страница /#staff, логин ' + login + '.');
-  } else if (cmd === 'password' || cmd === 'unlock' || cmd === 'off') {
+  } else if (cmd === 'password' || cmd === 'unlock' || cmd === 'off' || cmd === '2fa-off') {
     const login = normLogin(argv[1]);
     const p = await one(pool, 'SELECT * FROM players WHERE login = $1', [login]);
     if (!p) fail('логина ' + login + ' нет');
     if (cmd === 'password') await pool.query('UPDATE players SET pass_hash = $2, pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id, await newPassword()]);
     if (cmd === 'unlock') await pool.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
     if (cmd === 'off') { await pool.query('UPDATE players SET login = NULL, pass_hash = CASE WHEN email IS NULL THEN NULL ELSE pass_hash END WHERE id = $1', [p.id]); await pool.query('DELETE FROM sessions WHERE player_id = $1', [p.id]); }
+    if (cmd === '2fa-off') { await pool.query(`UPDATE players SET totp_on = false, totp_secret = NULL, totp_last = NULL, totp_backup = '[]' WHERE id = $1`, [p.id]); await pool.query('DELETE FROM sessions WHERE player_id = $1', [p.id]); }
     await audit(pool, null, 'cli.' + cmd, p, { login });
-    console.log('Готово: ' + who(p) + ' — ' + { password: 'пароль изменён', unlock: 'блокировка снята', off: 'вход по паролю убран, сеансы закрыты' }[cmd] + '.');
+    console.log('Готово: ' + who(p) + ' — ' + { password: 'пароль изменён', unlock: 'блокировка снята', off: 'вход по паролю убран, сеансы закрыты', '2fa-off': 'двухфакторный вход сброшен, сеансы закрыты — при входе привяжите приложение заново' }[cmd] + '.');
   } else {
     console.log(require('node:fs').readFileSync(__filename, 'utf8').split('\n').slice(0, 9).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
   }

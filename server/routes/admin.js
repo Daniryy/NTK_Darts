@@ -27,7 +27,7 @@ const adminJSON = (p, me) => {
   const c = seesContacts(me, p);
   return Object.assign(playerShort(p), {
     vk: p.vk_id != null, phone: c ? p.phone || null : p.phone ? 'скрыт' : null, claim: p.claim || null, role: p.role, blocked: p.blocked, owner: p.owner_id, created: p.created_at,
-    login: p.login || null, email: c ? p.email || null : p.email ? 'скрыта' : null, emailOk: !!p.email_ok, contacts: c
+    login: p.login || null, twofa: !!p.totp_on, email: c ? p.email || null : p.email ? 'скрыта' : null, emailOk: !!p.email_ok, contacts: c
   });
 };
 // свой номер ведущего для игрока: n — 1…9999, занятый номер переходит к новому игроку
@@ -188,6 +188,21 @@ module.exports = async function (app) {
       if (await one(c, 'SELECT 1 FROM players WHERE login = $1 AND id <> $2', [login, cur.id])) throw E.conflict('login_taken', 'Такой логин уже занят');
       const out = await one(c, 'UPDATE players SET login = $2, pass_hash = $3, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id, login, hash]);
       await audit(c, me, 'player.login', out, { login });
+      return out;
+    });
+    clearCache();
+    return { player: adminJSON(p, me) };
+  });
+  // сбросить двухфакторный вход (потерян телефон): при следующем входе — привязка заново; сеансы закрываются
+  app.delete('/api/admin/players/:id/2fa', async req => {
+    const me = needTech(req);
+    const p = await tx(async c => {
+      const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (!cur) throw E.notFound('Игрок не найден');
+      if (!cur.totp_on) throw E.conflict('conflict', 'Двухфакторный вход не включён');
+      const out = await one(c, `UPDATE players SET totp_on = false, totp_secret = NULL, totp_last = NULL, totp_backup = '[]' WHERE id = $1 RETURNING *`, [cur.id]);
+      if (cur.id !== me.id) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
+      await audit(c, me, '2fa.reset', out, null);
       return out;
     });
     clearCache();

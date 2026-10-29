@@ -144,11 +144,13 @@ module.exports = function routes(app) {
       // новый пароль — старые входы закрываются, неудачные попытки забываются
       await c.query('DELETE FROM sessions WHERE player_id = $1', [owner.id]);
       require('./limits').clear('pw:e:' + email);
-      await A.startSession(reply, c, out.id, req.device, sessionMs(out));
+      // администратору новый пароль по письму не даёт входа без кода из приложения
+      if (!atLeast(out, 'admin')) await A.startSession(reply, c, out.id, req.device, sessionMs(out));
       await audit(c, out, 'password.reset', out, { ip: req.ip });
       return out;
     });
     A.clearCache();
+    if (purpose === 'reset' && atLeast(p, 'admin')) return Object.assign(A.adminTicket(p, 'login.email'), { created: false });
     return Object.assign(await A.meResp(pool, p), { created });
   });
 
@@ -187,6 +189,8 @@ module.exports = function routes(app) {
     if (!p || !p.pass_hash) { await verifyPassword(pw, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'); throw bad(); }
     if (!await verifyPassword(pw, p.pass_hash)) throw bad();
     if (p.blocked) throw A.blockedErr();
+    // администратор — ещё код из приложения (двухфакторный вход)
+    if (atLeast(p, 'admin')) return A.adminTicket(p, 'login.email');
     await tx(async c => {
       await c.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
       await A.startSession(reply, c, p.id, req.device, sessionMs(p));

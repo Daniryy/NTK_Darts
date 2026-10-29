@@ -9,6 +9,7 @@ const { hit, wait, fail } = require('./limits');
 const { hashPassword, verifyPassword, passwordProblem, normLogin } = require('./password');
 const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
+const T = require('./totp');
 
 const SID = 'oche_sid', VKC = 'oche_vk';
 const SESSION_MS = 180 * 864e5;
@@ -61,6 +62,29 @@ async function meResp(c, p) {
   const clubs = p ? await c.query(`SELECT c.id, c.name FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 AND c.status = 'active' ORDER BY c.name`, [p.id]) : { rows: [] };
   return { player: meJSON(p), admin: isAdmin(p), role: p ? p.role : null, perms: permsOf(p), clubs: clubs.rows };
 }
+// второй шаг входа администратора: пароль уже проверен, сеанс — только после кода из приложения.
+// Нет 2FA — сначала привязка: секрет и ссылка для QR-кода, вход после первого верного кода. Билет живёт 10 минут.
+const tickets = new Map();
+function adminTicket(p, action) {
+  const now = Date.now();
+  for (const [k, v] of tickets) if (v.exp < now || tickets.size > 5000) tickets.delete(k);
+  const ticket = b64url(crypto.randomBytes(24)), t = { pid: p.id, exp: now + 10 * 6e4, action };
+  if (!p.totp_on) t.secret = T.newSecret();
+  tickets.set(ticket, t);
+  return p.totp_on ? { need2fa: 'code', ticket } : { need2fa: 'setup', ticket, secret: t.secret, otpauth: T.otpauth(p.login || p.email || p.code, t.secret) };
+}
+// код из приложения или резервный код: шаг принятого кода (или 'backup'), иначе null
+async function takeTotp(c, p, code) {
+  let secret;
+  try { secret = T.dec(p.totp_secret); } catch (e) { throw E.conflict('conflict', 'Двухфакторный вход не читается (сменился COOKIE_SECRET) — сбросьте его на сервере: admin.sh 2fa-off'); }
+  const step = T.check(secret, code, +p.totp_last || 0);
+  if (step) { await c.query('UPDATE players SET totp_last = $2 WHERE id = $1', [p.id, step]); return step; }
+  const n = T.normBackup(code), h = T.hashBackup(code), list = p.totp_backup || [];
+  if (n.length !== 8 || !list.includes(h)) return null;
+  await c.query('UPDATE players SET totp_backup = $2 WHERE id = $1', [p.id, JSON.stringify(list.filter(x => x !== h))]);
+  return 'backup';
+}
+
 // лимит попыток входа с одного IP: 429 с Retry-After
 function ipLimit(req, kind, max, ms) {
   const wait = hit(kind + ':' + req.ip, max, ms);
@@ -81,6 +105,7 @@ const PASS_FAILS = 5, PASS_LOCK = 15 * 6e4, PASS_SESSION = 30 * 864e5;
 const passKeys = (req, acct) => [['pw:' + acct + ':' + req.ip, PASS_FAILS, PASS_LOCK], ['pw:' + acct, 30, 36e5], ['pwip:' + req.ip, 50, PASS_LOCK]];
 const blockedErr = () => E.forbidden('Аккаунт заблокирован администратором');
 // администраторы входят только с паролем (логин или почта): код, звонок и VK для них закрыты
+const RANK_ADMIN = t => ['admin', 'tech'].includes(t.role);
 const adminPassErr = () => E.forbidden('Администраторы входят по логину или почте с паролем');
 
 // телефон в виде +79991234567: 8… и 9… без кода страны считаем российскими
@@ -145,6 +170,7 @@ function routes(app) {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
       if (!t) { failAdd(keys); throw E.notFound('Код не найден — проверьте у организатора'); }
       if (t.id === me.id) throw E.conflict('conflict', 'Этот аккаунт уже ваш');
+      if (RANK_ADMIN(t)) throw adminPassErr();
       if (t.vk_id != null || t.phone != null || t.email != null) throw E.conflict('conflict', 'К аккаунту уже привязан вход');
       const used = await one(c, `SELECT (SELECT count(*) FROM match_lines WHERE player_id = $1) + (SELECT count(*) FROM entries WHERE player_id = $1)
         + (SELECT count(*) FROM tournaments WHERE owner_id = $1) AS n`, [me.id]);
@@ -262,12 +288,63 @@ function routes(app) {
     }
     if (p.blocked) throw blockedErr();
     if (!atLeast(p, 'admin')) throw E.forbidden('Вход по паролю — только для администраторов');
-    await tx(async c => {
-      await c.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
+    await pool.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
+    return adminTicket(p, 'login.password');
+  });
+
+  // второй шаг входа администратора: { ticket, code } — код из приложения (6 цифр) или резервный (abcd-efgh).
+  // Привязка (need2fa: 'setup'): первый верный код включает 2FA, в ответе один раз — резервные коды (backup)
+  app.post('/api/auth/2fa', async (req, reply) => {
+    const b = req.body || {}, id = String(b.ticket || ''), t = tickets.get(id);
+    if (!t || t.exp < Date.now()) throw E.conflict('code_expired', 'Время на код вышло — войдите заново');
+    const keys = [['2fa:' + t.pid, 5, PASS_LOCK], ['2faip:' + req.ip, 30, PASS_LOCK]];
+    failCheck(keys);
+    let backup = null, left = null;
+    const ok = await tx(async c => {
+      const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [t.pid]);
+      if (!p) throw E.notFound('Аккаунт не найден');
+      if (p.blocked) throw blockedErr();
+      if (t.secret) {
+        if (p.totp_on) throw E.conflict('code_expired', 'Двухфакторный вход уже включён — войдите заново');
+        const step = T.check(t.secret, b.code, 0);
+        if (!step) return false;
+        const bk = T.newBackup();
+        backup = bk.codes;
+        await c.query('UPDATE players SET totp_secret = $2, totp_on = true, totp_last = $3, totp_backup = $4 WHERE id = $1', [p.id, T.enc(t.secret), step, JSON.stringify(bk.hashes)]);
+        await require('./audit').audit(c, p, '2fa.on', p, null);
+      } else {
+        if (!p.totp_on) throw E.conflict('code_expired', 'Двухфакторный вход сброшен — войдите заново');
+        const r = await takeTotp(c, p, b.code);
+        if (!r) return false;
+        if (r === 'backup') left = (p.totp_backup || []).length - 1;
+      }
+      tickets.delete(id);
       await startSession(reply, c, p.id, req.device, PASS_SESSION);
-      await require('./audit').audit(c, p, 'login.password', p, { ip: req.ip });
+      await require('./audit').audit(c, p, t.action, p, { ip: req.ip, backup: left != null || undefined });
+      return true;
     });
-    return meResp(pool, p);
+    if (!ok) { failAdd(keys); throw E.conflict('bad_code', 'Неверный код'); }
+    cache.clear();
+    const p = await one(pool, 'SELECT * FROM players WHERE id = $1', [t.pid]);
+    return Object.assign(await meResp(pool, p), backup ? { backup } : {}, left != null ? { backupLeft: left } : {});
+  });
+
+  // новые резервные коды (старые перестают работать): { code } — текущий код из приложения
+  app.post('/api/me/2fa/backup', async req => {
+    const me = needPlayer(req), keys = [['2fa:' + me.id, 5, PASS_LOCK]];
+    failCheck(keys);
+    const codes = await tx(async c => {
+      const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
+      if (!p.totp_on) throw E.conflict('conflict', 'Двухфакторный вход не включён');
+      const r = await takeTotp(c, p, (req.body || {}).code);
+      if (r !== 'backup' && !r) return null;
+      const bk = T.newBackup();
+      await c.query('UPDATE players SET totp_backup = $2 WHERE id = $1', [p.id, JSON.stringify(bk.hashes)]);
+      await require('./audit').audit(c, p, '2fa.backup', p, null);
+      return bk.codes;
+    });
+    if (!codes) { failAdd(keys); throw E.conflict('bad_code', 'Неверный код'); }
+    return { backup: codes };
   });
 
   // сменить свой пароль: { current, password }. Пароля ещё нет, а почта привязана — задать без current
@@ -378,4 +455,4 @@ function routes(app) {
   });
 }
 
-module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone, ipLimit, failCheck, failAdd, passKeys, tooMany, blockedErr, sha, PASS_FAILS, PASS_LOCK, PASS_SESSION, SESSION_MS };
+module.exports = { adminTicket, hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone, ipLimit, failCheck, failAdd, passKeys, tooMany, blockedErr, sha, PASS_FAILS, PASS_LOCK, PASS_SESSION, SESSION_MS };

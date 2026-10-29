@@ -879,6 +879,11 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tvopt { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-bright); }
 .tvqr { display: grid; justify-items: center; gap: 6px; text-align: center; }
 .qrbox { background: #fff; border-radius: 12px; padding: 10px; width: min(320px, 80vw); aspect-ratio: 1; }
+.tfa .qrbox { width: min(200px, 60vw); justify-self: center; }
+.tfa-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.tfa-key { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; word-break: break-all; user-select: all; }
+.tfa-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 17px; }
+.tfa-codes span { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; user-select: all; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
 .idchip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-bright); background: var(--surface2); font-size: 12.5px; color: var(--muted); }
@@ -1969,8 +1974,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2171,6 +2176,7 @@ function renderModals() {
     const t = TBY[S.qr], url = tourUrl(S.qr);
     return '<div class="over" role="dialog" aria-modal="true" aria-label="QR-код"><div class="ocard center"><div class="ohead"><span class="label">QR для игроков</span>' + closeBtn + '</div><h2>' + esc(t ? t.name : 'Турнир') + '</h2><div class="tvqr">' + qrHTML(url) + '<span class="meta">Игроки наводят камеру — открывается турнир: сетка, свои матчи и мишени, счёт вживую.</span><span class="meta" style="word-break:break-all">' + esc(url) + '</span></div><div class="row2"><button class="btn alt" data-act="qr-copy" data-v="' + esc(url) + '">Скопировать ссылку</button><button class="btn alt" data-act="go" data-v="tv.' + S.qr + '">Табло для ТВ</button></div></div></div>';
   }
+  if (S.tfa) return tfaModal();
   if (S.login) return loginModal();
   if (S.admOpen && SRV) return admCardModal();
   if (S.lbox) return '<div class="lbox" data-act="lbox-close" role="dialog" aria-modal="true" aria-label="Фото"><img src="' + esc(S.lbox) + '" alt=""></div>';
@@ -4228,7 +4234,7 @@ function loginModal() {
   }
   if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
   if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>. Новый аккаунт создаётся с этим согласием.</p>';
-  if (!L.link) h += devBox();
+  if (!L.link) h += '<button class="lnk meta" data-act="staff-open" style="justify-self:center">Вход для администраторов по логину</button>' + devBox();
   return h + '</div></div>';
 }
 // вкладка «Почта»: вход (почта + пароль), регистрация, новый пароль, привязка почты; step 'code' — ввод кода из письма
@@ -4268,7 +4274,7 @@ function mailAct(a) {
   if (a === 'login') {
     L.email = val('mail-email');
     if (!L.email || !pass()) { L.err = 'Введите почту и пароль.'; return render(); }
-    return loginDo(Api.mailLogin(L.email, pass()), () => loggedIn());
+    return loginDo(Api.mailLogin(L.email, pass()), r => r.need2fa ? tfaStart(r) : loggedIn());
   }
   if (a === 'reg') {
     L.name = val('mail-name'); L.city = val('mail-city'); L.email = val('mail-email'); L.regPass = pass();
@@ -4293,10 +4299,53 @@ function mailAct(a) {
     L.otp = val('mail-code');
     const purpose = L.link === 'email' ? 'link' : L.mode === 'reg' ? 'reg' : 'reset';
     return loginDo(Api.mailVerify({ email: L.email, purpose, code: L.otp, password: purpose === 'reset' ? pass() : undefined }), r => {
+      if (r.need2fa) return tfaStart(r);
       if (purpose === 'link') { svPlayer(Api.me); svStale('player:'); closeModals(); toast('Почта подтверждена.'); return; }
       loggedIn(purpose === 'reg' ? 'Аккаунт создан. Добро пожаловать!' : 'Пароль изменён, вы вошли.');
       if (r.created) go('p.me');
     });
+  }
+}
+/* Двухфакторный вход администратора: код из приложения после пароля; при первом входе — привязка по QR */
+function tfaStart(r, after) {
+  closeModals();
+  S.tfa = { ticket: r.ticket, mode: r.need2fa, secret: r.secret || '', otpauth: r.otpauth || '', after: after || '', err: '', busy: false };
+  render();
+  setTimeout(() => { const el = $('tfa-code'); if (el) el.focus(); }, 30);
+}
+function tfaModal() {
+  const F = S.tfa, dis = F.busy ? ' disabled' : '';
+  const head = t => '<div class="over" role="dialog" aria-modal="true" aria-label="' + t + '"><div class="ocard tfa"><div class="ohead"><h2>' + t + '</h2><button class="icon-btn" data-act="tfa-close" aria-label="Закрыть">✕</button></div>';
+  if (F.backup) {
+    return head('Резервные коды') + '<p class="meta">Сохраните их — в менеджер паролей или на бумагу. Каждый код входит один раз, если телефона нет под рукой. Больше они не покажутся.</p><div class="tfa-codes">' + F.backup.map(c => '<span>' + esc(c) + '</span>').join('') + '</div><button class="btn alt" data-act="tfa-copy">Скопировать коды</button><button class="btn" data-act="tfa-close">Я сохранил коды</button></div></div>';
+  }
+  const inp = '<input class="inp big code-inp" id="tfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="000000" aria-label="Код из приложения" value="' + esc(F.code || '') + '">';
+  const err = F.err ? '<div class="err">' + esc(F.err) + '</div>' : '';
+  if (F.mode === 'setup') {
+    return head('Защита входа') + '<p class="meta">Для администраторов вход — пароль и код из приложения на телефоне. Привяжите его один раз:</p><ol class="tfa-steps meta"><li>Установите <b>Яндекс Ключ</b> или <b>Google Authenticator</b>.</li><li>В приложении «Добавить» → отсканируйте QR-код.</li><li>Введите 6 цифр, которые оно покажет.</li></ol>' + qrHTML(F.otpauth) +
+      '<details class="meta"><summary>Не сканируется — ввести ключ вручную</summary><p class="tfa-key">' + esc(F.secret.replace(/(.{4})/g, '$1 ').trim()) + '</p></details>' + inp + err + '<button class="btn" data-act="tfa-go"' + dis + '>Включить и войти</button></div></div>';
+  }
+  return head('Код из приложения') + '<p class="meta">Откройте Яндекс Ключ или Google Authenticator и введите 6 цифр для Oche. Нет телефона — введите резервный код вида abcd-efgh.</p>' + inp + err + '<button class="btn" data-act="tfa-go"' + dis + '>Войти</button></div></div>';
+}
+async function tfaGo() {
+  const F = S.tfa, el = $('tfa-code');
+  if (!F || F.busy) return;
+  F.code = el ? el.value.trim() : '';
+  if (!F.code) { F.err = 'Введите код.'; return render(); }
+  F.busy = true; F.err = ''; render();
+  try {
+    const r = await Api.twofa(F.ticket, F.code), after = F.after;
+    loggedIn(r.backupLeft != null ? 'Вход по резервному коду. Осталось кодов: ' + r.backupLeft + (r.backupLeft < 3 ? ' — создайте новые в профиле.' : '.') : null);
+    if (after === 'admin') go('admin');
+    // резервные коды — поверх, после перехода (переход закрывает окна)
+    if (r.backup) S.tfa = { backup: r.backup };
+    render();
+  } catch (e) {
+    F.busy = false; F.code = '';
+    if (e.code === 'code_expired') { S.tfa = null; toast(e.message); }
+    else F.err = e.net ? 'Нет связи с сервером.' : e.code === 'bad_code' ? 'Неверный код. Проверьте, что время на телефоне выставлено автоматически.' : e.message;
+    render();
+    setTimeout(() => { const x = $('tfa-code'); if (x) x.focus(); }, 30);
   }
 }
 async function loginDo(p, ok) {
@@ -4346,6 +4395,8 @@ function meCard() {
   if (me.email && !me.login) h += row('Пароль', me.pass ? 'задан — вход по почте и паролю' : 'не задан', '<button class="mini" data-act="pass-ed">' + (me.pass ? 'Сменить' : 'Задать') + '</button>');
   if (S.passEd && me.email && !me.login) h += '<div class="panel">' + (me.pass ? '<input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль">' : '') + '<input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль"><input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="pass-set">Сохранить пароль</button></div>';
   // телефон и VK — только если настроены на сервере или уже привязаны
+  if (me.twofa) h += row('Двухфакторный вход', 'включён · резервных кодов: ' + (me.backupLeft || 0), '<button class="mini" data-act="tfa-new-ask">Новые коды</button>');
+  if (me.twofa && S.tfaNew) h += '<div class="panel"><span class="meta">Старые резервные коды перестанут работать. Введите код из приложения:</span><div class="nrow"><input class="inp code-inp" id="tfa-new-code" inputmode="numeric" maxlength="9" placeholder="000000" aria-label="Код из приложения"><button class="mini go" data-act="tfa-new">Создать</button></div></div>';
   if (c.phone || me.phone) h += row('Телефон', me.phone ? esc(showPhone(me.phone)) : 'не привязан', me.phone ? off('phone') : '<button class="mini" data-act="link-phone">Привязать</button>');
   if (c.vk || me.vk) h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? off('vk') : '<button class="mini" data-act="link-vk">Привязать</button>');
   h += '</div>';
@@ -5043,7 +5094,8 @@ const anyAdm = () => SRV && !!Api.me && ['accounts', 'players', 'host_nums', 'cl
 function adminView() {
   const head = '<h1 class="h1">Управление</h1>';
   if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
-  if (!anyAdm()) return '<div class="narrow">' + head + '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '<button class="btn" data-act="login">Войти</button>') + '</div>';
+  if (!anyAdm()) return '<div class="narrow">' + head + (ME || !SRV ? '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '')
+    : staffForm() + '<p class="meta">Ведущий клуба? <button class="lnk" data-act="login">Войти по почте, телефону или коду</button></p>') + '</div>';
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
     P2('titles') ? [['titles', 'Звания']] : [], P2('plans') ? [['plans', 'Тарифы']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
@@ -5144,7 +5196,7 @@ function admCardModal() {
   if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
   // логин и пароль администратора — выдаёт тех. администратор
-  if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Страница входа: ' + esc(location.origin) + '/#staff. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div></div>';
+  if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Страница входа: ' + esc(location.origin) + '/#staff. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div><p class="meta">Двухфакторный вход: ' + (p.twofa ? 'включён <button class="lnk dng" data-act="ac-2fa-off" data-v="' + p.id + '">сбросить (потерян телефон)</button>' : 'привяжет при следующем входе') + '</p></div>';
   if (Api.perm('plans')) {
     const pe = lz('acplans:' + p.id, () => Api.get('/api/admin/players/' + p.id + '/plans'), 15000), ap = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
     const subs = pe.data ? pe.data.subs.filter(x => x.status === 'active' && x.ends > Date.now()) : [];
@@ -5203,7 +5255,10 @@ function admMe() {
 function staffView() {
   if (!SRV) return '<div class="narrow"><h1 class="h1">Вход для администраторов</h1><div class="note-box">Нужен сервер: в демо-режиме входа нет.</div></div>';
   if (Api.me && anyAdm()) return '<div class="narrow"><h1 class="h1">Вы вошли</h1><p class="meta">' + esc(Api.me.name) + ' · ' + esc(roleName(Api.role)) + '</p><button class="btn" data-act="go" data-v="admin">Панель управления</button></div>';
-  return '<div class="narrow staff"><h1 class="h1">Вход для администраторов</h1><div class="panel"><input class="inp big" id="st-login" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин" aria-label="Логин" value="' + esc(S.staffLogin || '') + '"><input class="inp big" id="st-pass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль">' + (S.staffErr ? '<div class="err">' + esc(S.staffErr) + '</div>' : '') + '<button class="btn" data-act="staff-login">Войти</button></div><p class="meta">После 5 неверных паролей вход по этому логину закрывается на 15 минут.</p></div>';
+  return '<div class="narrow staff"><h1 class="h1">Вход для администраторов</h1>' + staffForm() + '</div>';
+}
+function staffForm() {
+  return '<div class="panel"><input class="inp big" id="st-login" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин или почта" aria-label="Логин или почта" value="' + esc(S.staffLogin || '') + '"><input class="inp big" id="st-pass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль">' + (S.staffErr ? '<div class="err">' + esc(S.staffErr) + '</div>' : '') + '<button class="btn" data-act="staff-login">Войти</button></div><p class="meta">Затем — код из приложения на телефоне (Яндекс Ключ, Google Authenticator): при первом входе приложение привязывается по QR-коду. После 5 неверных паролей вход закрывается на 15 минут.</p>';
 }
 function admNums() {
   const e = lz('hostnums', () => Api.get('/api/host/nums'), 60000);
@@ -6036,6 +6091,17 @@ document.addEventListener('click', e => {
       break;
     }
     case 'close-modal': closeModals(); render(); break;
+    case 'tfa-go': tfaGo(); break;
+    case 'tfa-close': S.tfa = null; render(); break;
+    case 'tfa-copy': copyText(S.tfa && S.tfa.backup ? S.tfa.backup.join('\n') : '', 'Коды скопированы.'); break;
+    case 'staff-open': closeModals(); go('staff'); break;
+    case 'tfa-new': {
+      const el = $('tfa-new-code');
+      svDo(Api.post('/api/me/2fa/backup', { code: el ? el.value.trim() : '' }), r => { S.tfaNew = false; S.tfa = { backup: r.backup }; svStale('me'); Api.loadMe().then(render); });
+      break;
+    }
+    case 'tfa-new-ask': S.tfaNew = !S.tfaNew; render(); break;
+    case 'ac-2fa-off': svDo(Api.del('/api/admin/players/' + v + '/2fa'), () => { svStale('acard:'); svStale('admin:'); toast('Двухфакторный вход сброшен — при входе приложение привяжут заново.'); }); break;
     case 'boards': { const [tid, d] = v.split('|'); setBoards(tid, +d); break; }
     case 'gready': gameReady(v); break;
     case 'notify-on': try { Notification.requestPermission().then(() => render()); } catch (e) {} break;
@@ -6325,7 +6391,9 @@ document.addEventListener('click', e => {
     case 'staff-login': {
       const l = $('st-login'), pw = $('st-pass');
       S.staffErr = '';
-      svDo(Api.passwordLogin(l ? l.value.trim() : '', pw ? pw.value : '').then(() => { S.staffLogin = ''; loggedIn(); go('admin'); }).catch(e => { S.staffErr = e.net ? 'Нет связи с сервером.' : e.message; setTimeout(() => { const el = $('st-pass'); if (el) el.focus(); }, 30); }));
+      const who = l ? l.value.trim() : '', pass = pw ? pw.value : '';
+      S.staffLogin = who;
+      svDo((who.includes('@') ? Api.mailLogin(who, pass) : Api.passwordLogin(who, pass)).then(r => { if (r.need2fa) return tfaStart(r, 'admin'); S.staffLogin = ''; loggedIn(); go('admin'); }).catch(e => { S.staffErr = e.net ? 'Нет связи с сервером.' : e.message; setTimeout(() => { const el = $('st-pass'); if (el) el.focus(); }, 30); }));
       break;
     }
     case 'adm-f': S.admF = v; render(); break;
@@ -6682,6 +6750,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && t && /^mail-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
   if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
   if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
+  if (e.key === 'Enter' && t && t.id === 'tfa-code') { e.preventDefault(); tfaGo(); return; }
   if (e.key === 'Enter' && t && (t.id === 'st-login' || t.id === 'st-pass')) { e.preventDefault(); if (t.id === 'st-login') { const n = $('st-pass'); if (n) n.focus(); } else { const b = $('app').querySelector('[data-act="staff-login"]'); if (b) b.click(); } return; }
   if (e.key === 'Enter' && t && t.id === 'dev-id') { e.preventDefault(); const b = document.querySelector('[data-act="dev-login"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && t && /^me-/.test(t.id)) { const sb = $('app').querySelector('[data-act="savename"]'); if (sb) sb.click(); return; }
