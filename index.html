@@ -919,6 +919,14 @@ html { scrollbar-gutter: stable; scrollbar-color: var(--line-bright) transparent
 .csel-o.on { color: var(--green); font-weight: 600; }
 .csel-o.on::after { content: '✓'; float: right; margin-left: 16px; }
 .csel-o:disabled { opacity: .4; cursor: default; }
+/* подсказки при наборе (вместо браузерного datalist) */
+.sug-pop .csel-o { display: flex; align-items: center; gap: 10px; white-space: normal; }
+.sug-pop .csel-o.cur { background: var(--surface2); }
+.sug-pop .sug-v { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.sug-pop .sug-v > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug-pop .sug-v b { color: var(--green); font-weight: 700; }
+.sug-pop .sug-m { color: var(--muted); font-size: 12px; }
+.sug-pop .sug-av { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface2); border: 1px solid var(--line); font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .dsel { display: grid; grid-template-columns: minmax(86px, .8fr) minmax(110px, 1.5fr) minmax(92px, 1fr); gap: 8px; }
 .dsel .csel { padding: 0 8px 0 12px; }
 /* дата из трёх списков — всегда на всю строку формы */
@@ -3090,7 +3098,7 @@ function playView() {
     h += '<div style="display:grid;gap:4px"><div class="nrow"><input class="inp" id="pn' + i + '" list="plist" data-name="' + i + '" value="' + esc(n) + '" maxlength="32" placeholder="Имя игрока" aria-label="Игрок ' + (i + 1) + '">' + (su.names.length > 1 ? '<button class="x" data-act="delp" data-v="' + i + '" aria-label="Убрать игрока">×</button>' : '') + '</div>';
     h += '<div class="p-resolve ' + pr.cls + '" id="pres' + i + '"' + (pr.txt ? '' : ' hidden') + '>' + pr.txt + '</div></div>';
   });
-  h += '</div><datalist id="plist">' + (SRV ? Object.values(P) : db.players).map(p => '<option value="' + esc(p.name) + '">').join('') + '</datalist>' + (su.names.length < 4 ? '<button class="ghost" data-act="addp">+ Добавить игрока</button>' : '') + '</div>';
+  h += '</div><datalist id="plist" data-av="1">' + (SRV ? Object.values(P) : db.players).map(p => '<option value="' + esc(p.name) + '" label="' + esc(p.city || '') + '">').join('') + '</datalist>' + (su.names.length < 4 ? '<button class="ghost" data-act="addp">+ Добавить игрока</button>' : '') + '</div>';
   const exk = su.exk || String(su.mode || 501);
   h += '<div class="field"><span class="label">Игра</span>' + exPicker(exk, su.lim, 'su-ex', 'su-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4], su.legsToWin, 'legs') + '</div></div>';
@@ -4580,6 +4588,7 @@ const CHEV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"
 const cselKey = sel => sel.id ? '#' + CSS.escape(sel.id) : 'select' + [...sel.attributes].filter(a => a.name.startsWith('data-') && a.name !== 'data-csel').map(a => '[' + a.name + '="' + CSS.escape(a.value) + '"]').join('');
 const cselText = sel => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; };
 function enhanceSelects(root) {
+  enhanceLists(root);
   root.querySelectorAll('select:not([data-csel])').forEach(sel => {
     sel.dataset.csel = '1';
     const b = document.createElement('button');
@@ -4603,6 +4612,103 @@ function enhanceSelects(root) {
     else cselClose(false);
   }
 }
+/* Подсказки при наборе: у <input list="…"> свой список вместо браузерного. <datalist> остаётся в разметке
+   источником вариантов (value — что вставить, label — подпись справа), атрибут list у поля снимается. */
+let SUG = null; // открытый: { inp, pop, items, i }
+const sugNorm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
+function enhanceLists(root) {
+  root.querySelectorAll('input[list]').forEach(inp => {
+    inp.dataset.sug = inp.getAttribute('list');
+    inp.removeAttribute('list');
+    inp.setAttribute('autocomplete', 'off');
+    inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-expanded', 'false');
+  });
+  if (SUG && !document.body.contains(SUG.inp)) sugClose();
+}
+function sugItems(inp) {
+  const dl = document.getElementById(inp.dataset.sug);
+  if (!dl) return [];
+  // уже выбранное в соседних полях с тем же списком (другие игроки матча) не предлагаем
+  const q = sugNorm(inp.value), seen = new Set([...document.querySelectorAll('input[data-sug="' + CSS.escape(inp.dataset.sug) + '"]')].filter(x => x !== inp).map(x => sugNorm(x.value)).filter(Boolean)), out = [];
+  for (const o of dl.options) {
+    const v = o.value, n = sugNorm(v);
+    if (!v || seen.has(n)) continue;
+    seen.add(n);
+    const at = q ? n.indexOf(q) : 0;
+    if (at < 0) continue;
+    out.push({ v, m: o.label && o.label !== v ? o.label : '', at, exact: n === q });
+  }
+  // сначала те, что начинаются с набранного, потом по алфавиту
+  out.sort((a, b) => (a.at > 0) - (b.at > 0) || a.v.localeCompare(b.v, 'ru'));
+  return out.length === 1 && out[0].exact ? [] : out.slice(0, 8);
+}
+function sugOpen(inp) {
+  const items = sugItems(inp);
+  if (!items.length) return sugClose();
+  if (!SUG || SUG.inp !== inp) {
+    sugClose();
+    const pop = document.createElement('div');
+    pop.className = 'csel-pop sug-pop'; pop.setAttribute('role', 'listbox');
+    // нажатие по списку не уводит фокус из поля
+    pop.addEventListener('pointerdown', e => e.preventDefault());
+    pop.addEventListener('click', e => { const o = e.target.closest('.csel-o'); if (o) sugPick(+o.dataset.k); });
+    document.body.appendChild(pop);
+    SUG = { inp, pop, items, i: -1 };
+    inp.setAttribute('aria-expanded', 'true');
+  }
+  SUG.items = items; SUG.i = -1;
+  const q = sugNorm(inp.value), av = document.getElementById(inp.dataset.sug).dataset.av;
+  SUG.pop.innerHTML = items.map((x, k) => {
+    const v = q ? esc(x.v.slice(0, x.at)) + '<b>' + esc(x.v.slice(x.at, x.at + q.length)) + '</b>' + esc(x.v.slice(x.at + q.length)) : esc(x.v);
+    return '<button type="button" tabindex="-1" role="option" class="csel-o" data-k="' + k + '">' + (av ? '<span class="sug-av">' + esc(x.v.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase()) + '</span>' : '') + '<span class="sug-v"><span>' + v + '</span>' + (x.m ? '<span class="sug-m">' + esc(x.m) + '</span>' : '') + '</span></button>';
+  }).join('');
+  sugPlace();
+}
+function sugPlace() {
+  if (!SUG) return;
+  const r = SUG.inp.getBoundingClientRect(), p = SUG.pop, gap = 6, H = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  p.style.minWidth = p.style.width = r.width + 'px';
+  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)) + 'px';
+  const below = H - r.bottom - gap - 8, above = r.top - gap - 8, h = Math.min(p.scrollHeight, 320);
+  const up = below < Math.min(h, 160) && above > below;
+  p.style.maxHeight = Math.max(110, Math.min(320, up ? above : below)) + 'px';
+  p.style.top = (up ? r.top - gap - Math.min(h, Math.max(110, above)) : r.bottom + gap) + 'px';
+}
+function sugMark() {
+  SUG.pop.querySelectorAll('.csel-o').forEach((o, k) => { o.classList.toggle('cur', k === SUG.i); if (k === SUG.i) o.scrollIntoView({ block: 'nearest' }); });
+}
+function sugPick(k) {
+  const x = SUG && SUG.items[k];
+  if (!x) return;
+  const inp = SUG.inp;
+  sugClose();
+  inp.value = x.v;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function sugClose() {
+  if (!SUG) return;
+  SUG.pop.remove(); SUG.inp.setAttribute('aria-expanded', 'false');
+  SUG = null;
+}
+// список открывается нажатием на поле, набором или стрелкой вниз — не сам по себе, когда поле получило фокус после перерисовки
+document.addEventListener('focusin', e => { if (SUG && e.target !== SUG.inp) sugClose(); });
+document.addEventListener('click', e => { const t = e.target; if (t.dataset && t.dataset.sug && !SUG) sugOpen(t); });
+document.addEventListener('focusout', e => { if (SUG && e.target === SUG.inp) setTimeout(() => { if (SUG && document.activeElement !== SUG.inp) sugClose(); }); });
+// набор с клавиатуры обновляет список; выбор из списка (событие от sugPick) его не открывает снова
+document.addEventListener('input', e => { const t = e.target; if (e.isTrusted && t.dataset && t.dataset.sug && document.activeElement === t) sugOpen(t); });
+document.addEventListener('keydown', e => {
+  if (!SUG && e.key === 'ArrowDown' && e.target.dataset && e.target.dataset.sug) { e.preventDefault(); return sugOpen(e.target); }
+  if (!SUG || e.target !== SUG.inp) return;
+  const n = SUG.items.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); SUG.i = (SUG.i + 1) % n; sugMark(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); SUG.i = SUG.i <= 0 ? n - 1 : SUG.i - 1; sugMark(); }
+  else if (e.key === 'Enter' && SUG.i >= 0) { e.preventDefault(); e.stopPropagation(); sugPick(SUG.i); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); sugClose(); }
+  else if (e.key === 'Tab') sugClose();
+}, true);
+window.addEventListener('resize', sugPlace);
+window.addEventListener('scroll', sugPlace, true);
 // дата своими списками: день, месяц, год; значение — YYYY-MM-DD в data-атрибуте поля формы
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 function dateSel(pre, v) {
