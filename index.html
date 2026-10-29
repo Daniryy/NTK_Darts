@@ -483,6 +483,12 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .yourm .label { color: var(--green); }
 .yourm b { font-size: 18px; }
 .yourm .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.yourm .ym-t { display: grid; gap: 2px; min-width: 0; }
+.yourm .ym-b { font-family: var(--display, inherit); font-size: 26px; line-height: 1.1; color: var(--green); letter-spacing: .01em; }
+/* вызов к мишени: карточка мягко пульсирует, пока игрок не начал */
+.yourm.call { animation: ymCall 1.6s ease-in-out infinite; }
+@keyframes ymCall { 50% { box-shadow: 0 0 0 7px var(--green-glow); } }
+@media (prefers-reduced-motion: reduce) { .yourm.call { animation: none; } }
 .seg2 { display: flex; gap: 4px; padding: 4px; border-radius: 11px; background: var(--surface); border: 1px solid var(--line); justify-self: start; max-width: 100%; overflow-x: auto; }
 .seg2 button { padding: 8px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
 .seg2 button:hover { color: var(--fg); }
@@ -585,6 +591,7 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
 .boards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .boards .num { min-width: 1.6em; text-align: center; font-size: 18px; }
+.boards .bnames { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
 .nums { display: grid; gap: 6px; }
 .nrow2 { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .nrow2:last-child { border-bottom: 0; }
@@ -812,6 +819,8 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tvc-p { display: grid; gap: .25vw; min-width: 0; }
 .tvn { display: flex; align-items: center; min-width: 0; font-size: clamp(15px, 1.3vw, 30px); font-weight: 600; }
 .tvn > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* игрок у мишени: нажал «Готов» или уже бросает попытку */
+.tvn.rdy > span:last-child::after { content: ' ✓'; color: var(--ok, #3ecf8e); }
 .tvc-m { display: grid; gap: .2vw; justify-items: end; text-align: right; font-size: clamp(11px, .8vw, 18px); color: var(--muted); }
 .tvc-m b { font-family: var(--display); font-size: 1.35em; color: var(--fg); letter-spacing: .03em; }
 /* последние результаты: счёт по легам у каждого игрока, победитель ярче */
@@ -1359,6 +1368,7 @@ function playSfx(kind) {
     if (kind === 'dart') tone(220, 0, 0.06, 'triangle', 0.07);
     else if (kind === '180') { tone(523.25, 0, 0.12, 'triangle', 0.1); tone(659.25, 0.1, 0.12, 'triangle', 0.1); tone(783.99, 0.2, 0.14, 'triangle', 0.1); tone(1046.5, 0.32, 0.3, 'triangle', 0.12); }
     else if (kind === 'bust') { tone(150, 0, 0.15, 'sawtooth', 0.07); tone(115, 0.14, 0.22, 'sawtooth', 0.07); }
+    else if (kind === 'call') { tone(880, 0, 0.16, 'sine', 0.12); tone(660, 0.18, 0.16, 'sine', 0.12); tone(880, 0.36, 0.24, 'sine', 0.12); }
     else if (kind === 'win') { tone(440, 0, 0.12, 'triangle', 0.1); tone(554.37, 0.11, 0.12, 'triangle', 0.1); tone(659.25, 0.22, 0.28, 'triangle', 0.12); }
   } catch (e) {}
 }
@@ -1526,7 +1536,13 @@ const ltwTxt = n => 'до ' + n + ' ' + pl(n, 'победы', 'побед', 'п�
 const numOf = (t, id) => (t.nums && t.nums[id]) || t.players.indexOf(id) + 1;
 const noBadge = (t, id) => t && isReal(id) && t.players.includes(id) ? '<span class="no" title="Номер в турнире">' + numOf(t, id) + '</span>' : '';
 // мишень игры сетки
-const boardOf = (t, r, i) => t.boards && t.boards.at ? t.boards.at[r + ':' + i] || null : null;
+// мишени: внутри — порядковые 1…n, в зале — свои номера (boards.names, например 3, 5, 7)
+const boardIdx = (t, r, i) => t.boards && t.boards.at ? t.boards.at[r + ':' + i] || null : null;
+const boardNo = (t, b) => b && t.boards && t.boards.names ? t.boards.names[b - 1] || b : b;
+const boardOf = (t, r, i) => boardNo(t, boardIdx(t, r, i)) || null;
+// мишень игрока на квалификации (бросают по двое) и кто с ним на этой мишени
+const qBoard = (t, id) => t.stage === 'qual' && t.boards && t.boards.q && t.boards.q[id] ? boardNo(t, t.boards.q[id]) : null;
+const qMates = (t, id) => { const q = t.boards && t.boards.q; return q && q[id] ? Object.keys(q).filter(x => x !== id && q[x] === q[id]) : []; };
 const boardTag = (t, r, i) => { const b = boardOf(t, r, i); return b ? '<span class="bd" title="Мишень ' + b + '">М' + b + '</span>' : ''; };
 // убрать результат можно, если дальше нет зависящих матчей и это не идущая сейчас игра
 function canClearResult(t, g) {
@@ -1783,7 +1799,7 @@ function recalc() {
   RATING = {}; for (const id in r) RATING[id] = { r: Math.round(r[id]), n: n[id] };
   // мишени держатся за готовыми играми: после результата освобождаются и переходят к следующим
   let moved = false;
-  db.tournaments.forEach(t => { if (t.boards && t.games.length && Bracket.assignBoards(t)) moved = true; });
+  db.tournaments.forEach(t => { if (t.boards && tStatus(t) !== 'reg' && Bracket.assignBoards(t)) moved = true; });
   if (moved) lsSet('oche2.db', db);
   RANK = {};
   db.players.filter(p => n[p.id] > 0).sort((x, y) => r[y.id] - r[x.id]).forEach((p, i) => RANK[p.id] = i + 1);
@@ -2053,8 +2069,8 @@ function renderModals() {
     h += '<div class="ohead"><span class="label">' + (gName(t, g, n) ? gName(t, g, n) + ' · ' : '') + gameLabel(t, g) + '</span>' + closeBtn + '</div>';
     h += '<div class="qm-names">' + noBadge(t, pa.id) + esc(pa.name) + ' — ' + noBadge(t, pb.id) + esc(pb.name) + '</div><div class="meta">' + esc(Games.label(exOf(t))) + ' · ' + ltwTxt(ltw) + '</div>';
     if (t.boards && t.boards.n && canDo(t, 'org')) {
-      const cur = boardOf(t, r, i);
-      h += '<div class="field"><span class="label">Мишень</span><div class="chips">' + Array.from({ length: t.boards.n }, (_, k) => '<button class="chip' + (cur === k + 1 ? ' on' : '') + '" data-act="qm-board" data-v="' + (k + 1) + '" aria-pressed="' + (cur === k + 1) + '">' + (k + 1) + '</button>').join('') + '</div></div>';
+      const cur = boardIdx(t, r, i);
+      h += '<div class="field"><span class="label">Мишень</span><div class="chips">' + Array.from({ length: t.boards.n }, (_, k) => '<button class="chip' + (cur === k + 1 ? ' on' : '') + '" data-act="qm-board" data-v="' + (k + 1) + '" aria-pressed="' + (cur === k + 1) + '">' + boardNo(t, k + 1) + '</button>').join('') + '</div></div>';
     }
     const grp = (p, aWins) => '<div class="field"><span class="label">Победил ' + esc(p.name) + '</span><div class="chips">' + Array.from({ length: ltw }, (_, k) => {
       const x = aWins ? ltw : k, y = aWins ? k : ltw, on = la === x && lb === y;
@@ -2232,23 +2248,63 @@ function myGame(t) {
   const x = list.sort((p, q) => (cx.nums.get(p.g.r + ':' + p.g.i) || 0) - (cx.nums.get(q.g.r + ':' + q.g.i) || 0))[0];
   return { g: x.g, opp: x.a === ME ? x.b : x.a, n: cx.nums.get(x.g.r + ':' + x.g.i) || 0 };
 }
-// о каком матче уже предупредили — помним между перезагрузками, чтобы не повторять
+// о каком вызове уже предупредили — помним между перезагрузками, чтобы не повторять
 const YM_SEEN = new Set([].concat(lsGet('oche2.ym') || []));
+function seenOnce(key) { if (YM_SEEN.has(key)) return false; YM_SEEN.add(key); lsSet('oche2.ym', [...YM_SEEN].slice(-40)); return true; }
+// вызов к мишени: вибрация, звук, подсказка; телефон в кармане — системное уведомление (где браузер разрешает)
+function callAlert(msg) {
+  // вибрация разрешена только после касания страницы
+  try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([250, 120, 250, 120, 400]); } catch (e) {}
+  playSfx('call');
+  setTimeout(() => toast(msg), 0);
+  try { if (document.hidden && window.Notification && Notification.permission === 'granted') new Notification('Oche', { body: msg, tag: 'oche-call' }); } catch (e) {}
+}
+const notifyAsk = () => window.isSecureContext && window.Notification && Notification.permission === 'default' ? '<button class="lnk meta" data-act="notify-on">Уведомлять, когда вызовут</button>' : '';
+// квалификация: моя следующая попытка (номер) или null — всё сдано
+function myQualNext(t) {
+  if (!ME || !t || t.stage !== 'qual' || !t.qual || !t.players.includes(ME)) return null;
+  const r = qRes(t, ME);
+  for (let k = 0; k < t.qual.tries; k++) if (!r[k]) return k;
+  return null;
+}
+// карточка квалификации: к какой мишени пройти, кто рядом, какая попытка
+function yourQual(t, link) {
+  const k = myQualNext(t);
+  if (k == null || !t.boards || !t.boards.n) return '';
+  const b = qBoard(t, ME), mates = qMates(t, ME).map(id => P[id] ? P[id].name : '—'), going = G && G.ctx && G.ctx.q && G.ctx.tid === t.id && hasLiveGame();
+  if (b && seenOnce('q:' + t.id + ':' + b + ':' + k)) callAlert('Квалификация: пройдите к мишени ' + b);
+  let wait = '';
+  if (!b) {
+    const q = t.boards.q || {}, no = id => (t.nums && t.nums[id]) || t.players.indexOf(id) + 1;
+    const queue = t.players.filter(id => !q[id] && myQualNextOf(t, id) != null).sort((x, y) => no(x) - no(y));
+    const ahead = queue.indexOf(ME);
+    wait = 'Все мишени заняты' + (ahead > 0 ? ' — перед вами ' + ahead + ' ' + pl(ahead, 'игрок', 'игрока', 'игроков') : ' — вы следующий') + '. Вызовем, когда освободится.';
+  }
+  return '<div class="card yourm' + (b ? ' call' : '') + '" role="status"><div class="ym-t"><span class="label">Квалификация · попытка ' + (k + 1) + ' из ' + t.qual.tries + '</span>' +
+    (b ? '<b class="ym-b">Пройдите к мишени ' + b + '</b><span class="meta">' + (link ? esc(t.name) + ' · ' : '') + esc(Games.label(t.qual.ex)) + (mates.length ? ' · на мишени с вами (бросаете по очереди): ' + esc(mates.join(', ')) : '') + '</span>' : '<b>Ждёте свободную мишень</b><span class="meta">' + (link ? esc(t.name) + ' · ' : '') + wait + '</span>') +
+    notifyAsk() + '</div><div class="row">' + (b ? '<button class="mini go" data-act="qplay" data-v="' + t.id + '|' + ME + '|' + k + '">' + (going ? 'Продолжить попытку' : 'Начать попытку') + '</button>' : '') + (link ? '<button class="mini" data-act="go" data-v="t.' + t.id + '">К турниру</button>' : '') + '</div></div>';
+}
+const myQualNextOf = (t, id) => { const r = qRes(t, id); for (let k = 0; k < t.qual.tries; k++) if (!r[k]) return k; return null; };
 // link — показать кнопку перехода в турнир (в ленте)
 function yourMatch(t, link) {
+  if (t && t.stage === 'qual') return yourQual(t, link);
   const m = myGame(t);
   if (!m) return '';
   const key = t.id + ':' + m.g.r + ':' + m.g.i, b = boardOf(t, m.g.r, m.g.i), opp = P[m.opp] ? P[m.opp].name : 'соперник';
-  const going = liveCtxIs(t.id, m.g.r, m.g.i) || !!otherLive(t, m.g);
-  // первый раз — вибрация и подсказка, чтобы не пропустить вызов к мишени
-  if (!YM_SEEN.has(key) && !going) {
-    YM_SEEN.add(key); lsSet('oche2.ym', [...YM_SEEN].slice(-30));
-    // вибрация разрешена только после касания страницы
-    try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([200, 100, 200]); } catch (e) {}
-    setTimeout(() => toast('Ваш матч готов: против ' + opp + (b ? ', мишень ' + b : '')), 0);
-  }
-  const acts = gameActs(t, m.g, 'ready', true);
-  return '<div class="card yourm" role="status"><div style="display:grid;gap:2px;min-width:0"><span class="label">' + (going ? 'Ваш матч идёт' : 'Ваш матч') + (gName(t, m.g, m.n) ? ' · ' + gName(t, m.g, m.n) : '') + '</span><b>против ' + esc(opp) + '</b><span class="meta">' + (link ? esc(t.name) + ' · ' : '') + (b ? 'Мишень ' + b : 'Мишень назначит организатор') + '</span></div><div class="row">' +
+  const mine = liveCtxIs(t.id, m.g.r, m.g.i), other = !mine && otherLive(t, m.g), going = mine || !!other;
+  // вызов к мишени — один раз; игра началась на телефоне соперника — тоже скажем
+  if (!going && seenOnce(key + (b ? ':b' + b : ''))) callAlert(b ? 'Ваш матч: пройдите к мишени ' + b + ', соперник — ' + opp : 'Ваш матч готов, соперник — ' + opp);
+  if (other && seenOnce(key + ':go')) callAlert('Игра началась — счёт ведёт ' + opp);
+  // «Готов»: на сервере, игрокам пары (организатор ведёт счёт как раньше)
+  const rd = SRV && t.ready && t.ready[m.g.r + ':' + m.g.i] || {}, meR = !!rd[ME], oppR = !!rd[m.opp];
+  const readyOn = SRV && !going && t.players.includes(ME);
+  let status = going ? (mine ? 'Вы ведёте счёт' : 'Счёт ведёт соперник') : readyOn ? (meR && oppR ? 'Оба готовы — начинаем…' : meR ? 'Вы готовы — ждём соперника' : oppR ? 'Соперник уже у мишени и готов' : 'Подойдите к мишени и нажмите «Готов» — игра начнётся, когда готовы оба') : '';
+  const acts = going ? gameActs(t, m.g, 'ready', true)
+    : readyOn ? (meR ? '<button class="mini" data-act="gready" data-v="' + t.id + '|' + m.g.r + '|' + m.g.i + '|0">Не готов</button>' : '<button class="mini go" data-act="gready" data-v="' + t.id + '|' + m.g.r + '|' + m.g.i + '|1">Готов</button>') + (canDo(t, 'score') ? '<button class="mini" data-act="tplay" data-v="' + gref(t, m.g) + '" title="Начать сразу и вести счёт с этого телефона">Вести счёт</button>' : '')
+    : gameActs(t, m.g, 'ready', true);
+  return '<div class="card yourm' + (b && !going ? ' call' : '') + '" role="status"><div class="ym-t"><span class="label">' + (going ? 'Ваш матч идёт' : 'Ваш матч') + (gName(t, m.g, m.n) ? ' · ' + gName(t, m.g, m.n) : '') + '</span>' +
+    (b && !going ? '<b class="ym-b">Пройдите к мишени ' + b + '</b>' : '') + '<b>Соперник: ' + esc(opp) + (oppR && !going ? ' <span class="ok">✓ готов</span>' : '') + '</b>' +
+    '<span class="meta">' + (link ? esc(t.name) + ' · ' : '') + (going && b ? 'мишень ' + b + ' · ' : '') + (b || going ? '' : 'Мишень назначит организатор. ') + esc(status) + '</span>' + (going ? '' : notifyAsk()) + '</div><div class="row">' +
     (acts || '<span class="meta">Счёт ведёт организатор</span>') + (link ? '<button class="mini" data-act="go" data-v="t.' + t.id + '">К турниру</button>' : '') + '</div></div>';
 }
 
@@ -2472,12 +2528,12 @@ function tourView(id) {
       h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (SRV && !ME ? '<button class="btn sm" data-act="login">Войти, чтобы записаться</button>' : canDo(t, 'join') || inn ? '<button class="btn sm' + (inn ? ' alt' : '') + '" data-act="join" data-v="' + t.id + '">' + (inn ? 'Отменить запись' : 'Записаться') + '</button>' : '<span class="meta">Мест нет</span>');
       if (canLaunch && canDo(t, 'launch')) h += '<button class="btn sm alt" data-act="launch-ask" data-v="' + t.id + '">Начать турнир</button>';
       h += '<button class="btn sm alt" data-act="ics" data-v="' + t.id + '" title="Событие в календарь телефона или компьютера">В календарь</button>';
-      h += '</div>';
+      h += '</div>' + boardsCtl(t);
     }
   } else if (st === 'live') {
     h += stagesView(t, rv);
     if (ready && !(tab === 'games' && S.gf === 'ready')) h += '<button class="mini go" data-act="ready-games">Можно играть: ' + ready + '</button>';
-    if (!inQual) h += boardsCtl(t);
+    h += boardsCtl(t);
   } else {
     h += coverBlock(t) + podium(t) + resBtns(t);
   }
@@ -2551,36 +2607,82 @@ function tourPct(t, rv) {
   const done = sts.reduce((a, x) => a + x.done, 0), total = sts.reduce((a, x) => a + x.total, 0), cur = sts.find(x => x.done < x.total);
   return { pc: Math.round(done / Math.max(1, total) * 100), cur: cur ? cur.l : 'всё сыграно', sts };
 }
+// сколько примерно осталось, мин: оставшиеся матчи по кругам (и попытки квалификации), сколько идёт разом —
+// по мишеням или готовым парам; темп — средний матч этого турнира в счётчике, пока его нет — по формату
+function etaMin(t, rv) {
+  if (tStatus(t) !== 'live') return null;
+  rv = rv || resolver(t);
+  const ex = exOf(t), legMin = ex.k === 'x01' ? ({ 301: 3, 501: 4.5, 701: 6 }[ex.mode] || 4.5) : 3;
+  const matchMs = (t.pace && t.pace.match) || legMin * t.ltw * 1.5 * 6e4, boards = (t.boards && t.boards.n) || 0;
+  let ms = 0;
+  if (t.stage === 'qual') {
+    const N = t.players.length, left = t.players.reduce((a, id) => a + t.qual.tries - qRes(t, id).filter(Boolean).length, 0);
+    const par = boards || Math.max(1, Math.ceil(N / 4));
+    ms = Math.ceil(left / par) * ((t.pace && t.pace.qual) || 4 * 6e4);
+    // потом сетки: примерно N/2 матчей на круг
+    ms += Math.ceil(Math.log2(Math.max(2, Math.min(N, t.split || N)))) * Math.ceil(N / 2 / par) * matchMs;
+  } else {
+    const par = boards || Math.max(1, callsOf(t).length + liveOf(t).length);
+    Bracket.roundProgress(t, rv).forEach(x => { ms += Math.ceil((x.total - x.done) / par) * matchMs; });
+    if (!t.games.length) ms = 0;
+  }
+  return ms ? Math.max(1, Math.round(ms / 6e4)) : null;
+}
+const etaTxt = m => m == null ? '' : '≈ ' + (m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч' + (m % 60 >= 5 ? ' ' + Math.round(m % 60 / 5) * 5 + ' мин' : ''));
 // полоса хода турнира: на табло под заголовком, в счётчике над игрой
 function tourBar(t, cls) {
   const tp = tStatus(t) === 'live' ? tourPct(t) : null;
   if (!tp) return '';
-  return '<div class="tbar' + (cls ? ' ' + cls : '') + '"><span class="tbar-l">Ход турнира · <b>' + esc(tp.cur) + '</b></span><div class="tbar-s">' + tp.sts.map(x => '<i class="' + (x.done >= x.total ? 'done' : x.done ? 'cur' : '') + '" style="--p:' + Math.round(x.done / Math.max(1, x.total) * 100) + '%" title="' + esc(x.l) + ': ' + x.done + '/' + x.total + '"></i>').join('') + '</div><b class="tbar-p">' + tp.pc + '%</b></div>';
+  const eta = etaMin(t);
+  return '<div class="tbar' + (cls ? ' ' + cls : '') + '"><span class="tbar-l">Ход турнира · <b>' + esc(tp.cur) + '</b>' + (eta ? ' · осталось ' + etaTxt(eta) : '') + '</span><div class="tbar-s">' + tp.sts.map(x => '<i class="' + (x.done >= x.total ? 'done' : x.done ? 'cur' : '') + '" style="--p:' + Math.round(x.done / Math.max(1, x.total) * 100) + '%" title="' + esc(x.l) + ': ' + x.done + '/' + x.total + '"></i>').join('') + '</div><b class="tbar-p">' + tp.pc + '%</b></div>';
 }
 function stagesView(t, rv) {
   const sts = stagesOf(t, rv);
   if (!sts.length) return '';
   const pr = tProgress(t, rv);
-  return '<div class="stages"><b>' + (t.stage === 'qual' ? 'Ход турнира' : 'Сыграно ' + pr.done + ' из ' + pr.total + ' ' + pl(pr.total, 'матча', 'матчей', 'матчей')) + '</b>' + sts.map(s => {
+  const eta = etaMin(t, rv);
+  return '<div class="stages"><b>' + (t.stage === 'qual' ? 'Ход турнира' : 'Сыграно ' + pr.done + ' из ' + pr.total + ' ' + pl(pr.total, 'матча', 'матчей', 'матчей')) + (eta ? ' <span class="meta">· до конца ' + etaTxt(eta) + '</span>' : '') + '</b>' + sts.map(s => {
     const pc = Math.round(s.done / Math.max(1, s.total) * 100);
     return '<div class="stg' + (pc === 100 ? ' done' : '') + '"><span>' + s.l + '</span><div class="bar"><i style="width:' + pc + '%"></i></div><span class="meta">' + s.done + '/' + s.total + ' · ' + pc + '%</span></div>';
   }).join('') + '</div>';
 }
 
 /* Мишени: сколько их в зале; готовые матчи получают свободные по порядку номеров */
+// номера мишеней строкой: «1-6», «3, 5, 7», «1-4, 9»
+const boardsTxt = t => { const bd = t.boards; if (!bd || !bd.n) return ''; return bd.names ? bd.names.join(', ') : bd.n === 1 ? '1' : '1-' + bd.n; };
+function parseBoards(v) {
+  const out = [];
+  for (const part of String(v || '').split(/[\s,;]+/).filter(Boolean)) {
+    const m = part.match(/^(\d{1,3})(?:[-–](\d{1,3}))?$/);
+    if (!m) return null;
+    const a = +m[1], b = m[2] ? +m[2] : a;
+    if (!a || !b || b < a || b - a > 63) return null;
+    for (let x = a; x <= b; x++) if (!out.includes(x)) out.push(x);
+  }
+  return out.length <= 64 ? out : null;
+}
+/* Мишени в зале: сколько их и какие номера. Готовые игры и квалификация (по двое на мишень) получают их сами */
 function boardsCtl(t) {
-  if (!t.games.length || !(canDo(t, 'org') || canDo(t, 'staff'))) return '';
+  if (!(canDo(t, 'org') || canDo(t, 'staff')) || tStatus(t) === 'done') return '';
   const n = t.boards ? t.boards.n : 0;
-  return '<div class="boards"><span class="label">Мишеней</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button></div>';
+  return '<div class="boards"><span class="label">Мишени</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button>' +
+    '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(boardsTxt(t)) + '" placeholder="номера: 1-8 или 3, 5, 7" aria-label="Номера мишеней в зале" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить</button>' +
+    '<span class="meta" style="flex-basis:100%">' + (n ? (t.stage === 'qual' ? 'Квалификация идёт по двое на мишень' : 'Готовые матчи получают свободные мишени') + ' — игрокам приходит, куда пройти.' : 'Укажите мишени — сайт сам разведёт игроков по ним.') + '</span></div>';
+}
+function saveBoards(t, names) {
+  if (SRV) return svDo(Api.patch('/api/tournaments/' + t.id + '/boards', { names }), r => { svTourSet(r); toast(names.length ? 'Мишени: ' + names.join(', ') : 'Мишени убраны'); });
+  const at = t.boards ? t.boards.at || {} : {};
+  t.boards = names.length ? Object.assign({ n: names.length, at }, names.every((x, k) => x === k + 1) ? {} : { names }) : null;
+  if (t.boards && tStatus(t) !== 'reg') Bracket.assignBoards(t);
+  saveDb(); render();
 }
 function setBoards(tid, d) {
   const t = TBY[tid];
   if (!t) return;
-  const n = Math.max(0, Math.min(64, (t.boards ? t.boards.n : 0) + d));
-  if (SRV) return svDo(Api.patch('/api/tournaments/' + tid + '/boards', { n }), svTourSet);
-  t.boards = n ? { n, at: t.boards ? t.boards.at : {} } : null;
-  if (t.boards) Bracket.assignBoards(t);
-  saveDb(); render();
+  const cur = t.boards ? (t.boards.names || Array.from({ length: t.boards.n }, (_, k) => k + 1)) : [];
+  const next = d > 0 ? cur.concat((cur.length ? Math.max(...cur) : 0) + 1) : cur.slice(0, -1);
+  if (next.length > 64 || next.some(x => x > 999)) return;
+  saveBoards(t, next);
 }
 // вручную поставить игре мишень: у другой игры она снимается, та получит свободную
 function setBoard(tid, r, i, b) {
@@ -2770,6 +2872,7 @@ function newTourView() {
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
     (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
+  h += '<div class="field"><label class="label" for="nt-boards">Мишени в зале</label><input class="inp" id="nt-boards" data-nt="boards" inputmode="numeric" maxlength="120" value="' + esc(nt.boards || '') + '" placeholder="например 1-6 или 3, 5, 7" style="max-width:320px"><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — с тарифом «Ведущий».</span><button class="lnk meta" data-act="go" data-v="plans" style="justify-self:start">Тарифы →</button></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
@@ -2799,6 +2902,8 @@ function createTour() {
   const ids = nt.sel.filter(id => P[id]), sm = ntSummary(nt);
   if (!nt.name.trim()) { nt.err = 'Введите название турнира.'; return render(); }
   if (!sm.ok) { nt.err = sm.txt; return render(); }
+  const boards = parseBoards(nt.boards);
+  if (!boards) { nt.err = 'Мишени: например 1-6 или 3, 5, 7 (до 64, числа до 999).'; return render(); }
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
@@ -2807,6 +2912,7 @@ function createTour() {
     const fee = ntFee(nt);
     if (fee) body.fee = fee;
     if (ndl) { body.qual = { ex: exFrom(nt.qk), tries: nt.tries }; body.split = 8; }
+    if (boards.length) body.boards = boards;
     nt.err = '';
     return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
   }
@@ -2818,6 +2924,7 @@ function createTour() {
   if (ndl) { t.players = ids.slice(); t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; t.split = 8; t.stage = 'qual'; }
   else if (nt.fmt === 'rr') { t.players = order; t.games = rrGames(order); }
   else setBracket(t, nt.fmt, order);
+  if (boards.length) t.boards = Object.assign({ n: boards.length, at: {} }, boards.every((x, k) => x === k + 1) ? {} : { names: boards });
   db.tournaments.push(t); saveDb(); recalc(); S.nt = null;
   toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.');
   go('t.' + t.id);
@@ -3111,7 +3218,7 @@ function playView() {
   const mine = myTourGames(), qs = myQualTries();
   if (mine.length || qs.length) {
     h += '<div class="sec"><span class="label">Ваши матчи в турнирах</span><div class="list">';
-    qs.forEach(x => { h += '<div class="trow"><div style="display:grid;min-width:0"><b>Квалификация · попытка ' + (x.k + 1) + '</b><span class="meta">' + esc(x.t.name) + ' · ' + esc(Games.label(x.t.qual.ex)) + '</span></div><div class="gacts"><button class="mini go" data-act="qplay" data-v="' + x.t.id + '|' + ME + '|' + x.k + '">Играть</button></div></div>'; });
+    qs.forEach(x => { const qb = qBoard(x.t, ME); h += '<div class="trow"><div style="display:grid;min-width:0"><b>' + (qb ? '<span class="bd">Мишень ' + qb + '</span> ' : '') + 'Квалификация · попытка ' + (x.k + 1) + '</b><span class="meta">' + esc(x.t.name) + ' · ' + esc(Games.label(x.t.qual.ex)) + '</span></div><div class="gacts"><button class="mini go" data-act="qplay" data-v="' + x.t.id + '|' + ME + '|' + x.k + '">Играть</button></div></div>'; });
     mine.forEach(x => {
       const b = boardOf(x.t, x.g.r, x.g.i);
       h += '<div class="trow"><div style="display:grid;min-width:0"><b>' + (b ? '<span class="bd">Мишень ' + b + '</span> ' : '') + esc(P[x.opp] ? P[x.opp].name : '—') + '</b><span class="meta">' + esc(x.t.name) + ' · ' + gameLabel(x.t, x.g) + '</span><span class="meta">' + esc(Games.label(exOf(x.t))) + ' · ' + ltwTxt(x.t.ltw) + '</span></div><div class="gacts">' + gameActs(x.t, x.g, 'ready', true) + '</div></div>';
@@ -3626,6 +3733,22 @@ function obBar() {
   }
   if (!n) return '<div id="ob-bar" hidden></div>';
   return '<div id="ob-bar" class="meta" style="text-align:center">' + (navigator.onLine === false ? 'Нет сети · ' : '') + 'не отправлено: ' + n + ' — дошлём сами</div>';
+}
+// «Готов» у мишени: v = турнир|r|i|1 или 0. Готовы оба — сервер начинает матч, счёт ведёт этот телефон
+async function gameReady(v) {
+  if (!SRV || !ME) return svLogin();
+  const [tid, r, i, on] = v.split('|');
+  try {
+    const res = await Api.post('/api/tournaments/' + tid + '/games/' + r + '/' + i + '/ready', { on: on === '1' });
+    svStale('tour:' + tid);
+    if (res.match) {
+      if (hasLiveGame()) { toast('Игра началась. Сначала закончите текущую игру — потом заберите счёт этого матча.'); return render(); }
+      restoreGame(res.match, []);
+      seenOnce(tid + ':' + r + ':' + i + ':go');
+      toast('Оба готовы — игра началась! Счёт ведёте вы.');
+      S.inGame = true; go('play');
+    } else { toast(on === '1' ? 'Отметили: вы готовы. Ждём соперника.' : 'Отметка «Готов» снята.'); render(); }
+  } catch (e) { svStale('tour:' + tid); toast(e.net ? 'Нет связи с сервером.' : e.message); render(); }
 }
 // забрать ведение счёта: все события с сервера, счётчик восстанавливается по ним
 async function takeover(mid) {
@@ -5111,13 +5234,30 @@ function callsOf(t) {
 // игрок строкой табло: номер в турнире и имя целиком, без переноса посередине
 const tvName = (t, id, cls) => '<span class="tvn' + (cls ? ' ' + cls : '') + '">' + noBadge(t, id) + '<span>' + esc(P[id] ? P[id].name : '—') + '</span></span>';
 function callsHTML(t, max) {
+  if (t.stage === 'qual') return qualCallsHTML(t, max);
   const cs = callsOf(t).slice(0, max || 12);
   if (!cs.length) return '<p class="meta">Сейчас никого не вызываем.</p>';
   return '<div class="tvcalls">' + cs.map(x => {
-    const b = boardOf(t, x.g.r, x.g.i), nm = gName(t, x.g, x.n);
+    const b = boardOf(t, x.g.r, x.g.i), nm = gName(t, x.g, x.n), rd = (t.ready && t.ready[x.g.r + ':' + x.g.i]) || {};
+    // ✓ — игрок у мишени и нажал «Готов»
+    const who = id => tvName(t, id, rd[id] ? 'rdy' : '');
     return '<div class="tvcall' + (b ? ' on' : '') + '"><div class="tvc-b">' + (b ? '<small>мишень</small><b>' + b + '</b>' : '<small>ждёт</small><b>—</b>') + '</div>' +
-      '<div class="tvc-p">' + tvName(t, x.s.a) + tvName(t, x.s.b) + '</div><div class="tvc-m">' + (nm ? '<b>' + esc(nm) + '</b>' : '') + '<span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
+      '<div class="tvc-p">' + who(x.s.a) + who(x.s.b) + '</div><div class="tvc-m">' + (nm ? '<b>' + esc(nm) + '</b>' : '') + '<span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
   }).join('') + '</div>';
+}
+// квалификация: на каждой мишени — кто бросает (по двое), ниже — очередь
+function qualCallsHTML(t, max) {
+  const bd = t.boards;
+  if (!bd || !bd.n) return '<p class="meta">Мишени не указаны — игроки сдают попытки по команде организатора.</p>';
+  const q = bd.q || {}, live = new Set(Object.keys(t.live || {}).filter(k => k.startsWith('q:')).map(k => k.split(':')[1]));
+  const rows = [];
+  for (let b = 1; b <= bd.n && rows.length < (max || 12); b++) {
+    const ids = Object.keys(q).filter(id => q[id] === b);
+    rows.push('<div class="tvcall' + (ids.length ? ' on' : '') + '"><div class="tvc-b"><small>мишень</small><b>' + boardNo(t, b) + '</b></div><div class="tvc-p">' +
+      (ids.length ? ids.map(id => tvName(t, id, live.has(id) ? 'rdy' : '')).join('') : '<span class="meta">свободна</span>') + '</div><div class="tvc-m"><span>квалификация</span></div></div>');
+  }
+  const queue = t.players.filter(id => !q[id] && myQualNextOf(t, id) != null).length;
+  return '<div class="tvcalls">' + rows.join('') + '</div>' + (queue ? '<p class="meta">В очереди к мишеням: ' + queue + '</p>' : '');
 }
 function recentHTML(t, max) {
   const done = (t.games || []).filter(g => g.res && gameState(t, g).st === 'done').map(g => ({ g, at: (MBY[g.res.mid] || {}).t || 0, s: gameState(t, g) }));
@@ -5150,6 +5290,7 @@ function tvView(id) {
   h += '<div class="tvside">';
   if (t.stage === 'qual') {
     const order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, 10);
+    if (O.calls && t.boards && t.boards.n) h += '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 12) + '</div>';
     h += '<div class="tvbox"><h2>Квалификация · лучшие</h2>' + (order.length ? order.map((x, k) => '<div class="tvrow"><span class="r">' + (k + 1) + '</span><span>' + noBadge(t, x) + esc(P[x] ? P[x].name : '—') + '</span><span class="r">' + qBest(t, x) + '</span></div>').join('') : '<p class="meta">Результатов пока нет.</p>') + '</div>';
   } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
   if (O.stages) h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div>';
@@ -5727,6 +5868,15 @@ document.addEventListener('click', e => {
     }
     case 'close-modal': closeModals(); render(); break;
     case 'boards': { const [tid, d] = v.split('|'); setBoards(tid, +d); break; }
+    case 'gready': gameReady(v); break;
+    case 'notify-on': try { Notification.requestPermission().then(() => render()); } catch (e) {} break;
+    case 'bnames': {
+      const t = TBY[v], names = parseBoards(($('bn-' + v) || {}).value);
+      if (!t) break;
+      if (!names) { toast('Номера мишеней: например 1-8 или 3, 5, 7 (до 64, числа до 999)'); break; }
+      saveBoards(t, names);
+      break;
+    }
     case 'qm-board': if (S.quickModal) setBoard(S.quickModal.tid, S.quickModal.r, S.quickModal.i, +v); break;
     case 'nums-reset': {
       const t = TBY[v];

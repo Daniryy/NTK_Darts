@@ -170,6 +170,12 @@ module.exports = async function (app) {
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
         f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now()]);
       if (f.fee != null) await c.query('UPDATE tournaments SET fee = $2 WHERE id = $1', [row.id, f.fee]);
+      // мишени в зале: сразу при создании — после старта игры и квалификация распределяются по ним сами
+      if (b.boards != null) {
+        const names = b.boards;
+        if (!Array.isArray(names) || names.length > 64 || names.some(x => !Number.isInteger(x) || x < 1 || x > 999) || new Set(names).size !== names.length) throw E.bad('Номера мишеней: до 64 разных чисел 1–999', 'boards');
+        if (names.length) await c.query('UPDATE tournaments SET boards = $2 WHERE id = $1', [row.id, JSON.stringify(Object.assign({ n: names.length, at: {} }, names.every((x, k) => x === k + 1) ? {} : { names }))]);
+      }
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
       // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
       else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
@@ -353,7 +359,9 @@ module.exports = async function (app) {
       if (k > 0 && !await one(c, 'SELECT 1 FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k - 1])) throw E.conflict('bad_state', 'Сначала нужна попытка ' + k);
       await c.query(`INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (tournament_id, player_id, try) DO UPDATE SET v = EXCLUDED.v, t = EXCLUDED.t`, [t.id, pid, k, v, Date.now()]);
-      await bump(c, t.id);
+      // сдавшие все попытки освобождают мишень — её получает следующий
+      await T.refreshTour(c, await getTour(c, t.id, false));
+      forget('t', t.id);
       return tourResp(c, t.id, me);
     });
   });
@@ -367,7 +375,8 @@ module.exports = async function (app) {
       const { pid, k } = qualSlot(t, req.params);
       await c.query(`DELETE FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try >= $3`, [t.id, pid, k]);
       await c.query('DELETE FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try >= $3', [t.id, pid, k]);
-      await bump(c, t.id);
+      await T.refreshTour(c, await getTour(c, t.id, false));
+      forget('t', t.id);
       return tourResp(c, t.id, me);
     });
   });
@@ -422,16 +431,24 @@ module.exports = async function (app) {
     });
   });
 
-  // мишени (организатор или помощник): { n } — сколько их, { r, i, board } — поставить игре мишень
+  // мишени (организатор или помощник, можно и до старта): { n } — сколько их (номера 1…n), { names: [3, 5, 7] } —
+  // свои номера мишеней в зале, { r, i, board } — поставить игре мишень (board — порядковый 1…n)
   app.patch('/api/tournaments/:id/boards', async req => {
     const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needStaff(t, me);
-      if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени — после старта');
-      let bd = t.boards ? { n: t.boards.n, at: Object.assign({}, t.boards.at) } : { n: 0, at: {} };
-      if (b.n !== undefined) bd.n = V.int(b.n, 'n', 0, 64);
+      if (t.status === 'done') throw E.conflict('bad_state', 'Турнир завершён');
+      let bd = t.boards ? Object.assign({}, t.boards, { at: Object.assign({}, t.boards.at) }) : { n: 0, at: {} };
+      if (b.names !== undefined) {
+        const names = b.names == null ? [] : b.names;
+        if (!Array.isArray(names) || names.length > 64 || names.some(x => !Number.isInteger(x) || x < 1 || x > 999) || new Set(names).size !== names.length) throw E.bad('Номера мишеней: до 64 разных чисел 1–999', 'names');
+        bd.n = names.length;
+        // номера 1…n подряд — обычный случай, отдельный список не нужен
+        if (names.every((x, k) => x === k + 1)) delete bd.names; else bd.names = names;
+      } else if (b.n !== undefined) { bd.n = V.int(b.n, 'n', 0, 64); delete bd.names; }
       if (b.board !== undefined) {
+        if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени играм — после старта');
         const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63), no = V.int(b.board, 'board', 1, Math.max(1, bd.n));
         const g = B.gameAt(t, r, i);
         if (!g || B.gameState(t, g).st !== 'ready') throw E.conflict('bad_state', 'Мишень ставится только готовой к игре паре');
@@ -439,7 +456,7 @@ module.exports = async function (app) {
         bd.at[r + ':' + i] = no;
       }
       t.boards = bd.n ? bd : null;
-      if (t.boards) B.assignBoards(t);
+      if (t.boards && t.status !== 'reg') B.assignBoards(t);
       await c.query('UPDATE tournaments SET boards = $2 WHERE id = $1', [t.id, t.boards && JSON.stringify(t.boards)]);
       await bump(c, t.id);
       return tourResp(c, t.id, me);

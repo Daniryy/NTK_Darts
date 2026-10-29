@@ -61,7 +61,8 @@ async function startTourMatch(c, req, me, b, id) {
   const nm = pid => t._ents.find(e => e.player_id === pid).name;
   const starter = b.starter == null ? 0 : V.int(b.starter, 'starter', 0, 1);
   await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
-  await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [tid]);
+  // матч начался — отметки «Готов» этой игры больше не нужны
+  await c.query(`UPDATE tournaments SET version = version + 1, ready = ready - $2 WHERE id = $1`, [tid, r + ':' + i]);
   forget('t', tid);
 }
 
@@ -133,6 +134,36 @@ async function finishMatch(c, m, st, lines, now) {
 }
 
 module.exports = async function (app) {
+  // «Готов» (игрок готовой игры сетки у мишени): { on } — отметиться или снять отметку. Когда готовы оба —
+  // матч начинается сам, счёт ведёт телефон того, кто отметился вторым; ответ { ready: [id], match | null }
+  app.post('/api/tournaments/:id/games/:r/:i/ready', async req => {
+    const me = needPlayer(req), b = req.body || {}, on = b.on == null ? true : V.bool(b.on, 'on');
+    const r = V.int(+req.params.r, 'r', 0, 63), i = V.int(+req.params.i, 'i', 0, 63), key = r + ':' + i;
+    return tx(async c => {
+      const t = await tourOf(c, req.params.id, true);
+      const busy = await one(c, 'SELECT id FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3', [t.id, r, i]);
+      if (busy) throw E.conflict('game_taken', 'Матч уже идёт', { matchId: busy.id });
+      const x = readyPair(t, r, i);
+      if (!x) throw E.conflict('bad_state', 'Эта игра сейчас не готова');
+      if (me.id !== x.a && me.id !== x.b) throw E.forbidden('«Готов» отмечают игроки этой пары');
+      const all = Object.assign({}, t.ready || {}), cur = Object.assign({}, all[key] || {});
+      if (on) cur[me.id] = Date.now(); else delete cur[me.id];
+      // устаревшие отметки (игры, которые уже не готовы) не копятся
+      Object.keys(all).forEach(k => { const [rr, ii] = k.split(':').map(Number); if (!readyPair(t, rr, ii)) delete all[k]; });
+      let match = null;
+      if (cur[x.a] && cur[x.b]) {
+        delete all[key];
+        const id = 'g' + require('node:crypto').randomBytes(10).toString('hex');
+        const nm = pid => t._ents.find(e => e.player_id === pid).name;
+        await insertMatch(c, req, me, { id, tid: t.id, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter: 0, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+        match = matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]), req);
+      } else if (Object.keys(cur).length) all[key] = cur; else delete all[key];
+      await c.query('UPDATE tournaments SET ready = $2, version = version + 1 WHERE id = $1', [t.id, Object.keys(all).length ? JSON.stringify(all) : null]);
+      forget('t', t.id);
+      return { ready: match ? [x.a, x.b] : Object.keys(cur), match };
+    });
+  });
+
   app.put('/api/matches/:id', async (req, reply) => {
     const me = needPlayer(req), id = req.params.id, b = req.body || {};
     if (!ID_RE.test(id)) throw E.bad('id матча: «g» и 10–30 латинских букв или цифр', 'id');
