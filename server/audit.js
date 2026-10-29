@@ -12,9 +12,10 @@ async function audit(c, me, action, target, data) {
 async function loadSettings(c) {
   c = c || pool;
   setRoles((await c.query('SELECT key, name, rank FROM roles')).rows);
-  const st = Object.fromEntries((await c.query(`SELECT key, value FROM settings WHERE key IN ('perms', 'discounts')`)).rows.map(r => [r.key, r.value]));
+  const st = Object.fromEntries((await c.query(`SELECT key, value FROM settings WHERE key IN ('perms', 'discounts', 'sale')`)).rows.map(r => [r.key, r.value]));
   setPerms(st.perms || {});
   require('./plans').setDiscounts(st.discounts || {});
+  require('./plans').setSale(st.sale || {});
 }
 
 module.exports = { audit, loadSettings };

@@ -560,6 +560,11 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .bd { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; border-radius: 5px; background: var(--brass-glow); color: var(--brass); font-weight: 700; letter-spacing: .04em; }
 .pc.path, .gb.path { box-shadow: inset 0 0 0 2px var(--brass); }
 .gb.path { box-shadow: 0 0 0 2px var(--brass); }
+.pc.path { background: color-mix(in srgb, var(--brass) 12%, transparent); }
+/* путь выбран — его матчи мягко вспыхивают, чтобы сразу найти их в сетке */
+.pflash { animation: pflash 1.2s ease-in-out 2; }
+@keyframes pflash { 50% { box-shadow: 0 0 0 4px var(--brass), 0 0 22px color-mix(in srgb, var(--brass) 55%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .pflash { animation: none; } }
 [data-pid].hp .pn { color: var(--brass); }
 .part-h { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 -4px; }
 .part-h b { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -591,7 +596,11 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
 .boards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .boards .num { min-width: 1.6em; text-align: center; font-size: 18px; }
-.boards .bnames { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.boards .bnames { flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.nt-bd { display: flex; gap: 10px; flex-wrap: wrap; }
+.nt-bd label { display: grid; gap: 4px; }
+.nt-bn { flex: 0 0 110px; }
+.nt-bl { flex: 1 1 220px; min-width: 0; }
 .nums { display: grid; gap: 6px; }
 .nrow2 { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .nrow2:last-child { border-bottom: 0; }
@@ -880,6 +889,13 @@ button.banner:hover { border-color: var(--line-bright); }
 .banner img { flex: none; }
 .banner .bn-t span { color: var(--muted); font-size: 13px; }
 .banner .bn-ad { align-self: start; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); opacity: .7; }
+.banner .bn-cta { flex: none; padding: 7px 12px; border-radius: 9px; background: var(--green); color: var(--green-ink); font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px var(--green-glow); }
+.banner.own { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); background: linear-gradient(115deg, color-mix(in srgb, var(--green) 20%, var(--surface)), var(--surface) 75%); }
+.banner.own b { color: var(--fg); }
+@media (max-width: 480px) { .banner { flex-wrap: wrap; } .banner .bn-cta { margin-left: auto; } }
+.bn-desk .banner, .side .banner { flex-wrap: wrap; } .bn-desk .bn-cta, .side .bn-cta { margin-left: 0; }
+.bn-tpl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bn-item .gacts { flex-wrap: wrap; }
 .stag { display: inline-block; min-width: 26px; margin-right: 5px; padding: 0 4px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line); font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: center; letter-spacing: .02em; }
 .pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
 .tchip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--green-ink); background: var(--green); margin-right: 6px; }
@@ -1020,6 +1036,17 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 .plan-save { color: var(--ok, #3ecf8e); font-weight: 600; }
 .plan-disc { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .plan-disc .tchip { font-size: 12.5px; }
+.sale-b { display: flex; justify-content: space-between; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding: 14px 18px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); background: linear-gradient(110deg, color-mix(in srgb, var(--green) 22%, var(--surface)), var(--surface) 70%); }
+.sale-b b { font-family: var(--display); font-size: 24px; letter-spacing: .02em; color: var(--green); }
+.sale-b span { color: var(--fg); font-weight: 500; }
+.plan-pct { color: var(--green); font-weight: 700; }
+.promo-r { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.promo-r .inp { max-width: 220px; min-height: 38px; padding: 7px 12px; text-transform: uppercase; }
+.sale-f { display: flex; gap: 10px; flex-wrap: wrap; }
+.sale-f label { display: grid; gap: 4px; flex: 0 1 150px; min-width: 0; }
+.sale-f label.grow1 { flex: 1 1 200px; }
+.adm-row.dim { opacity: .55; }
+.pn-plans { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .plan-f { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 3px; }
 .plan-ed { display: grid; gap: 8px; }
 .plan-ed .mini, .panel .nrow .mini { white-space: nowrap; }
@@ -1263,6 +1290,22 @@ img.av { object-fit: cover; padding: 0; }
 }
 @media (prefers-reduced-motion: no-preference) { .pill.live i { animation: pulse 1.8s ease-in-out infinite; } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 0%, transparent); } }
+/* ПК: аккуратные анимации при наведении. На телефоне (нет наведения) и при «уменьшить движение» их нет */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn, .mini, .ghost, .chip, .fchip, .pick, .selchip, .seg2 button, .nav button, .icon-btn, .tc, .mc, .trow, .grow, .card.plan, .banner, .tvcall, .adm-row.click, .pc, .gb {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease, color .18s ease, filter .18s ease;
+  }
+  .btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 24px var(--green-glow); }
+  .btn:not(:disabled):active, .mini:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .mini:not(:disabled):not(.on):not(.go):hover, .ghost:not(:disabled):hover, .fchip:not(.on):hover, .chip:not(:disabled):not(.on):hover, .pick:not(.on):hover, .selchip:hover, .icon-btn:hover { border-color: var(--line-bright); color: var(--fg); }
+  .mini.go:not(:disabled):hover { filter: brightness(1.08); box-shadow: 0 4px 14px var(--green-glow); }
+  .tc:hover, .mc[data-act]:hover, .card.plan:hover, .banner:hover { transform: translateY(-2px); border-color: var(--line-bright); box-shadow: 0 12px 30px rgba(0, 0, 0, .32); }
+  .trow.click:hover, .grow[data-act]:hover, .adm-row.click:hover { border-color: var(--line-bright); background: var(--surface2); }
+  .card.plan:hover { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+  /* переход на другую страницу — содержимое мягко проявляется */
+  #app.enter > * { animation: pageIn .26s ease-out; }
+}
+@keyframes pageIn { from { opacity: 0; transform: translateY(6px); } }
 </style>
 </head>
 <body>
@@ -1646,7 +1689,8 @@ function makeSeed() {
   qualTour({ name: 'Открытый чемпионат Петербурга', official: true, org: { name: 'Клуб «Северный дубль»', ver: true }, city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3 }, ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], 25 * MIN);
   const fr = T({ name: 'Дартс и пицца у Анны', official: false, org: { name: 'Анна Мельникова', ver: false }, city: 'Москва', venue: 'Квартирник', start: NOW - 10 * DAY, ltw: 2, cap: 5 });
   bracket(fr, 'pl', ['me', 'p9', 'p12', 'p15', 'p6'], null, 30 * MIN);
-  const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3 });
+  // мишени в зале с разрывами в номерах: игры получают их сами, игрокам пишет «пройдите к мишени 7»
+  const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3, boards: { n: 4, at: {}, names: [3, 4, 7, 8] } });
   bracket(live, 'pl', ALL16, 18, 15 * MIN);
   const rr = T({ name: 'Пятничная лига «Оче-бара»', official: false, org: { name: 'Денис Карпов', ver: false }, city: 'Москва', venue: '«Оче-бар»', start: NOW - 14 * DAY - 3 * HOUR, ltw: 2, cap: 6, format: 'rr' });
   rr.players = ['me', 'p6', 'p9', 'p12', 'p15', 'p4'];
@@ -1689,13 +1733,13 @@ function makeSeed() {
   ndl.games.forEach(g => { if (k < 17 && gameState(ndl, g).st === 'ready') { scoreMatch(ndl, g, ndl.start + 70 * MIN + k * 6 * MIN); k++; } });
   Bracket.assignBoards(ndl);
   // следующий этап: идёт квалификация, часть игроков уже сдала
-  const nq = T({ name: 'Лига NDL · этап 3', official: true, org: NDL_ORG, city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', stage: 'qual', format: 'pl', games: [] });
+  const nq = T({ name: 'Лига NDL · этап 3', official: true, org: NDL_ORG, city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', stage: 'qual', format: 'pl', games: [], boards: { n: 4, at: {} } });
   nq.players = NDL20.filter(id => id !== 'me').concat(['me']);
   nq.qual = { ex: SCORE, tries: 2, res: qualOf(nq.players.slice(0, 12)) };
   return { v: DB_V, players, tournaments: tours, matches };
 }
 
-const DB_V = 5;
+const DB_V = 6;
 let db = null, P = {}, TBY = {}, MBY = {}, RATING = {}, RANK = {};
 // кто «я»: в демо — игрок me, на сервере — вошедший игрок (null без входа)
 let ME = 'me';
@@ -1936,12 +1980,14 @@ const toTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
 const motionOk = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function go(r, fromHash) {
   if (r !== R) {
-    if (r.startsWith('t.')) { S.camEdit = null; S.ttab = null; S.gf = 'all'; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
+    if (r.startsWith('t.')) { S.camEdit = null; S.ttab = null; S.gf = 'all'; S.gst = null; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
     if (r.startsWith('p.')) { S.pMore = false; S.editName = false; }
   }
   // матч уже записан: без этого «отмена» могла бы снять результат после следующих матчей
   if (r !== 'play' && G && G.over === 'match') { G = null; undo = []; S.inGame = false; saveGame(); }
+  const nav = r !== R;
   R = r; closeModals(); render(); toTop();
+  if (nav) { const app = $('app'); if (app) { app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter'); clearTimeout(go.t); go.t = setTimeout(() => app.classList.remove('enter'), 400); } }
   if (!fromHash) try { if (location.hash.slice(1) !== r) location.hash = r; } catch (e) {}
 }
 window.addEventListener('hashchange', () => {
@@ -2445,7 +2491,15 @@ function gamesList(t) {
   const all = t.games.map(g => ({ g, st: gameState(t, g, cx.rv).st })).filter(x => x.st !== 'void' && x.st !== 'bye');
   const pick = k => all.filter(x => k === 'all' || (k === 'ready' ? x.st === 'ready' : x.st === 'done'));
   let h = '<div class="fchips" role="group" aria-label="Фильтр матчей">' + [['ready', 'Можно играть'], ['all', 'Все'], ['done', 'Сыграны']].map(([v, l]) => '<button class="fchip' + (f === v ? ' on' : '') + '" data-act="gf" data-v="' + v + '">' + l + ' <span class="muted">' + pick(v).length + '</span></button>').join('') + '</div>';
-  const list = pick(f);
+  // этапы по порядку: финал отдельно (его не ищут в конце длинного списка), затем круги
+  const last = isBracket(t) ? bRounds(t) - 1 : -1;
+  const isFin = g => g.r === last && (t.format === 'ko' || (t.format === 'pl' && plGroup(t, g.r, g.i).lo === 1));
+  const rounds = [...new Set(all.map(x => x.g.r))].sort((x, y) => x - y);
+  const stages = [['all', 'Все этапы']].concat(all.some(x => isFin(x.g)) ? [['fin', 'Финал']] : [], rounds.length > 1 ? rounds.map(r => ['r' + r, cap1(roundLabel(t, r))]) : []);
+  const gst = stages.some(x => x[0] === S.gst) ? S.gst : 'all';
+  const inStage = x => gst === 'all' || (gst === 'fin' ? isFin(x.g) : x.g.r === +gst.slice(1));
+  if (stages.length > 2) h += '<div class="fchips stg-f" role="group" aria-label="Этап">' + stages.map(([v, l]) => '<button class="fchip' + (gst === v ? ' on' : '') + '" data-act="gst" data-v="' + v + '">' + esc(l) + ' <span class="muted">' + pick(f).filter(x => v === 'all' || (v === 'fin' ? isFin(x.g) : x.g.r === +v.slice(1))).length + '</span></button>').join('') + '</div>';
+  const list = pick(f).filter(inStage);
   if (!list.length) return h + '<div class="note-box">' + (f === 'ready' ? 'Сейчас нет матчей, готовых к игре: ждём результатов предыдущего круга.' : 'Таких матчей пока нет.') + '</div>';
   const rows = xs => '<div class="glist">' + xs.slice().sort((x, y) => num(x.g) - num(y.g)).map(x => gameRow(t, x.g, cx)).join('') + '</div>';
   [...new Set(list.map(x => x.g.r))].forEach(r => {
@@ -2657,8 +2711,7 @@ function stagesView(t, rv) {
 }
 
 /* Мишени: сколько их в зале; готовые матчи получают свободные по порядку номеров */
-// номера мишеней строкой: «1-6», «3, 5, 7», «1-4, 9»
-const boardsTxt = t => { const bd = t.boards; if (!bd || !bd.n) return ''; return bd.names ? bd.names.join(', ') : bd.n === 1 ? '1' : '1-' + bd.n; };
+// свои номера мишеней строкой: «3, 5, 7», «1-4, 9»
 function parseBoards(v) {
   const out = [];
   for (const part of String(v || '').split(/[\s,;]+/).filter(Boolean)) {
@@ -2670,12 +2723,24 @@ function parseBoards(v) {
   }
   return out.length <= 64 ? out : null;
 }
+// мишени из двух полей: сколько (номера 1…N по порядку) и свои номера, если с разрывами; ответ — список или текст ошибки
+function boardsFrom(count, names) {
+  const n = String(count || '').trim() === '' ? null : +String(count).replace(/\D/g, '');
+  if (n != null && !(n >= 0 && n <= 64)) return 'Мишеней — от 0 до 64.';
+  if (String(names || '').trim()) {
+    const list = parseBoards(names);
+    if (!list) return 'Номера мишеней: например 3, 5, 7 или 1-4, 9 (числа до 999).';
+    if (n && list.length !== n) return 'Мишеней указано ' + n + ', а номеров — ' + list.length + '. Поправьте одно из полей.';
+    return list;
+  }
+  return Array.from({ length: n || 0 }, (_, k) => k + 1);
+}
 /* Мишени в зале: сколько их и какие номера. Готовые игры и квалификация (по двое на мишень) получают их сами */
 function boardsCtl(t) {
   if (!(canDo(t, 'org') || canDo(t, 'staff')) || tStatus(t) === 'done') return '';
   const n = t.boards ? t.boards.n : 0;
   return '<div class="boards"><span class="label">Мишени</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button>' +
-    '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(boardsTxt(t)) + '" placeholder="номера: 1-8 или 3, 5, 7" aria-label="Номера мишеней в зале" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить</button>' +
+    '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(t.boards && t.boards.names ? t.boards.names.join(', ') : '') + '" placeholder="' + (n ? 'номера по порядку 1–' + n + ' — или свои: 3, 5, 7' : 'свои номера: 3, 5, 7') + '" aria-label="Номера мишеней, если не по порядку" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить номера</button>' +
     '<span class="meta" style="flex-basis:100%">' + (n ? (t.stage === 'qual' ? 'Квалификация идёт по двое на мишень' : 'Готовые матчи получают свободные мишени') + ' — игрокам приходит, куда пройти.' : 'Укажите мишени — сайт сам разведёт игроков по ним.') + '</span></div>';
 }
 function saveBoards(t, names) {
@@ -2881,7 +2946,7 @@ function newTourView() {
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
     (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
-  h += '<div class="field"><label class="label" for="nt-boards">Мишени в зале</label><input class="inp" id="nt-boards" data-nt="boards" inputmode="numeric" maxlength="120" value="' + esc(nt.boards || '') + '" placeholder="например 1-6 или 3, 5, 7" style="max-width:320px"><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
+  h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — с тарифом «Ведущий».</span><button class="lnk meta" data-act="go" data-v="plans" style="justify-self:start">Тарифы →</button></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
@@ -2911,8 +2976,8 @@ function createTour() {
   const ids = nt.sel.filter(id => P[id]), sm = ntSummary(nt);
   if (!nt.name.trim()) { nt.err = 'Введите название турнира.'; return render(); }
   if (!sm.ok) { nt.err = sm.txt; return render(); }
-  const boards = parseBoards(nt.boards);
-  if (!boards) { nt.err = 'Мишени: например 1-6 или 3, 5, 7 (до 64, числа до 999).'; return render(); }
+  const boards = boardsFrom(nt.bcount, nt.bnames);
+  if (typeof boards === 'string') { nt.err = boards; return render(); }
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
@@ -4384,6 +4449,9 @@ function plansView() {
   const st = svState(e, 'тарифов');
   if (st) return h + st + '</div>';
   const d = e.data, ds = d.discounts, year = !!S.planYear && d.plans.some(p => p.year != null);
+  // промокод: цены по нему приходят с сервера (только тарифы, к которым он подходит)
+  const pr = S.promo && S.promo.code ? S.promo : null, prPlan = id => pr && pr.plans.find(x => x.id === id);
+  if (d.sale) h += '<div class="sale-b"><b>' + esc(d.sale.title) + ' −' + d.sale.pct + '%</b><span>' + (d.sale.until ? 'до ' + new Date(d.sale.until).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'на все тарифы') + '</span></div>';
   const DN = [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']].filter(([k]) => ds[k]);
   h += '<div class="plan-disc"><span class="meta">Скидка за подтверждённое звание:</span>' + DN.map(([k, n]) => '<span class="tchip">' + n + ' −' + ds[k] + '%</span>').join('') + (ME && !(meP().title) ? '<button class="lnk meta" data-act="go" data-v="title">Подтвердить звание</button>' : '') + '</div>';
   if (d.mine.length) h += d.mine.map(s => '<div class="note-box ok">Подключён тариф <b>' + esc(s.plan.name) + '</b>' + (s.year ? ' на год' : '') + ' до ' + new Date(s.ends).toLocaleDateString('ru-RU') + '.</div>').join('');
@@ -4393,15 +4461,17 @@ function plansView() {
     const best = Math.max(0, ...d.plans.filter(p => p.year != null).map(p => Math.round((1 - p.year / (p.price * 12)) * 100)));
     h += '<div class="seg2 plan-per" role="tablist"><button role="tab" aria-selected="' + !year + '" class="' + (year ? '' : 'on') + '" data-act="plan-per" data-v="m">Помесячно</button><button role="tab" aria-selected="' + year + '" class="' + (year ? 'on' : '') + '" data-act="plan-per" data-v="y">На год' + (best ? ' · −' + best + '%' : '') + '</button></div>';
   }
-  h += '<div class="plans">' + d.plans.map(p => {
-    const on = d.mine.some(s => s.plan.id === p.id), y = year && p.year != null;
-    const base = y ? p.year : p.price, fin = y ? p.yearFinal : p.final;
-    const sub = y ? '≈ ' + rub(Math.round(fin / 12)) + ' в месяц' + (p.price * 12 > p.year ? ' · <span class="plan-save">выгода ' + rub(Math.round(p.price * 12 * (100 - p.discount) / 100) - fin) + '</span>' : '') : '';
+  if (ME && !d.request) h += '<div class="promo-r">' + (pr ? '<span class="tchip ok">Промокод ' + esc(pr.code) + ' −' + pr.pct + '%</span><span class="meta">' + (pr.plans.length < d.plans.length ? 'для: ' + esc(pr.plans.map(x => x.name).join(', ')) : 'на все тарифы') + '</span><button class="lnk meta" data-act="promo-off">Убрать</button>'
+    : '<input class="inp" id="promo-in" maxlength="24" placeholder="Промокод" aria-label="Промокод" autocomplete="off" autocapitalize="characters"><button class="mini" data-act="promo-on">Применить</button>') + '</div>';
+  h += '<div class="plans">' + d.plans.map(p0 => {
+    const p = prPlan(p0.id) || p0, on = d.mine.some(s => s.plan.id === p.id), y = year && p.year != null;
+    const base = y ? p.year : p.price, fin = y ? p.yearFinal : p.final, pct = y ? p.yearDiscount : p.discount;
+    const sub = y ? '≈ ' + rub(Math.round(fin / 12)) + ' в месяц' + (p.final * 12 > fin ? ' · <span class="plan-save">выгода ' + rub(p.final * 12 - fin) + '</span>' : '') : '';
     return '<div class="card plan' + (on ? ' on' : '') + '"><div class="plan-h"><b>' + esc(p.name) + '</b>' + (on ? '<span class="tchip">подключён</span>' : '') + '</div>' +
-      '<div class="plan-p">' + (p.discount ? '<s>' + rub(base) + '</s>' : '') + '<b>' + rub(fin) + '</b><span class="meta">/ ' + (y ? 'год' : daysTxt(p.days)) + '</span></div>' +
-      (p.discount || sub ? '<div class="meta">' + (p.discount ? '−' + p.discount + '% · ' + esc(p.why) + (sub ? ' · ' : '') : '') + sub + '</div>' : '') +
+      '<div class="plan-p">' + (fin < base ? '<s>' + rub(base) + '</s>' : '') + '<b>' + rub(fin) + '</b><span class="meta">/ ' + (y ? 'год' : daysTxt(p.days)) + '</span></div>' +
+      (pct || sub ? '<div class="meta">' + (pct ? '<span class="plan-pct">−' + pct + '%</span> · ' + esc(p.why) + (sub ? ' · ' : '') : '') + sub + '</div>' : '') +
       '<ul class="plan-f">' + p.about.split('\n').filter(Boolean).map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' +
-      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + (y ? '|y' : '') + '">' + (on ? 'Продлить' : 'Подключить') + (y ? ' на год' : '') + '</button>') + '</div>';
+      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + '|' + (y ? 'y' : '') + '|' + (prPlan(p.id) ? esc(pr.code) : '') + '">' + (on ? 'Продлить' : 'Подключить') + (y ? ' на год' : '') + '</button>') + '</div>';
   }).join('') + '</div><p class="meta">Онлайн-оплата появится позже. Сейчас после заявки тариф подключает администратор.</p>';
   return h + '</div>';
 }
@@ -4411,14 +4481,36 @@ function planCard() {
   const m = e.data.mine[0];
   return '<div class="card sec"><span class="label">Тариф</span>' + (m ? '<div><b>' + esc(m.plan.name) + '</b> <span class="meta">до ' + new Date(m.ends).toLocaleDateString('ru-RU') + '</span></div>' : e.data.request ? '<p class="meta">Заявка на «' + esc(e.data.request.plan.name) + '» ждёт подключения.</p>' : '<p class="meta">Обычный аккаунт. Тарифы: Pro — статистика и без рекламы, «Ведущий» — турниры от клуба и инструменты клуба.</p>') + '<button class="mini" data-act="go" data-v="plans">Тарифы</button></div>';
 }
+const dateVal = t => { if (!t) return ''; const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+// скидка на открытие и промокоды
+function admSale(d) {
+  const sl = d.sale || { pct: 0, until: null, title: 'Скидка на открытие' }, on = d.saleNow;
+  let h = '<div class="panel"><span class="h2">Скидка на все тарифы</span><span class="meta">' + (on ? 'Действует: −' + sl.pct + '%' + (sl.until ? ' до ' + new Date(sl.until).toLocaleDateString('ru-RU') : ', без срока') : sl.pct && sl.until ? 'Срок кончился ' + new Date(sl.until).toLocaleDateString('ru-RU') : 'Выключена') + '. Цены округляются красиво: −50% → 119 / 1 190 ₽ и 399 / 3 990 ₽. Со скидкой за звание не складывается — игрок получает выгоднейшую.</span>' +
+    '<div class="nrow sale-f"><label><span class="meta">Скидка, %</span><input class="inp" id="sale-pct" inputmode="numeric" maxlength="2" value="' + sl.pct + '"></label><label><span class="meta">До (включительно)</span><input class="inp" id="sale-until" type="date" value="' + dateVal(sl.until) + '"></label><label class="grow1"><span class="meta">Название</span><input class="inp" id="sale-title" maxlength="60" value="' + esc(sl.title) + '"></label></div>' +
+    '<div class="row"><button class="btn sm" data-act="sale-save">Сохранить скидку</button><span class="meta">0% — выключить. Пустая дата — без срока.</span></div></div>';
+  const ps = d.promos || [], now = Date.now();
+  h += '<div class="sec"><span class="label">Промокоды · ' + ps.length + '</span>';
+  if (ps.length) h += '<div class="card" style="padding:4px 14px">' + ps.map(x => {
+    const dead = !x.active || (x.until && x.until <= now) || (x.maxUses && x.used >= x.maxUses);
+    const st = !x.active ? 'выключен' : x.until && x.until <= now ? 'срок кончился' : x.maxUses && x.used >= x.maxUses ? 'исчерпан' : 'действует';
+    return '<div class="adm-row' + (dead ? ' dim' : '') + '"><span class="numb">%</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="promo-copy" data-v="' + esc(x.code) + '" title="Скопировать"><b>' + esc(x.code) + '</b></button> −' + x.pct + '% · ' + st + '</span><span class="meta">' +
+      [x.until ? 'до ' + new Date(x.until).toLocaleDateString('ru-RU') : 'без срока', 'использован ' + x.used + (x.maxUses ? ' из ' + x.maxUses : ''), x.plans ? d.plans.filter(p => x.plans.includes(p.id)).map(p => p.name).join(', ') : 'все тарифы', x.note].filter(Boolean).map(esc).join(' · ') + '</span></div>' +
+      '<div class="gacts"><button class="mini" data-act="promo-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Выключить' : 'Включить') + '</button><button class="mini dng" data-act="promo-del" data-v="' + x.id + '">Удалить</button></div></div>';
+  }).join('') + '</div>';
+  h += '<div class="panel"><span class="h2">Новый промокод</span><div class="nrow sale-f"><label class="grow1"><span class="meta">Код</span><input class="inp" id="pn-code" maxlength="24" placeholder="пусто — придумаем сами" autocapitalize="characters"></label><label><span class="meta">Скидка, %</span><input class="inp" id="pn-pct" inputmode="numeric" maxlength="2" placeholder="20"></label><label><span class="meta">До (включительно)</span><input class="inp" id="pn-until" type="date"></label><label><span class="meta">Сколько раз</span><input class="inp" id="pn-max" inputmode="numeric" maxlength="6" placeholder="без лимита"></label></div>' +
+    '<div class="pn-plans"><span class="meta">Тарифы:</span>' + d.plans.filter(p => p.active).map(p => '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-pnplan="' + p.id + '"> ' + esc(p.name) + '</label>').join('') + '<span class="meta">(ничего не отмечено — все)</span></div>' +
+    '<input class="inp" id="pn-note" maxlength="200" placeholder="Заметка: для кого, откуда (видно только админам)"><button class="btn sm" data-act="promo-add">Создать промокод</button><span class="meta">Скидка промокода — сверху цены со скидкой. Использованным код считается, когда тариф подключили.</span></div></div>';
+  return h;
+}
 // админка: заявки, действующие, подключить вручную; тех. администратор — тарифы и скидки
 function admPlans() {
   const e = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
   const st = svState(e, 'тарифов');
   if (st) return st;
   const d = e.data, tech = Api.perm('plans_edit');
-  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b>' + (r.year ? ' · на год' : '') + '</span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
+  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b>' + (r.year ? ' · на год' : '') + (r.promo ? ' · промокод ' + esc(r.promo) : '') + '</span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
   h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pg-year"> на год — по цене за год, 365 дней</label><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
+  h += admSale(d);
   h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + (s.year ? ' · год' : '') + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
   if (!tech) return h;
   // тарифы и скидки
@@ -5131,25 +5223,55 @@ function admStats() {
   return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('Заявки на звания', d.titlesPending || 0, d.titlesPending ? '<button class="lnk" data-act="adm-tab" data-v="titles">проверить</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
 }
 const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', tv: 'Табло' };
+// страницы сайта, куда может вести баннер
+const BN_PAGES = [['#plans', 'Тарифы'], ['#tours', 'Турниры'], ['#play', 'Играть'], ['#rating', 'Рейтинг'], ['#clubs', 'Клубы'], ['#title', 'Подтвердить звание'], ['#feed', 'Лента'], ['#help', 'Как пользоваться']];
+const bnLinkName = l => !l ? 'без ссылки' : l[0] === '#' ? 'страница «' + ((BN_PAGES.find(x => x[0] === l) || [])[1] || l) + '»' : l.replace(/^https?:\/\//, '').slice(0, 40);
+// готовые баннеры: скидка на тарифы — с текущими процентом, ценами и сроком
+function bnTemplates() {
+  const pd = (lz('plans', () => Api.get('/api/plans'), 60000).data) || null, sale = pd && pd.sale;
+  const from = role => { const p = pd && pd.plans.find(x => x.role === role); return p ? rub(p.final) : ''; };
+  return [
+    ['sale', '🔥 Скидка на тарифы', sale ? { title: sale.title + ' −' + sale.pct + '%', body: 'Pro — ' + from('plus') + ' в месяц, «Ведущий» — ' + from('host') + (sale.until ? '. До ' + new Date(sale.until).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''), link: '#plans', cta: 'Смотреть тарифы →', ends: sale.until ? dateVal(sale.until) : '' } : null],
+    ['title', '🏅 Скидка за звание', { title: 'МС, МСМК, ЗМС — скидка на тарифы до 90%', body: 'Подтвердите звание документом — скидка применится сама', link: '#title', cta: 'Подтвердить →' }],
+    ['club', '🎯 Клуб в Oche', { title: 'Проводите турниры в своём клубе', body: 'Страница клуба, сетки, табло и спонсоры на экране', link: '#clubs', cta: 'Подробнее →' }],
+    ['play', '🏆 Турниры рядом', { title: 'Открыта запись на турниры', body: 'Выберите турнир и запишитесь в один клик', link: '#tours', cta: 'К турнирам →' }]
+  ].filter(x => x[2]);
+}
 function admBanners() {
   const e = lz('abanners', () => Api.get('/api/admin/banners'));
-  const b = S.bnr || (S.bnr = { place: 'feed', title: '', body: '', link: '', image: '' });
-  let h = '<div class="panel" id="bnr-form"><span class="h2">' + (b.id ? 'Изменить баннер' : 'Новый баннер') + '</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (b.place === v ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '">' + BN_PLACE[v] + '</button>').join('') + '</div>';
-  h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '"><input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link) + '">';
+  const b = S.bnr || (S.bnr = { places: ['feed'], title: '', body: '', link: '', lk: 'page', cta: '', image: '', starts: '', ends: '' });
+  const places = b.id ? [b.place] : b.places, lk = b.lk || (b.link && b.link[0] !== '#' ? 'url' : 'page');
+  let h = '<div class="panel" id="bnr-form"><span class="h2">' + (b.id ? 'Изменить баннер' : 'Новый баннер') + '</span>';
+  if (!b.id) h += '<div class="bn-tpl"><span class="meta">Готовые:</span>' + bnTemplates().map(([k, l]) => '<button class="mini" data-act="bnr-tpl" data-v="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
+  h += '<div class="field"><span class="label">' + (b.id ? 'Где показывать' : 'Где показывать — можно сразу в нескольких местах') + '</span><div class="chips">' + Object.keys(BN_PLACE).map(v => '<button class="chip txt' + (places.includes(v) ? ' on' : '') + '" data-act="bnr-place" data-v="' + v + '" aria-pressed="' + places.includes(v) + '">' + BN_PLACE[v] + '</button>').join('') + '</div></div>';
+  h += '<input class="inp" data-bnr="title" maxlength="80" placeholder="Заголовок" aria-label="Заголовок" value="' + esc(b.title) + '"><input class="inp" data-bnr="body" maxlength="200" placeholder="Текст" aria-label="Текст" value="' + esc(b.body) + '">';
+  h += '<div class="field"><span class="label">Куда ведёт</span><div class="seg2" role="tablist"><button role="tab" class="' + (lk === 'page' ? 'on' : '') + '" data-act="bnr-lk" data-v="page">Страница сайта</button><button role="tab" class="' + (lk === 'url' ? 'on' : '') + '" data-act="bnr-lk" data-v="url">Своя ссылка</button><button role="tab" class="' + (lk === 'none' ? 'on' : '') + '" data-act="bnr-lk" data-v="none">Никуда</button></div>' +
+    (lk === 'page' ? '<div class="chips">' + BN_PAGES.map(([v, l]) => '<button class="chip txt' + (b.link === v ? ' on' : '') + '" data-act="bnr-page" data-v="' + v + '">' + l + '</button>').join('') + '</div>' : lk === 'url' ? '<input class="inp" data-bnr="link" placeholder="Ссылка https://…" aria-label="Ссылка" value="' + esc(b.link && b.link[0] !== '#' ? b.link : '') + '">' : '') + '</div>';
+  if (lk !== 'none') h += '<input class="inp" data-bnr="cta" maxlength="30" placeholder="Текст кнопки, например «Подключить →» (необязательно)" aria-label="Текст кнопки" value="' + esc(b.cta || '') + '">';
   h += '<div class="nrow"><input class="inp" data-bnr="image" placeholder="Картинка: ссылка https://… или загрузите" aria-label="Картинка" value="' + esc(b.image) + '"><label class="mini" style="cursor:pointer">Загрузить<input type="file" id="bnr-file" accept="image/jpeg,image/png,image/webp" hidden></label></div>';
-  if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b), true);
-  h += b.id ? '<div class="row2"><button class="btn sm" data-act="bnr-add">Сохранить</button><button class="btn sm alt" data-act="bnr-cancel">Отмена</button></div></div>' : '<button class="btn sm" data-act="bnr-add">Добавить баннер</button></div>';
+  h += '<div class="nrow sale-f"><label><span class="meta">Показывать с</span><input class="inp" type="date" data-bnr="starts" value="' + esc(b.starts || '') + '"></label><label><span class="meta">по (включительно)</span><input class="inp" type="date" data-bnr="ends" value="' + esc(b.ends || '') + '"></label><span class="meta" style="align-self:end;padding-bottom:10px">пусто — без срока</span></div>';
+  if (b.title || b.image) h += '<span class="label">Так увидят</span>' + bannerBox(Object.assign({ id: '' }, b, { link: lk === 'none' ? '' : b.link }), true);
+  h += b.id ? '<div class="row2"><button class="btn sm" data-act="bnr-add">Сохранить</button><button class="btn sm alt" data-act="bnr-cancel">Отмена</button></div></div>' : '<button class="btn sm" data-act="bnr-add">' + (places.length > 1 ? 'Добавить в ' + places.length + ' места' : 'Добавить баннер') + '</button></div>';
   const st = svState(e, 'баннеров');
   if (st) return h + st;
-  return h + (e.data.banners.length ? e.data.banners.map(x => '<div class="card sec">' + bannerBox(x, true) + '<div class="tstat"><span class="meta">' + BN_PLACE[x.place] + ' · переходов: ' + x.clicks + (x.ends ? ' · до ' + fmtDate(x.ends) : '') + '</span><div class="gacts"><button class="mini" data-act="bnr-edit" data-v="' + x.id + '">Изменить</button><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>').join('') : '<div class="note-box">Баннеров пока нет.</div>');
+  const list = e.data.banners, now = Date.now();
+  return h + (list.length ? list.map(x => {
+    const missing = Object.keys(BN_PLACE).filter(pl => pl !== x.place && !list.some(y => y.place === pl && y.title === x.title && y.body === x.body && y.link === x.link));
+    const when = x.starts && x.starts > now ? 'с ' + fmtDate(x.starts) : x.ends ? (x.ends <= now ? 'срок кончился' : 'до ' + fmtDate(x.ends - 1)) : '';
+    return '<div class="card sec bn-item">' + bannerBox(x, true) + '<div class="tstat"><span class="meta"><b>' + BN_PLACE[x.place] + '</b> · ' + esc(bnLinkName(x.link)) + ' · переходов: ' + x.clicks + (when ? ' · ' + when : '') + '</span><div class="gacts">' +
+      missing.map(pl => '<button class="mini" data-act="bnr-copy" data-v="' + x.id + '|' + pl + '" title="Такой же баннер — ещё и здесь">+ ' + BN_PLACE[pl] + '</button>').join('') +
+      '<button class="mini" data-act="bnr-edit" data-v="' + x.id + '">Изменить</button><button class="mini' + (x.active ? ' go' : '') + '" data-act="bnr-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Показывается' : 'Выключен') + '</button><button class="ghost sm dng" data-act="bnr-del" data-v="' + x.id + '">Удалить</button></div></div></div>';
+  }).join('') : '<div class="note-box">Баннеров пока нет. Начните с готового — например, «Скидка на тарифы».</div>');
 }
 
 /* Баннеры: лента, страница турнира, табло. Переход считается на сервере. */
 const BANNERS = {};
 function bannerBox(b, preview) {
   BANNERS[b.id] = b;
-  const tag = b.link && !preview ? 'button' : 'div';
-  return '<' + tag + ' class="banner"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span><span class="bn-ad">реклама</span></' + tag + '>';
+  const tag = b.link && !preview ? 'button' : 'div', own = b.link && b.link[0] === '#';
+  // свои страницы (тарифы, турниры) — без пометки «реклама», с кнопкой
+  return '<' + tag + ' class="banner' + (own ? ' own' : '') + '"' + (tag === 'button' ? ' data-act="banner" data-v="' + esc(b.id) + '"' : '') + '>' + (b.image ? '<img src="' + esc(b.image) + '" alt="" loading="lazy">' : '') + '<span class="bn-t">' + (b.title ? '<b>' + esc(b.title) + '</b>' : '') + (b.body ? '<span>' + esc(b.body) + '</span>' : '') + '</span>' +
+    (b.cta && b.link ? '<span class="bn-cta">' + esc(b.cta) + '</span>' : '') + (own ? '' : '<span class="bn-ad">реклама</span>') + '</' + tag + '>';
 }
 // tid — турнир: у клуба с тарифом «Ведущий» там его спонсоры
 function bannerHTML(place, tid) {
@@ -5890,9 +6012,11 @@ document.addEventListener('click', e => {
     case 'gready': gameReady(v); break;
     case 'notify-on': try { Notification.requestPermission().then(() => render()); } catch (e) {} break;
     case 'bnames': {
-      const t = TBY[v], names = parseBoards(($('bn-' + v) || {}).value);
+      const t = TBY[v], raw = (($('bn-' + v) || {}).value || '').trim();
       if (!t) break;
-      if (!names) { toast('Номера мишеней: например 1-8 или 3, 5, 7 (до 64, числа до 999)'); break; }
+      // пусто — номера по порядку 1…N (сколько мишеней сейчас)
+      const names = raw ? parseBoards(raw) : Array.from({ length: t.boards ? t.boards.n : 0 }, (_, k) => k + 1);
+      if (!names) { toast('Номера мишеней: например 3, 5, 7 или 1-4, 9 (до 64, числа до 999)'); break; }
       saveBoards(t, names);
       break;
     }
@@ -6042,7 +6166,33 @@ document.addEventListener('click', e => {
     }
     case 'paid': { const [tid, pid2, on] = v.split('|'); svDo(Api.patch('/api/tournaments/' + tid + '/paid', { playerId: pid2, paid: on === '1' }), svTourSet); break; }
     case 'plan-per': S.planYear = v === 'y'; render(); break;
-    case 'plan-req': { const [pid, y] = v.split('|'); svDo(Api.post('/api/plans/' + pid + '/request', y ? { year: true } : {}), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф' + (y ? ' на год' : '') + '.'); }); break; }
+    case 'plan-req': {
+      const [pid, y, code] = v.split('|'), body = Object.assign(y ? { year: true } : {}, code ? { promo: code } : {});
+      svDo(Api.post('/api/plans/' + pid + '/request', body), () => { S.promo = null; svStale('plans'); toast('Заявка отправлена — администратор подключит тариф' + (y ? ' на год' : '') + '.'); });
+      break;
+    }
+    case 'promo-on': {
+      const code = (($('promo-in') || {}).value || '').trim();
+      if (!code) { toast('Введите промокод.'); break; }
+      svDo(Api.get('/api/plans/promo?code=' + encodeURIComponent(code)), r => { S.promo = Object.assign({}, r.promo, { plans: r.plans }); toast('Промокод применён: −' + r.promo.pct + '%.'); });
+      break;
+    }
+    case 'promo-off': S.promo = null; render(); break;
+    case 'sale-save': {
+      const g = k => ($('sale-' + k) || {}).value || '', until = g('until') ? new Date(g('until') + 'T23:59:59').getTime() : null;
+      svDo(Api.put('/api/admin/sale', { pct: +g('pct').replace(/\D/g, '') || 0, until, title: g('title').trim() }), () => { svStale('aplans'); svStale('plans'); toast('Скидка сохранена.'); });
+      break;
+    }
+    case 'promo-add': {
+      const g = k => (($('pn-' + k) || {}).value || '').trim(), plans = [...document.querySelectorAll('[data-pnplan]:checked')].map(x => x.dataset.pnplan);
+      const body = { code: g('code'), pct: +g('pct').replace(/\D/g, ''), until: g('until') ? new Date(g('until') + 'T23:59:59').getTime() : null, maxUses: g('max') ? +g('max').replace(/\D/g, '') : null, plans: plans.length ? plans : null, note: g('note') };
+      if (!(body.pct >= 1 && body.pct <= 90)) { toast('Скидка промокода — от 1 до 90%.'); break; }
+      svDo(Api.post('/api/admin/promos', body), r => { svStale('aplans'); toast('Промокод ' + r.promo.code + ' создан.'); });
+      break;
+    }
+    case 'promo-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/promos/' + id, { active: on === '1' }), () => svStale('aplans')); break; }
+    case 'promo-del': if (confirm('Удалить промокод?')) svDo(Api.del('/api/admin/promos/' + v), () => { svStale('aplans'); toast('Промокод удалён.'); }); break;
+    case 'promo-copy': copyText(v, 'Промокод скопирован.'); break;
     case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
     case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
     case 'plan-rej': {
@@ -6180,23 +6330,41 @@ document.addEventListener('click', e => {
       break;
     }
     case 'club-host-rm': { const [cid, pid2] = v.split('|'); svDo(Api.del('/api/admin/clubs/' + cid + '/hosts/' + pid2), () => { svStale('aclubs:'); toast('Ведущий убран.'); }); break; }
-    case 'bnr-place': S.bnr.place = v; render(); break;
+    case 'bnr-place': {
+      const b = S.bnr;
+      if (b.id) b.place = v;
+      else { b.places = b.places.includes(v) ? b.places.filter(x => x !== v) : b.places.concat(v); if (!b.places.length) b.places = [v]; }
+      render(); break;
+    }
+    case 'bnr-lk': S.bnr.lk = v; if (v === 'page' && !(S.bnr.link || '').startsWith('#')) S.bnr.link = '#plans'; if (v === 'url' && (S.bnr.link || '').startsWith('#')) S.bnr.link = ''; render(); break;
+    case 'bnr-page': S.bnr.link = v; S.bnr.lk = 'page'; render(); break;
+    case 'bnr-tpl': { const tp = bnTemplates().find(x => x[0] === v); if (tp) { Object.assign(S.bnr, tp[2], { lk: 'page' }); if (v === 'sale') S.bnr.places = Object.keys(BN_PLACE); render(); } break; }
+    case 'bnr-copy': { const [id, pl] = v.split('|'); svDo(Api.post('/api/admin/banners/' + id + '/copy', { places: [pl] }), () => { svStale('abanners'); svStale('banners:'); toast('Баннер добавлен: ' + BN_PLACE[pl] + '.'); }); break; }
     case 'bnr-add': {
-      const b = S.bnr, body = { place: b.place, title: b.title.trim(), body: b.body.trim(), link: b.link.trim() || null, image: b.image.trim() || null };
-      svDo(b.id ? Api.patch('/api/admin/banners/' + b.id, body) : Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast(b.id ? 'Баннер сохранён.' : 'Баннер добавлен.'); });
+      const b = S.bnr, lk = b.lk || (b.link && b.link[0] !== '#' ? 'url' : 'page'), day = v2 => v2 ? new Date(v2 + 'T00:00:00').getTime() : null;
+      const body = { title: b.title.trim(), body: b.body.trim(), link: lk === 'none' ? null : (b.link || '').trim() || null, cta: lk === 'none' ? null : (b.cta || '').trim() || null, image: b.image.trim() || null, starts: day(b.starts), ends: b.ends ? day(b.ends) + 864e5 : null };
+      if (b.id) body.place = b.place; else body.places = b.places;
+      svDo(b.id ? Api.patch('/api/admin/banners/' + b.id, body) : Api.post('/api/admin/banners', body), () => { S.bnr = null; svStale('abanners'); svStale('banners:'); toast(b.id ? 'Баннер сохранён.' : body.places.length > 1 ? 'Баннер добавлен в ' + body.places.length + ' места.' : 'Баннер добавлен.'); });
       break;
     }
     case 'bnr-edit': {
       const e = SVC.abanners, x = e && e.data && e.data.banners.find(y => String(y.id) === v);
       if (!x) break;
-      S.bnr = { id: x.id, place: x.place, title: x.title || '', body: x.body || '', link: x.link || '', image: x.image || '' };
+      S.bnr = { id: x.id, place: x.place, title: x.title || '', body: x.body || '', link: x.link || '', lk: !x.link ? 'none' : x.link[0] === '#' ? 'page' : 'url', cta: x.cta || '', image: x.image || '', starts: x.starts ? dateVal(x.starts) : '', ends: x.ends ? dateVal(x.ends - 1) : '' };
       render(); const f = $('bnr-form'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
       break;
     }
     case 'bnr-cancel': S.bnr = null; render(); break;
     case 'bnr-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/banners/' + id, { active: on === '1' }), () => { svStale('abanners'); svStale('banners:'); }); break; }
     case 'bnr-del': svDo(Api.del('/api/admin/banners/' + v), () => { svStale('abanners'); svStale('banners:'); toast('Баннер удалён.'); }); break;
-    case 'banner': { const b = BANNERS[v]; if (b && b.link) { Api.post('/api/banners/' + v + '/click').catch(() => {}); window.open(b.link, '_blank', 'noopener'); } break; }
+    case 'banner': {
+      const b = BANNERS[v];
+      if (!b || !b.link) break;
+      Api.post('/api/banners/' + v + '/click').catch(() => {});
+      // своя страница — переход внутри сайта, чужая — в новой вкладке
+      if (b.link[0] === '#') { const r = b.link.slice(1); if (validRoute(r)) go(r); } else window.open(b.link, '_blank', 'noopener');
+      break;
+    }
     case 'nt-club': if (S.nt) { S.nt.club = v; render(); } break;
     case 'nt-feeon': if (S.nt) { S.nt.feeOn = v === '1'; render(); } break;
     case 't-labels': {
@@ -6227,6 +6395,7 @@ document.addEventListener('click', e => {
     case 'tf': S.tf = v; render(); break;
     case 'ttab': S.ttab = v; render(); break;
     case 'gf': S.gf = v; render(); break;
+    case 'gst': S.gst = v; render(); break;
     case 'ready-games': S.ttab = 'games'; S.gf = 'ready'; render(); break;
     case 'jump': { const el = $(v); if (el) el.scrollIntoView({ behavior: motionOk() ? 'smooth' : 'instant', block: 'start' }); break; }
     case 'join': {
@@ -6413,7 +6582,6 @@ document.addEventListener('input', e => {
     const [tid, id] = t.dataset.num.split('|'), n = +t.value;
     if (Number.isInteger(n) && n >= 1 && n <= 999) setNum(tid, id, n);
   }
-  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); }
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
@@ -6440,6 +6608,8 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset && t.dataset.rregion) { S.rregion = t.value; S.rpage = 0; render(); return; }
+  // путь игрока: подсветить и прокрутить сетку к его последнему матчу
+  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); if (S.hp) showPath(S.hp); return; }
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
     svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + roleName(role) + '.'); });
@@ -6507,6 +6677,14 @@ document.addEventListener('keydown', e => {
   }
 });
 
+function showPath(id) {
+  const els = [...document.querySelectorAll('.bk [data-pids~="' + id + '"], .pg [data-pids~="' + id + '"]')];
+  if (!els.length) return;
+  // самый дальний круг игрока — последний в разметке (колонки идут по кругам)
+  els[els.length - 1].scrollIntoView({ behavior: motionOk() ? 'smooth' : 'auto', block: 'center', inline: 'center' });
+  els.forEach(el => { el.classList.remove('pflash'); void el.offsetWidth; el.classList.add('pflash'); });
+  setTimeout(() => els.forEach(el => el.classList.remove('pflash')), 2400);
+}
 function hoverPath(id, on) {
   document.querySelectorAll('[data-pids~="' + id + '"]').forEach(el => el.classList.toggle('path', on || el.dataset.pids.split(' ').includes(S.hp || '')));
   document.querySelectorAll('[data-pid="' + id + '"]').forEach(el => el.classList.toggle('hp', on));

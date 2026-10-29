@@ -252,17 +252,24 @@
 
 Скидка за подтверждённое звание (`settings.discounts`, меняет тех. администратор), у каждого звания своя: `zms` — ЗМС (по умолчанию 90%), `msmk` — МСМК (70%), `ms` — МС (40%), `kms` — КМС (10%), `r1` — 1 разряд (по умолчанию без скидки). Цена округляется до рубля. Скидка действует и на оплату за год.
 
-**Plan:** `{ id, name, price, days, role, about, active, sort, discount, why, final, year, yearFinal }` — `final` цена со скидкой текущего игрока, `why` — за что скидка; `year` — цена за год (`null` — только помесячно), `yearFinal` — она же со скидкой.
+**Скидка на все тарифы** (`settings.sale`: `{ pct, until, title }`, например «Скидка на открытие» −50%) — пока не кончился срок. Цена со скидкой округляется красиво: до тысячи — на …9, от тысячи — на …90 (−50%: 249 → 119, 2490 → 1190, 799 → 399, 7990 → 3990). Со скидкой за звание не складывается: игрок получает выгоднейшую из двух.
+
+**Промокоды** — процент сверху получившейся цены, срок, лимит использований, на какие тарифы (`null` — на все). Использованным код считается, когда тариф подключили по заявке с ним. Заявка помнит цену, которую видел игрок: администратор подключает по ней, даже если скидка уже кончилась.
+
+**Plan:** `{ id, name, price, days, role, about, active, sort, discount, why, final, year, yearFinal, yearDiscount }` — `final` цена со скидкой текущего игрока, `discount` — итоговая скидка, %, `why` — за что; `year` — цена за год (`null` — только помесячно), `yearFinal` и `yearDiscount` — то же за год.
 **Sub:** `{ id, player?, plan: { id, name, price, days }, year, status: requested | active | ended | rejected | cancelled, price, discount, starts, ends, note, created, by }` — `year: true` — на год (365 дней по цене за год).
 
 ### `GET /api/roles`
 `{ roles: [{ key, name, rank, builtin }] }` — для значков и списков ролей.
 
 ### `GET /api/plans`
-`{ plans: [Plan], mine: [Sub], request: Sub | null, discounts }` — тарифы с моей скидкой, мои действующие, моя заявка.
+`{ plans: [Plan], mine: [Sub], request: Sub | null, discounts, sale: { pct, until, title } | null }` — тарифы с моей скидкой, мои действующие, моя заявка, действующая скидка на все тарифы.
+
+### `GET /api/plans/promo?code=` — нужен вход
+Проверить промокод: `{ promo: { code, pct, until, plans }, plans: [Plan] }` — тарифы, к которым он подходит, с ценой по нему. `404` — нет такого или выключен, `409 promo_expired | promo_used`.
 
 ### `POST /api/plans/:id/request` — нужен вход
-`{ note?, year? }` — `year: true` — на год. Ответ `201 { request: Sub }`; `409` — заявка уже есть, `400` — у тарифа нет оплаты за год.
+`{ note?, year?, promo? }` — `year: true` — на год, `promo` — промокод (`409 promo_plan` — не для этого тарифа). Ответ `201 { request: Sub }`; `409` — заявка уже есть, `400` — у тарифа нет оплаты за год.
 
 ### `DELETE /api/plans/requests/:id`
 Отозвать свою заявку.
@@ -284,6 +291,14 @@
 
 ### `POST /api/admin/plans`, `PATCH /api/admin/plans/:id` — тех. администратор
 `{ name, price, days, role, about, yearPrice?, active?, sort? }` — `yearPrice` — цена за год (`null` — только помесячно); роль тарифа — не выше ранга 1.
+
+### `PUT /api/admin/sale` — право `plans`
+`{ pct: 0–90, until: время | null, title }` — скидка на все тарифы; `0` — выключить, `until: null` — без срока.
+
+### Промокоды — право `plans`
+- `GET /api/admin/plans` отдаёт и `sale`, `saleNow`, `promos: [{ id, code, pct, until, maxUses, used, plans, active, note, created }]`;
+- `POST /api/admin/promos` — `{ code?, pct 1–90, until?, maxUses?, plans?: [id], note? }`; без `code` — придумаем (`OCHE…`); код — буквы, цифры, `-`, `_`, хранится заглавными;
+- `PATCH /api/admin/promos/:id` — `{ active, pct, until, maxUses, note }`; `DELETE /api/admin/promos/:id`.
 
 ### `PUT /api/admin/discounts` — тех. администратор
 `{ zms, msmk, ms, kms, r1 }`, 0–90 (не указанное — 0).
@@ -376,13 +391,18 @@
 Реклама в ленте (`feed`), на странице турнира (`tour`) и на табло (`tv`). Ведёт тех. администратор.
 
 ### `GET /api/banners?place=feed`
-Действующие сейчас (включены, `starts` ≤ сейчас < `ends`), до 5: `{ "banners": [{ "id", "place", "title", "body", "image", "link" }] }`. С правом `pro` в ленте и на странице турнира — пусто (без рекламы); табло (`tv`) — для всех.
+Действующие сейчас (включены, `starts` ≤ сейчас < `ends`), до 5: `{ "banners": [{ "id", "place", "title", "body", "image", "link", "cta" }] }`. С правом `pro` в ленте и на странице турнира — пусто (без рекламы); табло (`tv`) — для всех.
 
 ### `POST /api/banners/:id/click`
 Переход по баннеру — страница шлёт перед открытием ссылки. Ответ `{ "ok": true }`.
 
 ### `GET /api/admin/banners`, `POST /api/admin/banners`, `PATCH /api/admin/banners/:id`, `DELETE /api/admin/banners/:id` — тех. администратор
-Поля: `place`, `title` (до 80), `body` (до 200), `image` (`/uploads/…` или `https://`), `link` (`https://`), `active`, `starts`, `ends`; в списке ещё `clicks`. Нужен заголовок или картинка. Удаление убирает и загруженную картинку.
+Поля: `place`, `title` (до 80), `body` (до 200), `image` (`/uploads/…` или `https://`), `link` (`https://` или страница сайта `#plans`, `#tours`, `#t.t12`…), `cta` — текст кнопки (до 30), `active`, `starts`, `ends`; в списке ещё `clicks`. Нужен заголовок или картинка. Удаление убирает загруженную картинку, если её не использует другой баннер.
+
+`POST` принимает и `places: ["feed", "tour", "tv"]` вместо `place` — один и тот же баннер сразу на несколько мест; ответ `{ banner, banners }`.
+
+### `POST /api/admin/banners/:id/copy` — тех. администратор
+`{ "places": ["tv"] }` — копия баннера (текст, картинка, ссылка, кнопка, срок) на другие места. Ответ `201 { banners }`.
 
 ---
 

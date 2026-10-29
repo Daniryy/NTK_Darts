@@ -25,6 +25,32 @@ function discountFor(title) {
 }
 const priceWith = (price, pct) => Math.round(price * (100 - pct) / 100);
 
+// скидка на открытие: { pct, until, title } — общая на все тарифы, пока не кончился срок
+let sale = { pct: 0, until: null, title: 'Скидка на открытие' };
+function setSale(v) {
+  const o = v || {};
+  sale = { pct: Number.isInteger(o.pct) ? Math.max(0, Math.min(90, o.pct)) : 0, until: Number.isFinite(o.until) ? o.until : null, title: typeof o.title === 'string' && o.title.trim() ? o.title.trim().slice(0, 60) : 'Скидка на открытие' };
+  return getSale();
+}
+const getSale = () => Object.assign({}, sale);
+const saleNow = now => sale.pct > 0 && (sale.until == null || sale.until > (now || Date.now())) ? sale : null;
+// красивая цена со скидкой: до тысячи — на …9 (124,5 → 119, 399,5 → 399), от тысячи — на …90 (1245 → 1190, 3995 → 3990)
+function nicePrice(v) {
+  if (v < 10) return Math.max(0, Math.round(v));
+  if (v < 1000) return Math.floor((v + 1) / 10) * 10 - 1;
+  return Math.floor((v + 10) / 100) * 100 - 10;
+}
+// цена тарифа для игрока: из скидки на открытие и скидки за звание — выгоднейшая (не складываются), промокод — сверху.
+// Ответ { price, base, pct (итоговая скидка от base), why }
+function priceFor(plan, title, year, promo, now) {
+  const base = year ? plan.year_price : plan.price, t = discountFor(title || ''), s = saleNow(now);
+  const byTitle = priceWith(base, t.pct), bySale = s ? Math.min(base, nicePrice(base * (100 - s.pct) / 100)) : base;
+  let price = byTitle, why = t.why;
+  if (s && bySale <= byTitle) { price = bySale; why = s.title.toLowerCase(); }
+  if (promo) { price = priceWith(price, promo.pct); why = (why ? why + ' + ' : '') + 'промокод ' + promo.code; }
+  return { price, base, pct: base ? Math.round((1 - price / base) * 100) : 0, why };
+}
+
 // выставить роль игрока по тарифам (кроме администраторов). Клуб роль не даёт: инструменты ведущего — по тарифу.
 // Основа — роль, выданная вручную (base_role); тариф её повышает,
 // а роль того же ранга (например «Игрок+» у ведущего) не заменяет: ведущий остаётся ведущим.
@@ -48,4 +74,4 @@ async function sweepPlans(c) {
   return done.length;
 }
 
-module.exports = { DISC_KEYS, setDiscounts, getDiscounts, discountFor, priceWith, syncPlanRole, sweepPlans };
+module.exports = { DISC_KEYS, setDiscounts, getDiscounts, discountFor, priceWith, setSale, getSale, saleNow, nicePrice, priceFor, syncPlanRole, sweepPlans };
