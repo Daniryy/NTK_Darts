@@ -130,6 +130,12 @@ module.exports = async function (app) {
     return { total, tournaments: (await T.loadTours(pool, rows)).map(t => T.tourCard(t, me)) };
   });
 
+  // время турнира: сколько идёт, матчи, квалификация, игроки — среднее время на подход
+  app.get('/api/tournaments/:id/time', async req => {
+    const t = await one(pool, 'SELECT id, status FROM tournaments WHERE id = $1', [String(req.params.id)]);
+    if (!t) throw E.notFound('Турнир не найден');
+    return require('../timing').tourTimes(pool, t);
+  });
   app.get('/api/tournaments/:id', async (req, reply) => {
     const id = req.params.id, since = req.query.since == null ? null : +req.query.since;
     if (since != null && !(Number.isInteger(since) && since >= 0)) throw E.bad('since: целое число', 'since');
