@@ -4,6 +4,7 @@ const Games = require('../shared/games.js');
 const { all, one } = require('./db');
 const { activeVisits } = require('./darts');
 const { matchCards } = require('./cards');
+const { TRUSTED } = require('./stats');
 
 const DAY = 864e5, MAX_MATCHES = 500;
 const PERIODS = { 30: 30, 90: 90, 365: 365, all: 0 };
@@ -79,7 +80,7 @@ async function visitStats(c, lines) {
 // рекорды упражнений за всё время: лучший лег каждого упражнения
 async function records(c, pid) {
   const rows = await all(c, `SELECT l.pts, l.sc, m.ex, m.finished FROM match_lines l JOIN matches m ON m.id = l.match_id
-    WHERE l.player_id = $1 AND m.status = 'done' AND m.ex IS NOT NULL AND m.ex->>'k' <> 'x01'`, [pid]);
+    WHERE l.player_id = $1 AND m.status = 'done' AND m.ex IS NOT NULL AND m.ex->>'k' <> 'x01' AND ${TRUSTED('l', 'm')}`, [pid]);
   const by = new Map();
   rows.forEach(r => {
     const ex = Games.norm(r.ex);
@@ -107,7 +108,7 @@ async function peers(c, pid) {
 }
 
 const LINES_SQL = `SELECT l.*, m.finished, m.w AS mw, m.dbl FROM match_lines l JOIN matches m ON m.id = l.match_id
-  WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND ${X01_SQL} AND l.darts > 0 AND m.finished >= $2 AND m.finished < $3
+  WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND ${X01_SQL} AND l.darts > 0 AND m.finished >= $2 AND m.finished < $3 AND ${TRUSTED('l', 'm')}
   ORDER BY m.finished DESC, m.id LIMIT ${MAX_MATCHES}`;
 
 async function proStats(c, pid, period) {
@@ -147,7 +148,7 @@ async function exportCsv(c, pid) {
     (SELECT string_agg(o.name, ', ' ORDER BY o.idx) FROM match_lines o WHERE o.match_id = m.id AND o.idx <> l.idx) AS opp,
     (SELECT string_agg(o.legs::text, ':' ORDER BY o.idx <> l.idx, o.idx) FROM match_lines o WHERE o.match_id = m.id) AS score
     FROM match_lines l JOIN matches m ON m.id = l.match_id LEFT JOIN tournaments t ON t.id = m.tournament_id
-    WHERE l.player_id = $1 AND m.status = 'done' ORDER BY m.finished DESC, m.id LIMIT 20000`, [pid]);
+    WHERE l.player_id = $1 AND m.status = 'done' AND ${TRUSTED('l', 'm')} ORDER BY m.finished DESC, m.id LIMIT 20000`, [pid]);
   const cell = v => { const s = v == null ? '' : String(v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const num = v => v == null ? '' : String(v).replace('.', ',');
   const head = ['Дата', 'Турнир', 'Игра', 'Соперник', 'Счёт', 'Итог', 'Среднее', 'Первые 9', '180', 'Закрытия', 'Макс. закрытие'];

@@ -2,7 +2,7 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, activeVisits } = require('../darts');
+const { stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, lineStats, activeVisits } = require('../darts');
 const Games = require('../../shared/games.js');
 const { TOUR_SQL, loadTours, readyPair, canScoreGame, isStaff, canClear, refreshTour } = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
@@ -127,8 +127,9 @@ async function finishMatch(c, m, st, lines, now) {
     if (t.stage === 'qual') await c.query(`INSERT INTO qual_results (tournament_id, player_id, try, v, match_id, t) VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (tournament_id, player_id, try) DO NOTHING`, [m.tournament_id, m.q_player, m.q_try, st.legsLog[0].tot[0], m.id, now]);
   } else if (m.tournament_id) {
-    await tourOf(c, m.tournament_id, true);
-    await eloAdd(c, m.players[0].id, m.players[1].id, st.winner === 0);
+    // рейтинг Эло — только официальные и клубные турниры: в своём турнире любой мог бы вписать кого угодно
+    const t = await tourOf(c, m.tournament_id, true);
+    if (t.official) await eloAdd(c, m.players[0].id, m.players[1].id, st.winner === 0);
   }
   await afterResult(c, m.tournament_id, m.players.map(p => p.id), false);
 }
@@ -219,7 +220,7 @@ module.exports = async function (app) {
         } else if (ev.type === 'finish') {
           const st = stateOf(m, visits), err = checkFinish(m, st, ev);
           if (err) throw E.badEvent(err, ev.seq);
-          const lines = ev.pl.map((l, k) => lineOf(m, l, k, st));
+          const calc = lineStats(m, visits), lines = ev.pl.map((l, k) => lineOf(m, l, k, st, calc));
           fin = { st, lines };
           data = { w: ev.w, pl: lines.map(lineJSON) };
           done = true;

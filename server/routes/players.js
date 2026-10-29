@@ -2,8 +2,9 @@
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
+const { atLeast } = require('../roles');
 const { createPlayer, playerShort } = require('../players');
-const { statsJSON } = require('../stats');
+const { statsJSON, TRUSTED } = require('../stats');
 const { matchCards } = require('../cards');
 const { TOUR_SQL, loadTours, tourCard } = require('../tour');
 
@@ -20,9 +21,21 @@ function searchSql(q, arg, alias) {
 
 async function playerMatches(c, id, scope, bef, limit) {
   const ms = await all(c, `SELECT m.* FROM matches m JOIN match_lines l ON l.match_id = m.id AND l.player_id = $1
-    WHERE m.status = 'done' AND m.finished < $2 ${scope === 'tour' ? 'AND m.tournament_id IS NOT NULL' : ''}
+    WHERE m.status = 'done' AND m.finished < $2 AND ${TRUSTED('l', 'm')} ${scope === 'tour' ? 'AND m.tournament_id IS NOT NULL' : ''}
     ORDER BY m.finished DESC, m.id LIMIT ${limit}`, [id, bef]);
   return matchCards(c, ms);
+}
+
+// города и области игроков рейтинга для фильтра: общие для всех запросов, пересчёт раз в минуту
+let geoCache = null;
+async function ratingGeo() {
+  if (geoCache && geoCache.at > Date.now() - 60000) return geoCache;
+  const cityRows = await all(pool, `SELECT city, count(*)::int AS n FROM players WHERE rated > 0 AND city <> '' GROUP BY city ORDER BY city`);
+  // области, где есть игроки в рейтинге; по убыванию числа игроков
+  const regs = new Map();
+  cityRows.forEach(x => { const r = R.regionOf(x.city); if (r) regs.set(r, (regs.get(r) || 0) + x.n); });
+  geoCache = { at: Date.now(), cities: cityRows.map(x => x.city), regions: [...regs].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([name, n]) => ({ name, n })) };
+  return geoCache;
 }
 
 module.exports = async function (app) {
@@ -38,7 +51,11 @@ module.exports = async function (app) {
     const name = V.str(b.name, 'name', 2, 32), city = b.city == null ? me.city : V.optStr(b.city, 'city', 40);
     const p = await tx(async c => {
       const same = await one(c, 'SELECT * FROM players WHERE owner_id = $1 AND vk_id IS NULL AND lower(name) = lower($2)', [me.id, name]);
-      return same || createPlayer(c, { name, city, owner_id: me.id });
+      if (same) return same;
+      // квота от засорения: игроку 100 новых гостей в сутки, ведущему и выше — 1000
+      const day = await one(c, 'SELECT count(*)::int AS n FROM players WHERE owner_id = $1 AND created_at > $2', [me.id, Date.now() - 864e5]);
+      if (day.n >= (atLeast(me, 'host') ? 1000 : 100)) throw E.quota('Слишком много новых игроков за сутки — продолжите завтра');
+      return createPlayer(c, { name, city, owner_id: me.id });
     });
     return { player: playerShort(p) };
   });
@@ -50,7 +67,7 @@ module.exports = async function (app) {
     const rank = p.rated > 0 ? (await one(pool, 'SELECT count(*) + 1 AS n FROM players WHERE rated > 0 AND rating > $1', [p.rating])).n : null;
     // лучшее среднее за матч x01 (от 9 дротиков) — для достижений
     const best = await one(pool, `SELECT max(l.pts::float8 / l.darts * 3) AS a FROM match_lines l JOIN matches m ON m.id = l.match_id
-      WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND (m.ex IS NULL OR m.ex->>'k' = 'x01') AND l.darts >= 9`, [p.id]);
+      WHERE l.player_id = $1 AND m.status = 'done' AND m.q_player IS NULL AND (m.ex IS NULL OR m.ex->>'k' = 'x01') AND l.darts >= 9 AND ${TRUSTED('l', 'm')}`, [p.id]);
     const tours = await all(pool, `SELECT t.id, t.name, t.start, t.status, t.format, e.place_lo, e.place_hi FROM entries e
       JOIN tournaments t ON t.id = e.tournament_id WHERE e.player_id = $1 ORDER BY t.start DESC LIMIT 100`, [p.id]);
     return {
@@ -87,12 +104,9 @@ module.exports = async function (app) {
     const total = (await one(pool, 'SELECT count(*) AS n' + from, args)).n;
     const rows = await all(pool, `SELECT p.id, p.name, p.city, p.club, p.photo, p.rating, p.rated, ${avg} AS avg` + from +
       ` ORDER BY ${sort === 'avg' ? avg + ' DESC, p.rating DESC' : 'p.rating DESC'}, p.id LIMIT ${limit} OFFSET ${offset}`, args);
-    const cityRows = await all(pool, `SELECT city, count(*)::int AS n FROM players WHERE rated > 0 AND city <> '' GROUP BY city ORDER BY city`);
-    // области, где есть игроки в рейтинге, — для фильтра; по убыванию числа игроков
-    const regs = new Map();
-    cityRows.forEach(x => { const r = R.regionOf(x.city); if (r) regs.set(r, (regs.get(r) || 0) + x.n); });
+    const geo = await ratingGeo();
     return {
-      total, cities: cityRows.map(x => x.city), regions: [...regs].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([name, n]) => ({ name, n })),
+      total, cities: geo.cities, regions: geo.regions,
       rows: rows.map((x, k) => ({ rank: offset + k + 1, id: x.id, name: x.name, city: x.city, region: R.regionOf(x.city), club: x.club, photo: x.photo || null, r: Math.round(x.rating), avg: Math.round(x.avg * 10) / 10, n: x.rated }))
     };
   });
@@ -100,7 +114,9 @@ module.exports = async function (app) {
   app.get('/api/feed', async req => {
     const q = req.query, scope = q.scope == null ? 'all' : V.oneOf(q.scope, 'scope', ['all', 'my']);
     const me = scope === 'my' ? needPlayer(req) : null, bef = before(q.before), limit = lim(q.limit, 30, 50);
+    // в ленте — только матчи, засчитанные всем их игрокам (чужой дружеский матч от имени игрока не показываем)
     const ms = await all(pool, `SELECT m.* FROM matches m WHERE m.status = 'done' AND m.q_player IS NULL AND m.finished < $1
+      AND NOT EXISTS (SELECT 1 FROM match_lines l2 WHERE l2.match_id = m.id AND l2.player_id IS NOT NULL AND NOT ${TRUSTED('l2', 'm')})
       ${me ? 'AND EXISTS (SELECT 1 FROM match_lines l WHERE l.match_id = m.id AND l.player_id = $2)' : ''}
       ORDER BY m.finished DESC, m.id LIMIT ${limit}`, me ? [bef, me.id] : [bef]);
     // турнир в ленте — сразу после последнего матча, как на странице

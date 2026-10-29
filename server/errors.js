@@ -14,6 +14,7 @@ const E = {
   notFound: (message) => new ApiError(404, 'not_found', message || 'Не найдено'),
   conflict: (code, message, extra) => new ApiError(409, code, message, extra),
   badEvent: (message, seq) => new ApiError(422, 'bad_event', message, { seq }),
+  quota: (message) => new ApiError(429, 'quota', message),
   locked: (by, until) => new ApiError(423, 'locked', 'Матч ведёт другое устройство', { by, until })
 };
 

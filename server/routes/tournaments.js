@@ -5,7 +5,7 @@ const Games = require('../../shared/games.js');
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer } = require('../auth');
-const { can } = require('../roles');
+const { can, atLeast } = require('../roles');
 const T = require('../tour');
 const { eloAdd, eloAll, refreshStats } = require('../stats');
 const { matchCards } = require('../cards');
@@ -144,6 +144,9 @@ module.exports = async function (app) {
   app.post('/api/tournaments', async (req, reply) => {
     const me = needPlayer(req), b = req.body || {};
     if (!can(me, 'create_tour')) throw E.forbidden('Создавать турниры вам не разрешено — обратитесь к администратору');
+    // квота от засорения: игроку 20 турниров в сутки, ведущему и выше — 200
+    const day = await one(pool, 'SELECT count(*)::int AS n FROM tournaments WHERE owner_id = $1 AND created_at > $2', [me.id, Date.now() - 864e5]);
+    if (day.n >= (atLeast(me, 'host') ? 200 : 20)) throw E.quota('Слишком много турниров за сутки — продолжите завтра');
     const f = tourFields(b, true, me);
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
@@ -323,7 +326,8 @@ module.exports = async function (app) {
       if (busy) throw E.conflict('game_taken', 'Этот матч уже ведётся или сыгран', { matchId: busy.id });
       const x = T.readyPair(t, r, i);
       if (!x) throw E.conflict('bad_state', 'Счёт этого матча сейчас внести нельзя');
-      if (!T.canScoreGame(t, me, x.a, x.b)) throw E.forbidden('Вносить счёт может организатор или игрок этой пары');
+      // итог без бросков меняет рейтинг — вносит только команда турнира; игроки пары играют матч в счётчике
+      if (!T.isStaff(t, me)) throw E.forbidden('Итог без игры вносит организатор турнира — сыграйте матч в счётчике');
       const la = V.int(b.la, 'la', 0, t.ltw), lb = V.int(b.lb, 'lb', 0, t.ltw);
       if (!((la === t.ltw && lb < t.ltw) || (lb === t.ltw && la < t.ltw))) throw E.bad('Победитель должен выиграть ' + t.ltw + ' лег(а)', 'la');
       const id = 'q' + crypto.randomBytes(8).toString('hex'), now = Date.now(), w = la > lb ? 0 : 1;
@@ -335,7 +339,7 @@ module.exports = async function (app) {
       for (const [k, pid, legs] of [[0, x.a, la], [1, x.b, lb]]) {
         await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9) VALUES ($1, $2, $3, $4, $5, 0, 0, NULL)`, [id, k, pid, nm(pid), legs]);
       }
-      await eloAdd(c, x.a, x.b, w === 0);
+      if (t.official) await eloAdd(c, x.a, x.b, w === 0);
       await T.refreshTour(c, await getTour(c, t.id, false));
       await refreshStats(c, [x.a, x.b]);
       forget('t', t.id);

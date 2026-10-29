@@ -38,7 +38,14 @@ async function flush() {
   const batch = [...pending];
   pending.clear();
   const ids = batch.map(([id]) => id);
-  const rows = ids.length ? await all(pool, LIVE_SQL + ' WHERE m.id = ANY($1)', [ids]) : [];
+  let rows;
+  try { rows = ids.length ? await all(pool, LIVE_SQL + ' WHERE m.id = ANY($1)', [ids]) : []; }
+  catch (e) {
+    // база не ответила — изменения не теряются: этим табло полный снимок чуть позже
+    const tids = [...new Set(batch.map(([, tid]) => tid))];
+    setTimeout(() => resync(tids).catch(() => {}), 1000);
+    return;
+  }
   batch.forEach(([id, tid]) => {
     const m = rows.find(x => x.id === id);
     send(tid, 'match', m ? liveJSON(m) : { id, deleted: true });
@@ -55,11 +62,15 @@ function onNotify(msg) {
 }
 
 // после переподключения часть уведомлений могла потеряться — каждому табло новый снимок
-async function resync() {
-  for (const tid of clients.keys()) {
-    const s = await snapshot(pool, tid);
-    send(tid, 'snapshot', s || { deleted: true });
+// tids — только эти турниры; снимок не получился — повтор через 3 с
+async function resync(tids) {
+  const left = [];
+  for (const tid of tids || [...clients.keys()]) {
+    if (!clients.has(tid)) continue;
+    try { const s = await snapshot(pool, tid); send(tid, 'snapshot', s || { deleted: true }); }
+    catch (e) { left.push(tid); }
   }
+  if (left.length) setTimeout(() => resync(left).catch(() => {}), 3000);
 }
 
 let wasConnected = false;
