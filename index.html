@@ -344,6 +344,8 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 
 .phead { display: flex; align-items: end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .phead-a { display: flex; gap: 8px; flex-wrap: wrap; }
+/* на телефоне кнопки под заголовком — одним рядом на всю ширину */
+@media (max-width: 600px) { .phead-a { width: 100%; flex-wrap: nowrap; } .phead-a > .btn { flex: 1 1 auto; min-width: 0; padding-left: 12px; padding-right: 12px; white-space: nowrap; } .phead-a > .btn.alt { flex: 0 0 auto; } }
 .warn-a { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .warn-a .btn { width: auto; }
 .h1 { font-family: var(--display); font-size: clamp(26px, 6vw, 42px); line-height: 1.04; text-transform: uppercase; font-weight: 700; letter-spacing: .02em; text-wrap: balance; }
@@ -1787,6 +1789,7 @@ function recalc() {
   db.players.filter(p => n[p.id] > 0).sort((x, y) => r[y.id] - r[x.id]).forEach((p, i) => RANK[p.id] = i + 1);
 }
 
+const cap1 = s => s.charAt(0).toUpperCase() + s.slice(1);
 const koName = k => k === 1 ? 'финал' : k === 2 ? '1/2 финала' : k === 3 ? '1/4 финала' : '1/' + 2 ** (k - 1) + ' финала';
 function roundLabel(t, r) {
   if (t.format === 'rr') return 'тур ' + (r + 1);
@@ -2538,7 +2541,7 @@ function launchRegTour(tid) {
 function stagesOf(t, rv) {
   const out = [];
   if (t.qual) { const n = t.players.filter(id => qBest(t, id) != null).length; out.push({ l: 'Квалификация', done: n, total: t.players.length }); }
-  if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.format === 'rr' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
+  if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.format === 'ko' ? cap1(roundLabel(t, x.r)) : t.format === 'rr' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
   return out;
 }
 // общий ход турнира: доля сыгранного по всем этапам (квалификация — попытки игроков) и текущий этап
@@ -3187,7 +3190,8 @@ function startFromSetup() {
   if (ex.k === 'x01') ex.dbl = su.dbl;
   // на сервер уходит матч, где есть вошедший игрок или другой игрок из базы
   newGame(list, { legsToWin: su.legsToWin, ex, srv: SRV && !!ME && list.some(x => x.id) }, null, 0);
-  render();
+  // счётчик — с самого верха: «Начать игру» нажимают внизу длинной формы
+  render(); toTop();
 }
 // попытка квалификации: один игрок, один лег упражнения квалификации
 function startQualGame(v) {
@@ -4476,7 +4480,7 @@ const feeTxt = fee => fee ? 'взнос ' + rub(fee) : '';
 function coverBlock(t) {
   const c = coverOf(t), org = canDo(t, 'org');
   let h = c ? '<img class="tcover" src="' + esc(c.url) + '" alt="Общее фото игроков" data-act="lbox" data-v="' + esc(c.url) + '">' : '';
-  if (org) h += '<div class="row">' + (c ? '<button class="mini" data-act="photo-pick" data-v="cover|' + t.id + '">Сменить общее фото</button><button class="mini dng" data-act="cover-rm" data-v="' + t.id + '">Убрать из итогов</button>' : '<button class="mini go" data-act="photo-pick" data-v="cover|' + t.id + '">+ Общее фото игроков</button><span class="meta">Покажется в итогах и в ленте</span>') + '</div>';
+  if (org) h += '<div class="row" style="align-items:center;flex-wrap:wrap">' + (c ? '<button class="mini" data-act="photo-pick" data-v="cover|' + t.id + '">Сменить общее фото</button><button class="mini dng" data-act="cover-rm" data-v="' + t.id + '">Убрать из итогов</button>' : '<button class="mini go" data-act="photo-pick" data-v="cover|' + t.id + '">+ Общее фото игроков</button><span class="meta" style="flex-basis:100%">Покажется в итогах и в ленте</span>') + '</div>';
   return h;
 }
 const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button></div>';
@@ -5584,7 +5588,7 @@ function sideViewS() {
 }
 function toursViewS() {
   const L = { live: listE('live'), reg: listE('reg'), done: listE('done') }, cur = L[S.tf];
-  let h = '<div class="phead"><h1 class="h1">Турниры</h1><div class="phead-a"><button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (!ME ? '<button class="btn sm alt" data-act="login">Войти, чтобы создать турнир</button>' : Api.perm('create_tour') ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '') + '</div></div>';
+  let h = '<div class="phead"><h1 class="h1">Турниры</h1><div class="phead-a"><button class="btn sm alt" data-act="go" data-v="clubs">Клубы</button>' + (!ME ? '<button class="btn sm" data-act="login" title="Создавать турниры можно после входа">+ Создать турнир</button>' : Api.perm('create_tour') ? '<button class="btn sm" data-act="go" data-v="new">+ Создать турнир</button>' : '') + '</div></div>';
   h += '<div class="seg2" role="group" aria-label="Статус">' + [['live', 'Идут'], ['reg', 'Регистрация'], ['done', 'Завершены']].map(([v, l]) => '<button class="' + (S.tf === v ? 'on' : '') + '" data-act="tf" data-v="' + v + '">' + l + ' <span class="muted">' + (L[v].data ? L[v].data.total : '…') + '</span></button>').join('') + '</div>';
   const st = svState(cur, 'турниров');
   if (st) return h + st;

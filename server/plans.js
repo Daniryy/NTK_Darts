@@ -3,7 +3,7 @@
 // Администраторов это не касается: их роль меняет только тех. администратор.
 const { all, one } = require('./db');
 const { KINDS } = require('./titles');
-const { RANK } = require('./roles');
+const { RANK, permsOf } = require('./roles');
 
 // скидка, %: ms — МС и выше (МС, МСМК, ЗМС), kms — КМС, r1 — 1 разряд
 let discounts = { ms: 25, kms: 10, r1: 5 };
@@ -29,8 +29,11 @@ const priceWith = (price, pct) => Math.round(price * (100 - pct) / 100);
 async function syncPlanRole(c, pid) {
   const p = await one(c, 'SELECT id, role, base_role FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p || (RANK[p.role] || 0) >= RANK.admin) return p && p.role;
-  const act = await one(c, `SELECT pl.role FROM player_plans pp JOIN plans pl ON pl.id = pp.plan_id
-    WHERE pp.player_id = $1 AND pp.status = 'active' AND pp.ends > $2 ORDER BY pp.ends DESC LIMIT 1`, [pid, Date.now()]);
+  // из нескольких действующих тарифов — роль старше, при равном ранге — с большим числом прав
+  // (Pro и «Ведущий» сразу — ведущий, сколько бы ни оставалось Pro)
+  const score = r => (RANK[r] || 0) * 1000 + permsOf({ role: r }).length;
+  const act = (await all(c, `SELECT DISTINCT pl.role FROM player_plans pp JOIN plans pl ON pl.id = pp.plan_id
+    WHERE pp.player_id = $1 AND pp.status = 'active' AND pp.ends > $2`, [pid, Date.now()])).sort((a, b) => score(b.role) - score(a.role))[0];
   const base = p.base_role && (RANK[p.base_role] || 0) < RANK.admin ? p.base_role : 'player';
   const want = act && ((RANK[act.role] || 0) > (RANK[base] || 0) || base === 'player') ? act.role : base;
   if (want !== p.role) await c.query('UPDATE players SET role = $2 WHERE id = $1', [pid, want]);

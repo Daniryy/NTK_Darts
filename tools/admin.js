@@ -78,7 +78,7 @@ const who = p => p.name + ' (' + p.code + ', ' + p.role + (p.login ? ', логи
     if (!p) fail('логина ' + login + ' нет');
     if (cmd === 'password') await pool.query('UPDATE players SET pass_hash = $2, pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id, await newPassword()]);
     if (cmd === 'unlock') await pool.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
-    if (cmd === 'off') { await pool.query('UPDATE players SET login = NULL, pass_hash = NULL WHERE id = $1', [p.id]); await pool.query('DELETE FROM sessions WHERE player_id = $1', [p.id]); }
+    if (cmd === 'off') { await pool.query('UPDATE players SET login = NULL, pass_hash = CASE WHEN email IS NULL THEN NULL ELSE pass_hash END WHERE id = $1', [p.id]); await pool.query('DELETE FROM sessions WHERE player_id = $1', [p.id]); }
     await audit(pool, null, 'cli.' + cmd, p, { login });
     console.log('Готово: ' + who(p) + ' — ' + { password: 'пароль изменён', unlock: 'блокировка снята', off: 'вход по паролю убран, сеансы закрыты' }[cmd] + '.');
   } else {

@@ -142,12 +142,12 @@ module.exports = async function (app) {
         set.role = role;
         // выданная вручную роль остаётся основой: к ней игрок вернётся, когда кончится тариф (plans.js)
         set.base_role = RANK[role] < RANK.admin ? role : 'player';
-        // ниже администратора вход по паролю не нужен
-        if (RANK[role] < RANK.admin) { set.login = null; set.pass_hash = null; }
+        // ниже администратора вход по логину не нужен; пароль остаётся, если по нему входят с почтой
+        if (RANK[role] < RANK.admin && cur.login) { set.login = null; if (!cur.email) set.pass_hash = null; }
       }
       const keys = Object.keys(set);
       if (!keys.length) throw E.bad('Нечего менять');
-      if (set.blocked || set.pass_hash === null) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
+      if (set.blocked || 'login' in set) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
       const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
@@ -198,8 +198,9 @@ module.exports = async function (app) {
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!cur) throw E.notFound('Игрок не найден');
-      if (cur.id === me.id && cur.vk_id == null && cur.phone == null) throw E.conflict('conflict', 'Это ваш единственный способ входа');
-      const out = await one(c, 'UPDATE players SET login = NULL, pass_hash = NULL, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id]);
+      if (cur.id === me.id && cur.vk_id == null && cur.phone == null && !cur.email) throw E.conflict('conflict', 'Это ваш единственный способ входа');
+      // пароль остаётся, если по нему входят с почтой
+      const out = await one(c, 'UPDATE players SET login = NULL, pass_hash = CASE WHEN email IS NULL THEN NULL ELSE pass_hash END, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id]);
       await audit(c, me, 'player.login_off', out, null);
       return out;
     });
@@ -275,7 +276,7 @@ module.exports = async function (app) {
   app.get('/api/admin/audit', async req => {
     needPerm(req, 'audit', 'Журнал — для администратора');
     const limit = Math.min(200, Math.max(1, +req.query.limit || 50)), args = [], where = [];
-    if (req.query.before) { args.push(+req.query.before); where.push('t < $' + args.length); }
+    if (req.query.before) { args.push(V.int(+req.query.before, 'before', 0, Number.MAX_SAFE_INTEGER)); where.push('t < $' + args.length); }
     if (req.query.target) { args.push(String(req.query.target)); where.push('target = $' + args.length); }
     const rows = await all(pool, 'SELECT id, t, actor_id, actor_name, action, target, target_name, data FROM audit' + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ` ORDER BY t DESC, id DESC LIMIT ${limit}`, args);
     return { items: rows.map(r => ({ id: +r.id, t: +r.t, actor: r.actor_id ? { id: r.actor_id, name: r.actor_name } : null, action: r.action, target: r.target ? { id: r.target, name: r.target_name } : null, data: r.data })) };

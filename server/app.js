@@ -37,6 +37,11 @@ function build(opts = {}) {
     if (err.validation || err.statusCode === 400 || err.statusCode === 415 || err.statusCode === 413) {
       return reply.code(err.statusCode || 400).send({ error: { code: 'bad_request', message: 'Неверный запрос: ' + err.message } });
     }
+    // ошибка данных в базе (класс 22: не число, нулевой байт в строке, число вне диапазона) — кривой запрос, не сбой сервера
+    if (typeof err.code === 'string' && err.code.startsWith('22') && err.severity) {
+      req.log.warn({ code: err.code, err: err.message }, 'bad data');
+      return reply.code(400).send({ error: { code: 'bad_request', message: 'Неверные данные в запросе' } });
+    }
     req.log.error(err);
     return reply.code(500).send({ error: { code: 'server', message: 'Ошибка сервера' } });
   });
