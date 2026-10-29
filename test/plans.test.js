@@ -30,6 +30,8 @@ test.before(async () => {
   await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
   await migrate(() => {});
   await tx(seed);
+  // цены по званиям проверяем без скидки на открытие; она — в своём тесте
+  await pool.query(`UPDATE settings SET value = '{"pct": 0}' WHERE key = 'sale'`);
   await pool.query(`UPDATE players SET title = 'МС' WHERE id = 'p3'; UPDATE players SET title = 'КМС' WHERE id = 'p5'; UPDATE players SET title = '1 разряд' WHERE id = 'p7'`);
   app = build({ logger: false });
   await app.ready();
@@ -161,4 +163,59 @@ test('скидка за каждое звание своя; на год — по
   ok(await call(TECH, 'PATCH', '/api/admin/plans/' + plus.id, { yearPrice: null }));
   err(await call(await login('p15'), 'POST', '/api/plans/' + plus.id + '/request', { year: true }), 400);
   ok(await call(TECH, 'PATCH', '/api/admin/plans/' + plus.id, { yearPrice: 2490 }));
+});
+
+test('скидка на открытие: красивые цены, со сроком; со званием — выгоднейшая, не складываются', async () => {
+  const get = async u => ok(await call(u, 'GET', '/api/plans'));
+  err(await call(PL, 'PUT', '/api/admin/sale', { pct: 50 }), 403);
+  ok(await call(ADMIN, 'PUT', '/api/admin/sale', { pct: 50, title: 'Скидка на открытие' }));
+  let d = await get(PL);
+  assert.deepEqual(d.sale, { pct: 50, until: null, title: 'Скидка на открытие' });
+  const pick = (d, role) => d.plans.find(p => p.role === role);
+  assert.deepEqual([pick(d, 'plus'), pick(d, 'host')].map(p => [p.final, p.yearFinal]), [[119, 1190], [399, 3990]]);
+  assert.equal(pick(d, 'plus').why, 'скидка на открытие');
+  // ЗМС (−90%) выгоднее скидки на открытие, КМС (−10%) — нет
+  await pool.query(`UPDATE players SET title = 'ЗМС' WHERE id = 'p11'`);
+  assert.equal(pick(await get(await login('p11')), 'host').final, 80);
+  assert.equal(pick(await get(KMS), 'host').final, 399);
+  // заявка — по цене, которую видел игрок; подключение — по цене заявки, даже если скидка уже кончилась
+  const plus = pick(d, 'plus'), U = await login('p16');
+  const rq = ok(await call(U, 'POST', '/api/plans/' + plus.id + '/request'), 201).request;
+  assert.equal(rq.price, 119);
+  ok(await call(ADMIN, 'PUT', '/api/admin/sale', { pct: 50, until: Date.now() - 1000 }));
+  d = await get(PL);
+  assert.equal(d.sale, null);
+  assert.equal(pick(d, 'plus').final, 249);
+  assert.equal(ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { requestId: rq.id })).sub.price, 119);
+  ok(await call(ADMIN, 'PUT', '/api/admin/sale', { pct: 0 }));
+});
+
+test('промокоды: создать, проверить, заявка со скидкой сверху, лимит, срок, тариф', async () => {
+  const host = plans.find(p => p.role === 'host'), plus = plans.find(p => p.role === 'plus');
+  err(await call(PL, 'POST', '/api/admin/promos', { pct: 20 }), 403);
+  const auto = ok(await call(ADMIN, 'POST', '/api/admin/promos', { pct: 15 }), 201).promo;
+  assert.match(auto.code, /^OCHE[0-9A-F]{6}$/);
+  const p = ok(await call(ADMIN, 'POST', '/api/admin/promos', { code: 'darts20', pct: 20, maxUses: 1, plans: [host.id] }), 201).promo;
+  assert.equal(p.code, 'DARTS20');
+  err(await call(ADMIN, 'POST', '/api/admin/promos', { code: 'DARTS20', pct: 10 }), 409);
+  err(await call(ADMIN, 'POST', '/api/admin/promos', { code: 'с пробелом', pct: 10 }), 400);
+  const U = await login('p18');
+  // проверка кода: цены по нему, только «Ведущий»
+  const chk = ok(await call(U, 'GET', '/api/plans/promo?code=darts20'));
+  assert.deepEqual(chk.plans.map(x => [x.id, x.final]), [[host.id, 639]]);
+  err(await call(U, 'GET', '/api/plans/promo?code=nope'), 404);
+  err(await call(U, 'POST', '/api/plans/' + plus.id + '/request', { promo: 'DARTS20' }), 409, 'promo_plan');
+  const rq = ok(await call(U, 'POST', '/api/plans/' + host.id + '/request', { promo: 'darts20', year: true }), 201).request;
+  assert.deepEqual([rq.price, rq.promo], [6392, 'DARTS20']);
+  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { requestId: rq.id }));
+  // использован — второй раз нельзя
+  err(await call(await login('p19'), 'GET', '/api/plans/promo?code=DARTS20'), 409, 'promo_used');
+  const list = ok(await call(ADMIN, 'GET', '/api/admin/plans')).promos;
+  assert.equal(list.find(x => x.code === 'DARTS20').used, 1);
+  // срок и выключение
+  ok(await call(ADMIN, 'PATCH', '/api/admin/promos/' + auto.id, { until: Date.now() - 1000 }));
+  err(await call(U, 'GET', '/api/plans/promo?code=' + auto.code), 409, 'promo_expired');
+  ok(await call(ADMIN, 'PATCH', '/api/admin/promos/' + auto.id, { until: null, active: false }));
+  err(await call(U, 'GET', '/api/plans/promo?code=' + auto.code), 404);
+  ok(await call(ADMIN, 'DELETE', '/api/admin/promos/' + auto.id));
 });

@@ -1029,6 +1029,17 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 .plan-save { color: var(--ok, #3ecf8e); font-weight: 600; }
 .plan-disc { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .plan-disc .tchip { font-size: 12.5px; }
+.sale-b { display: flex; justify-content: space-between; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding: 14px 18px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); background: linear-gradient(110deg, color-mix(in srgb, var(--green) 22%, var(--surface)), var(--surface) 70%); }
+.sale-b b { font-family: var(--display); font-size: 24px; letter-spacing: .02em; color: var(--green); }
+.sale-b span { color: var(--fg); font-weight: 500; }
+.plan-pct { color: var(--green); font-weight: 700; }
+.promo-r { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.promo-r .inp { max-width: 220px; min-height: 38px; padding: 7px 12px; text-transform: uppercase; }
+.sale-f { display: flex; gap: 10px; flex-wrap: wrap; }
+.sale-f label { display: grid; gap: 4px; flex: 0 1 150px; min-width: 0; }
+.sale-f label.grow1 { flex: 1 1 200px; }
+.adm-row.dim { opacity: .55; }
+.pn-plans { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .plan-f { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 3px; }
 .plan-ed { display: grid; gap: 8px; }
 .plan-ed .mini, .panel .nrow .mini { white-space: nowrap; }
@@ -4431,6 +4442,9 @@ function plansView() {
   const st = svState(e, 'тарифов');
   if (st) return h + st + '</div>';
   const d = e.data, ds = d.discounts, year = !!S.planYear && d.plans.some(p => p.year != null);
+  // промокод: цены по нему приходят с сервера (только тарифы, к которым он подходит)
+  const pr = S.promo && S.promo.code ? S.promo : null, prPlan = id => pr && pr.plans.find(x => x.id === id);
+  if (d.sale) h += '<div class="sale-b"><b>' + esc(d.sale.title) + ' −' + d.sale.pct + '%</b><span>' + (d.sale.until ? 'до ' + new Date(d.sale.until).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'на все тарифы') + '</span></div>';
   const DN = [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']].filter(([k]) => ds[k]);
   h += '<div class="plan-disc"><span class="meta">Скидка за подтверждённое звание:</span>' + DN.map(([k, n]) => '<span class="tchip">' + n + ' −' + ds[k] + '%</span>').join('') + (ME && !(meP().title) ? '<button class="lnk meta" data-act="go" data-v="title">Подтвердить звание</button>' : '') + '</div>';
   if (d.mine.length) h += d.mine.map(s => '<div class="note-box ok">Подключён тариф <b>' + esc(s.plan.name) + '</b>' + (s.year ? ' на год' : '') + ' до ' + new Date(s.ends).toLocaleDateString('ru-RU') + '.</div>').join('');
@@ -4440,15 +4454,17 @@ function plansView() {
     const best = Math.max(0, ...d.plans.filter(p => p.year != null).map(p => Math.round((1 - p.year / (p.price * 12)) * 100)));
     h += '<div class="seg2 plan-per" role="tablist"><button role="tab" aria-selected="' + !year + '" class="' + (year ? '' : 'on') + '" data-act="plan-per" data-v="m">Помесячно</button><button role="tab" aria-selected="' + year + '" class="' + (year ? 'on' : '') + '" data-act="plan-per" data-v="y">На год' + (best ? ' · −' + best + '%' : '') + '</button></div>';
   }
-  h += '<div class="plans">' + d.plans.map(p => {
-    const on = d.mine.some(s => s.plan.id === p.id), y = year && p.year != null;
-    const base = y ? p.year : p.price, fin = y ? p.yearFinal : p.final;
-    const sub = y ? '≈ ' + rub(Math.round(fin / 12)) + ' в месяц' + (p.price * 12 > p.year ? ' · <span class="plan-save">выгода ' + rub(Math.round(p.price * 12 * (100 - p.discount) / 100) - fin) + '</span>' : '') : '';
+  if (ME && !d.request) h += '<div class="promo-r">' + (pr ? '<span class="tchip ok">Промокод ' + esc(pr.code) + ' −' + pr.pct + '%</span><span class="meta">' + (pr.plans.length < d.plans.length ? 'для: ' + esc(pr.plans.map(x => x.name).join(', ')) : 'на все тарифы') + '</span><button class="lnk meta" data-act="promo-off">Убрать</button>'
+    : '<input class="inp" id="promo-in" maxlength="24" placeholder="Промокод" aria-label="Промокод" autocomplete="off" autocapitalize="characters"><button class="mini" data-act="promo-on">Применить</button>') + '</div>';
+  h += '<div class="plans">' + d.plans.map(p0 => {
+    const p = prPlan(p0.id) || p0, on = d.mine.some(s => s.plan.id === p.id), y = year && p.year != null;
+    const base = y ? p.year : p.price, fin = y ? p.yearFinal : p.final, pct = y ? p.yearDiscount : p.discount;
+    const sub = y ? '≈ ' + rub(Math.round(fin / 12)) + ' в месяц' + (p.final * 12 > fin ? ' · <span class="plan-save">выгода ' + rub(p.final * 12 - fin) + '</span>' : '') : '';
     return '<div class="card plan' + (on ? ' on' : '') + '"><div class="plan-h"><b>' + esc(p.name) + '</b>' + (on ? '<span class="tchip">подключён</span>' : '') + '</div>' +
-      '<div class="plan-p">' + (p.discount ? '<s>' + rub(base) + '</s>' : '') + '<b>' + rub(fin) + '</b><span class="meta">/ ' + (y ? 'год' : daysTxt(p.days)) + '</span></div>' +
-      (p.discount || sub ? '<div class="meta">' + (p.discount ? '−' + p.discount + '% · ' + esc(p.why) + (sub ? ' · ' : '') : '') + sub + '</div>' : '') +
+      '<div class="plan-p">' + (fin < base ? '<s>' + rub(base) + '</s>' : '') + '<b>' + rub(fin) + '</b><span class="meta">/ ' + (y ? 'год' : daysTxt(p.days)) + '</span></div>' +
+      (pct || sub ? '<div class="meta">' + (pct ? '<span class="plan-pct">−' + pct + '%</span> · ' + esc(p.why) + (sub ? ' · ' : '') : '') + sub + '</div>' : '') +
       '<ul class="plan-f">' + p.about.split('\n').filter(Boolean).map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' +
-      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + (y ? '|y' : '') + '">' + (on ? 'Продлить' : 'Подключить') + (y ? ' на год' : '') + '</button>') + '</div>';
+      (!ME ? '<button class="btn sm" data-act="login">Войти</button>' : d.request ? '' : '<button class="btn sm" data-act="plan-req" data-v="' + p.id + '|' + (y ? 'y' : '') + '|' + (prPlan(p.id) ? esc(pr.code) : '') + '">' + (on ? 'Продлить' : 'Подключить') + (y ? ' на год' : '') + '</button>') + '</div>';
   }).join('') + '</div><p class="meta">Онлайн-оплата появится позже. Сейчас после заявки тариф подключает администратор.</p>';
   return h + '</div>';
 }
@@ -4458,14 +4474,36 @@ function planCard() {
   const m = e.data.mine[0];
   return '<div class="card sec"><span class="label">Тариф</span>' + (m ? '<div><b>' + esc(m.plan.name) + '</b> <span class="meta">до ' + new Date(m.ends).toLocaleDateString('ru-RU') + '</span></div>' : e.data.request ? '<p class="meta">Заявка на «' + esc(e.data.request.plan.name) + '» ждёт подключения.</p>' : '<p class="meta">Обычный аккаунт. Тарифы: Pro — статистика и без рекламы, «Ведущий» — турниры от клуба и инструменты клуба.</p>') + '<button class="mini" data-act="go" data-v="plans">Тарифы</button></div>';
 }
+const dateVal = t => { if (!t) return ''; const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+// скидка на открытие и промокоды
+function admSale(d) {
+  const sl = d.sale || { pct: 0, until: null, title: 'Скидка на открытие' }, on = d.saleNow;
+  let h = '<div class="panel"><span class="h2">Скидка на все тарифы</span><span class="meta">' + (on ? 'Действует: −' + sl.pct + '%' + (sl.until ? ' до ' + new Date(sl.until).toLocaleDateString('ru-RU') : ', без срока') : sl.pct && sl.until ? 'Срок кончился ' + new Date(sl.until).toLocaleDateString('ru-RU') : 'Выключена') + '. Цены округляются красиво: −50% → 119 / 1 190 ₽ и 399 / 3 990 ₽. Со скидкой за звание не складывается — игрок получает выгоднейшую.</span>' +
+    '<div class="nrow sale-f"><label><span class="meta">Скидка, %</span><input class="inp" id="sale-pct" inputmode="numeric" maxlength="2" value="' + sl.pct + '"></label><label><span class="meta">До (включительно)</span><input class="inp" id="sale-until" type="date" value="' + dateVal(sl.until) + '"></label><label class="grow1"><span class="meta">Название</span><input class="inp" id="sale-title" maxlength="60" value="' + esc(sl.title) + '"></label></div>' +
+    '<div class="row"><button class="btn sm" data-act="sale-save">Сохранить скидку</button><span class="meta">0% — выключить. Пустая дата — без срока.</span></div></div>';
+  const ps = d.promos || [], now = Date.now();
+  h += '<div class="sec"><span class="label">Промокоды · ' + ps.length + '</span>';
+  if (ps.length) h += '<div class="card" style="padding:4px 14px">' + ps.map(x => {
+    const dead = !x.active || (x.until && x.until <= now) || (x.maxUses && x.used >= x.maxUses);
+    const st = !x.active ? 'выключен' : x.until && x.until <= now ? 'срок кончился' : x.maxUses && x.used >= x.maxUses ? 'исчерпан' : 'действует';
+    return '<div class="adm-row' + (dead ? ' dim' : '') + '"><span class="numb">%</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="promo-copy" data-v="' + esc(x.code) + '" title="Скопировать"><b>' + esc(x.code) + '</b></button> −' + x.pct + '% · ' + st + '</span><span class="meta">' +
+      [x.until ? 'до ' + new Date(x.until).toLocaleDateString('ru-RU') : 'без срока', 'использован ' + x.used + (x.maxUses ? ' из ' + x.maxUses : ''), x.plans ? d.plans.filter(p => x.plans.includes(p.id)).map(p => p.name).join(', ') : 'все тарифы', x.note].filter(Boolean).map(esc).join(' · ') + '</span></div>' +
+      '<div class="gacts"><button class="mini" data-act="promo-tg" data-v="' + x.id + '|' + (x.active ? 0 : 1) + '">' + (x.active ? 'Выключить' : 'Включить') + '</button><button class="mini dng" data-act="promo-del" data-v="' + x.id + '">Удалить</button></div></div>';
+  }).join('') + '</div>';
+  h += '<div class="panel"><span class="h2">Новый промокод</span><div class="nrow sale-f"><label class="grow1"><span class="meta">Код</span><input class="inp" id="pn-code" maxlength="24" placeholder="пусто — придумаем сами" autocapitalize="characters"></label><label><span class="meta">Скидка, %</span><input class="inp" id="pn-pct" inputmode="numeric" maxlength="2" placeholder="20"></label><label><span class="meta">До (включительно)</span><input class="inp" id="pn-until" type="date"></label><label><span class="meta">Сколько раз</span><input class="inp" id="pn-max" inputmode="numeric" maxlength="6" placeholder="без лимита"></label></div>' +
+    '<div class="pn-plans"><span class="meta">Тарифы:</span>' + d.plans.filter(p => p.active).map(p => '<label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-pnplan="' + p.id + '"> ' + esc(p.name) + '</label>').join('') + '<span class="meta">(ничего не отмечено — все)</span></div>' +
+    '<input class="inp" id="pn-note" maxlength="200" placeholder="Заметка: для кого, откуда (видно только админам)"><button class="btn sm" data-act="promo-add">Создать промокод</button><span class="meta">Скидка промокода — сверху цены со скидкой. Использованным код считается, когда тариф подключили.</span></div></div>';
+  return h;
+}
 // админка: заявки, действующие, подключить вручную; тех. администратор — тарифы и скидки
 function admPlans() {
   const e = lz('aplans', () => Api.get('/api/admin/plans'), 20000);
   const st = svState(e, 'тарифов');
   if (st) return st;
   const d = e.data, tech = Api.perm('plans_edit');
-  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b>' + (r.year ? ' · на год' : '') + '</span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
+  let h = '<div class="sec"><span class="label">Заявки</span>' + (d.requests.length ? '<div class="card" style="padding:4px 14px">' + d.requests.map(r => '<div class="adm-row"><span class="numb">₽</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> ' + titleChip(r.player.title) + ' → <b>' + esc(r.plan.name) + '</b>' + (r.year ? ' · на год' : '') + (r.promo ? ' · промокод ' + esc(r.promo) : '') + '</span><span class="meta">' + rub(r.final) + (r.discount ? ' (−' + r.discount + '%)' : '') + ' · ' + fmtDate(r.created) + (r.note ? ' · ' + esc(r.note) : '') + '</span></div><div class="gacts"><button class="mini go" data-act="plan-grant-req" data-v="' + r.id + '">Подключить</button><button class="mini dng" data-act="plan-rej" data-v="' + r.id + '">Отклонить</button></div></div>').join('') + '</div>' : '<div class="note-box">Новых заявок нет.</div>') + '</div>';
   h += '<div class="panel"><span class="h2">Подключить вручную</span><div class="nrow"><input class="inp" id="pg-player" placeholder="ID игрока, например OCH-1005" aria-label="ID игрока"><select class="inp" id="pg-plan" aria-label="Тариф">' + d.plans.filter(p => p.active).map(p => '<option value="' + p.id + '">' + esc(p.name) + ' · ' + rub(p.price) + '</option>').join('') + '</select><input class="inp" id="pg-days" inputmode="numeric" placeholder="дней" aria-label="Дней" style="max-width:90px"></div><label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pg-year"> на год — по цене за год, 365 дней</label><button class="btn sm" data-act="plan-grant">Подключить</button><span class="meta">Пусто в «дней» — срок тарифа. Если тариф уже действует, срок прибавится.</span></div>';
+  h += admSale(d);
   h += '<div class="sec"><span class="label">Действуют · ' + d.active.length + '</span>' + (d.active.length ? '<div class="card" style="padding:4px 14px">' + d.active.map(s => '<div class="adm-row"><span class="numb">✓</span><div style="min-width:0;display:grid"><span><button class="lnk" data-act="adm-open" data-v="' + esc(s.player.id) + '">' + esc(s.player.name) + '</button> · ' + esc(s.plan.name) + (s.year ? ' · год' : '') + '</span><span class="meta">до ' + new Date(s.ends).toLocaleDateString('ru-RU') + ' · ' + rub(s.price) + (s.by ? ' · подключил ' + esc(s.by) : '') + '</span></div><div class="gacts"><button class="mini" data-act="plan-ext" data-v="' + s.player.id + '|' + s.plan.id + '">+ ' + daysTxt(s.plan.days) + '</button><button class="mini dng" data-act="plan-end" data-v="' + s.id + '">Завершить</button></div></div>').join('') + '</div>' : '<div class="note-box">Подключённых тарифов нет.</div>') + '</div>';
   if (!tech) return h;
   // тарифы и скидки
@@ -6091,7 +6129,33 @@ document.addEventListener('click', e => {
     }
     case 'paid': { const [tid, pid2, on] = v.split('|'); svDo(Api.patch('/api/tournaments/' + tid + '/paid', { playerId: pid2, paid: on === '1' }), svTourSet); break; }
     case 'plan-per': S.planYear = v === 'y'; render(); break;
-    case 'plan-req': { const [pid, y] = v.split('|'); svDo(Api.post('/api/plans/' + pid + '/request', y ? { year: true } : {}), () => { svStale('plans'); toast('Заявка отправлена — администратор подключит тариф' + (y ? ' на год' : '') + '.'); }); break; }
+    case 'plan-req': {
+      const [pid, y, code] = v.split('|'), body = Object.assign(y ? { year: true } : {}, code ? { promo: code } : {});
+      svDo(Api.post('/api/plans/' + pid + '/request', body), () => { S.promo = null; svStale('plans'); toast('Заявка отправлена — администратор подключит тариф' + (y ? ' на год' : '') + '.'); });
+      break;
+    }
+    case 'promo-on': {
+      const code = (($('promo-in') || {}).value || '').trim();
+      if (!code) { toast('Введите промокод.'); break; }
+      svDo(Api.get('/api/plans/promo?code=' + encodeURIComponent(code)), r => { S.promo = Object.assign({}, r.promo, { plans: r.plans }); toast('Промокод применён: −' + r.promo.pct + '%.'); });
+      break;
+    }
+    case 'promo-off': S.promo = null; render(); break;
+    case 'sale-save': {
+      const g = k => ($('sale-' + k) || {}).value || '', until = g('until') ? new Date(g('until') + 'T23:59:59').getTime() : null;
+      svDo(Api.put('/api/admin/sale', { pct: +g('pct').replace(/\D/g, '') || 0, until, title: g('title').trim() }), () => { svStale('aplans'); svStale('plans'); toast('Скидка сохранена.'); });
+      break;
+    }
+    case 'promo-add': {
+      const g = k => (($('pn-' + k) || {}).value || '').trim(), plans = [...document.querySelectorAll('[data-pnplan]:checked')].map(x => x.dataset.pnplan);
+      const body = { code: g('code'), pct: +g('pct').replace(/\D/g, ''), until: g('until') ? new Date(g('until') + 'T23:59:59').getTime() : null, maxUses: g('max') ? +g('max').replace(/\D/g, '') : null, plans: plans.length ? plans : null, note: g('note') };
+      if (!(body.pct >= 1 && body.pct <= 90)) { toast('Скидка промокода — от 1 до 90%.'); break; }
+      svDo(Api.post('/api/admin/promos', body), r => { svStale('aplans'); toast('Промокод ' + r.promo.code + ' создан.'); });
+      break;
+    }
+    case 'promo-tg': { const [id, on] = v.split('|'); svDo(Api.patch('/api/admin/promos/' + id, { active: on === '1' }), () => svStale('aplans')); break; }
+    case 'promo-del': if (confirm('Удалить промокод?')) svDo(Api.del('/api/admin/promos/' + v), () => { svStale('aplans'); toast('Промокод удалён.'); }); break;
+    case 'promo-copy': copyText(v, 'Промокод скопирован.'); break;
     case 'plan-unreq': svDo(Api.del('/api/plans/requests/' + v), () => { svStale('plans'); toast('Заявка отозвана.'); }); break;
     case 'plan-grant-req': svDo(Api.post('/api/admin/plans/grant', { requestId: +v }), () => { svStale('aplans'); svStale('admin:'); svStale('acplans:'); toast('Тариф подключён.'); }); break;
     case 'plan-rej': {
