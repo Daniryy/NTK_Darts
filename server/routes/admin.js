@@ -220,12 +220,15 @@ module.exports = async function (app) {
       if (RANK[p.role] >= RANK.admin && me.role !== 'tech') throw E.forbidden('Администраторов удаляет тех. администратор');
       const busy = await one(c, `SELECT count(*)::int AS n FROM entries e JOIN tournaments t ON t.id = e.tournament_id WHERE e.player_id = $1 AND t.status <> 'reg'`, [p.id]);
       if (busy.n) throw E.conflict('in_tournaments', 'Игрок участвует в ' + busy.n + ' ' + (busy.n === 1 ? 'турнире' : 'турнирах') + ' — пока они есть, аккаунт удалить нельзя (можно заблокировать)');
+      const docs = await all(c, 'SELECT file FROM title_docs WHERE player_id = $1', [p.id]);
       await c.query('DELETE FROM players WHERE id = $1', [p.id]);
       await audit(c, me, 'player.delete', null, { id: p.id, name: p.name, code: p.code });
-      return { id: p.id, photo: p.photo };
+      return { id: p.id, photo: p.photo, docs: docs.map(d => d.file) };
     });
-    // фото профиля — файлом на диске
-    if (out.photo) try { require('node:fs').unlinkSync(require('node:path').join(require('../config').uploadDir, out.photo.replace(/^.*\//, ''))); } catch (e) { /* уже нет */ }
+    // фото профиля и документы о звании — файлами на диске
+    const fs = require('node:fs'), path = require('node:path'), cfg = require('../config');
+    if (out.photo) fs.promises.unlink(path.join(cfg.uploadDir, out.photo.replace(/^.*\//, ''))).catch(() => {});
+    for (const f of out.docs) fs.promises.unlink(path.join(cfg.privateDir, f)).catch(() => {});
     clearCache();
     return { ok: true };
   });

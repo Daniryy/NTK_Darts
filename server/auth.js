@@ -5,7 +5,7 @@ const config = require('./config');
 const { pool, tx, one } = require('./db');
 const { E, V, ApiError } = require('./errors');
 const { isAdmin, atLeast, can, permsOf } = require('./roles');
-const { hit } = require('./limits');
+const { hit, wait, fail } = require('./limits');
 const { hashPassword, verifyPassword, passwordProblem, normLogin } = require('./password');
 const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
@@ -66,8 +66,22 @@ function ipLimit(req, kind, max, ms) {
   const wait = hit(kind + ':' + req.ip, max, ms);
   if (wait) throw tooMany(wait, 'Слишком много попыток входа с этого адреса — повторите через ' + Math.ceil(wait / 60) + ' мин');
 }
+// неудачные попытки входа: [ключ, сколько можно, окно мс]. Проверяем до попытки, засчитываем после ошибки;
+// удачные не считаются — в зале у всех телефонов один IP
+function failCheck(keys) {
+  for (const [key, max] of keys) {
+    const w = wait(key, max);
+    if (w) throw tooMany(w, 'Слишком много неудачных попыток — повторите через ' + Math.ceil(w / 60) + ' мин');
+  }
+}
+const failAdd = keys => keys.forEach(([key, , ms]) => fail(key, ms));
+// пароль: на аккаунт с одного адреса — 5 ошибок за 15 минут (посторонний с другого адреса владельцу вход не закроет),
+// на аккаунт со всех адресов — 30 в час, с одного адреса на любые аккаунты — 50 за 15 минут
 const PASS_FAILS = 5, PASS_LOCK = 15 * 6e4, PASS_SESSION = 30 * 864e5;
+const passKeys = (req, acct) => [['pw:' + acct + ':' + req.ip, PASS_FAILS, PASS_LOCK], ['pw:' + acct, 30, 36e5], ['pwip:' + req.ip, 50, PASS_LOCK]];
 const blockedErr = () => E.forbidden('Аккаунт заблокирован администратором');
+// администраторы входят только с паролем (логин или почта): код, звонок и VK для них закрыты
+const adminPassErr = () => E.forbidden('Администраторы входят по логину или почте с паролем');
 
 // телефон в виде +79991234567: 8… и 9… без кода страны считаем российскими
 function normPhone(v) {
@@ -98,7 +112,7 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, contact: config.contact }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
@@ -125,11 +139,11 @@ function routes(app) {
 
   // привязать аккаунт, созданный администратором: { code }. Свой новый аккаунт (без матчей и турниров) растворяется в нём.
   app.post('/api/me/claim', async req => {
-    const me = needPlayer(req), code = normCode((req.body || {}).code);
-    ipLimit(req, 'code', 60, 10 * 6e4);
+    const me = needPlayer(req), code = normCode((req.body || {}).code), keys = [['code:' + req.ip, 30, 10 * 6e4]];
+    failCheck(keys);
     const p = await tx(async c => {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
-      if (!t) throw E.notFound('Код не найден — проверьте у организатора');
+      if (!t) { failAdd(keys); throw E.notFound('Код не найден — проверьте у организатора'); }
       if (t.id === me.id) throw E.conflict('conflict', 'Этот аккаунт уже ваш');
       if (t.vk_id != null || t.phone != null || t.email != null) throw E.conflict('conflict', 'К аккаунту уже привязан вход');
       const used = await one(c, `SELECT (SELECT count(*) FROM match_lines WHERE player_id = $1) + (SELECT count(*) FROM entries WHERE player_id = $1)
@@ -155,12 +169,13 @@ function routes(app) {
 
   // вход по коду от ведущего: аккаунт для тех, у кого нет VK и кто не хочет SMS. Код одноразовый.
   app.post('/api/auth/code', async (req, reply) => {
-    const code = normCode((req.body || {}).code);
-    ipLimit(req, 'code', 60, 10 * 6e4);
+    const code = normCode((req.body || {}).code), keys = [['code:' + req.ip, 30, 10 * 6e4]];
+    failCheck(keys);
     const p = await tx(async c => {
       const t = await one(c, 'SELECT * FROM players WHERE claim = $1 FOR UPDATE', [code]);
-      if (!t) throw E.notFound('Код не найден — проверьте у ведущего');
+      if (!t) { failAdd(keys); throw E.notFound('Код не найден — проверьте у ведущего'); }
       if (t.blocked) throw blockedErr();
+      if (atLeast(t, 'admin')) throw adminPassErr();
       await c.query('UPDATE players SET claim = NULL WHERE id = $1', [t.id]);
       await startSession(reply, c, t.id, req.device);
       return t;
@@ -172,7 +187,7 @@ function routes(app) {
   app.post('/api/auth/phone', async (req, reply) => {
     if (!phoneOn()) throw E.notFound('Вход по телефону не настроен');
     const phone = normPhone((req.body || {}).phone), now = Date.now(), method = config.sms.method;
-    ipLimit(req, 'sms', 30, 36e5);
+    ipLimit(req, 'sms', 100, 36e5);
     // лимиты и запись в журнал — до отправки: ошибки провайдера тоже считаются
     await tx(async c => {
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [phone]);
@@ -200,14 +215,16 @@ function routes(app) {
   // шаг 2: { phone, code } → вход (новый номер — новый игрок); { link: true } — привязать номер к своему аккаунту
   app.post('/api/auth/phone/verify', async (req, reply) => {
     const b = req.body || {}, phone = normPhone(b.phone), code = String(b.code == null ? '' : b.code).replace(/\D/g, ''), now = Date.now();
-    ipLimit(req, 'verify', 60, 10 * 6e4);
+    // неверные коды: на номер — 10 в сутки (у кода звонка всего 4 цифры), с одного адреса — 60 за 10 минут
+    const keys = [['pv:' + phone, 10, 864e5], ['pvip:' + req.ip, 60, 10 * 6e4]];
+    failCheck(keys);
     if (code.length !== DIGITS.call && code.length !== DIGITS.sms) throw E.bad('Код — 4 последние цифры номера, с которого звонили, или 6 цифр из SMS', 'code');
     const link = b.link === true, me = link ? needPlayer(req) : null;
     // попытка считается сразу и вне транзакции: неверный код не откатывает счётчик
     const row = await one(pool, `UPDATE phone_codes SET tries = tries + 1 WHERE phone = $1 AND expires_at > $2 AND tries < CASE digits WHEN 4 THEN ${TRIES[4]} ELSE ${TRIES[6]} END RETURNING code_hash`, [phone, now]);
-    if (!row) throw E.conflict('code_expired', 'Код устарел или кончились попытки — запросите новый');
+    if (!row) { failAdd(keys); throw E.conflict('code_expired', 'Код устарел или кончились попытки — запросите новый'); }
     const want = Buffer.from(row.code_hash), got = Buffer.from(codeHash(phone, code));
-    if (!crypto.timingSafeEqual(want, got)) throw E.conflict('bad_code', 'Неверный код');
+    if (!crypto.timingSafeEqual(want, got)) { failAdd(keys); throw E.conflict('bad_code', 'Неверный код'); }
     let created = false;
     const p = await tx(async c => {
       if (!(await c.query('DELETE FROM phone_codes WHERE phone = $1 AND code_hash = $2', [phone, row.code_hash])).rowCount) throw E.conflict('code_expired', 'Код уже использован — запросите новый');
@@ -217,8 +234,10 @@ function routes(app) {
         return one(c, 'UPDATE players SET phone = $2 WHERE id = $1 RETURNING *', [me.id, phone]);
       }
       let t = owner;
-      if (!t) { t = await createPlayer(c, { name: 'Игрок ' + phone.slice(-4), phone }); created = true; }
+      // новый аккаунт: на экране входа написано, что вход — согласие с политикой
+      if (!t) { t = await createPlayer(c, { name: 'Игрок ' + phone.slice(-4), phone, consent: true }); created = true; }
       if (t.blocked) throw blockedErr();
+      if (atLeast(t, 'admin')) throw adminPassErr();
       await startSession(reply, c, t.id, req.device);
       return t;
     });
@@ -230,16 +249,14 @@ function routes(app) {
   // (npm run admin) или тех. администратором в панели; после 5 неверных паролей вход по логину закрыт на 15 минут.
   app.post('/api/auth/password', async (req, reply) => {
     const b = req.body || {}, login = normLogin(b.login), pw = typeof b.password === 'string' ? b.password : '';
-    ipLimit(req, 'pass', 10, 10 * 6e4);
-    const bad = () => E.conflict('bad_login', 'Неверный логин или пароль');
+    const keys = passKeys(req, 'l:' + login);
+    failCheck(keys);
+    const bad = () => { failAdd(keys); return E.conflict('bad_login', 'Неверный логин или пароль'); };
     if (!login || !pw || pw.length > 200) throw bad();
     const p = await one(pool, 'SELECT * FROM players WHERE login = $1', [login]);
     // нет такого логина — всё равно считаем хэш: ответ по времени не выдаёт, есть ли логин
     if (!p || !p.pass_hash) { await verifyPassword(pw, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'); throw bad(); }
-    const now = Date.now();
-    if (p.pass_lock_until && p.pass_lock_until > now) throw tooMany(Math.ceil((p.pass_lock_until - now) / 1000), 'Вход по логину временно закрыт после неверных паролей — повторите через ' + Math.ceil((p.pass_lock_until - now) / 6e4) + ' мин');
     if (!await verifyPassword(pw, p.pass_hash)) {
-      await pool.query('UPDATE players SET pass_fails = pass_fails + 1, pass_lock_until = CASE WHEN pass_fails + 1 >= $2 THEN $3 ELSE pass_lock_until END WHERE id = $1', [p.id, PASS_FAILS, now + PASS_LOCK]);
       req.log.warn({ login }, 'bad admin password');
       throw bad();
     }
@@ -255,16 +272,18 @@ function routes(app) {
 
   // сменить свой пароль: { current, password }. Пароля ещё нет, а почта привязана — задать без current
   app.put('/api/me/password', async req => {
-    const me = needPlayer(req), b = req.body || {};
-    ipLimit(req, 'pass', 10, 10 * 6e4);
+    const me = needPlayer(req), b = req.body || {}, keys = [['pwc:' + me.id, 10, PASS_LOCK]];
+    failCheck(keys);
     const cur = await one(pool, 'SELECT * FROM players WHERE id = $1', [me.id]);
     if (!cur.pass_hash && !cur.email) throw E.conflict('conflict', 'Сначала привяжите почту — по ней и паролю будете входить');
-    if (cur.pass_hash && !await verifyPassword(typeof b.current === 'string' ? b.current : '', cur.pass_hash)) throw E.conflict('bad_login', 'Текущий пароль неверный');
+    if (cur.pass_hash && !await verifyPassword(typeof b.current === 'string' ? b.current : '', cur.pass_hash)) { failAdd(keys); throw E.conflict('bad_login', 'Текущий пароль неверный'); }
     // администраторам с логином — строже (от 10 символов)
     const bad = cur.login ? passwordProblem(b.password) : require('./email').playerPassProblem(b.password);
     if (bad) throw E.bad(bad, 'password');
     await tx(async c => {
       await c.query('UPDATE players SET pass_hash = $2, pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [me.id, await hashPassword(b.password)]);
+      // новый пароль: остальные входы закрываются, этот остаётся
+      await c.query('DELETE FROM sessions WHERE player_id = $1 AND token_hash <> $2', [me.id, sha(req.cookies[SID] || '')]);
       await require('./audit').audit(c, me, 'password.change', me, null);
     });
     cache.clear();
@@ -338,7 +357,7 @@ function routes(app) {
       if (!vkId) return fail('no user id');
       const name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim().replace(/\s+/g, ' ').slice(0, 32) || 'Игрок VK';
       const out = await tx(async c => {
-        const p = await one(c, 'SELECT id, blocked FROM players WHERE vk_id = $1', [vkId]);
+        const p = await one(c, 'SELECT id, blocked, role FROM players WHERE vk_id = $1', [vkId]);
         if (saved.l) {
           if (!req.player || req.player.id !== saved.l) return 'fail';
           if (p && p.id !== saved.l) return 'vk_taken';
@@ -346,7 +365,8 @@ function routes(app) {
           return 'linked';
         }
         if (p && p.blocked) return 'blocked';
-        await startSession(reply, c, p ? p.id : (await createPlayer(c, { name, vk_id: vkId })).id, req.device);
+        if (p && atLeast(p, 'admin')) return 'admin_pass';
+        await startSession(reply, c, p ? p.id : (await createPlayer(c, { name, vk_id: vkId, consent: true })).id, req.device);
         return null;
       });
       cache.clear();
@@ -358,4 +378,4 @@ function routes(app) {
   });
 }
 
-module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone, ipLimit, tooMany, blockedErr, sha, PASS_FAILS, PASS_LOCK, PASS_SESSION, SESSION_MS };
+module.exports = { hooks, routes, needPlayer, needPerm, startSession, clearCache, meResp, normPhone, ipLimit, failCheck, failAdd, passKeys, tooMany, blockedErr, sha, PASS_FAILS, PASS_LOCK, PASS_SESSION, SESSION_MS };

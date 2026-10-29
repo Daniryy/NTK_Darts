@@ -18,6 +18,8 @@ module.exports = {
   uploadDir: env.UPLOAD_DIR || (prod ? '/srv/oche/uploads' : require('node:path').join(__dirname, '..', 'uploads')),
   // документы заявок на звания: закрытая папка, nginx её не отдаёт; на VPS — /srv/oche/private
   privateDir: env.PRIVATE_DIR || (prod ? '/srv/oche/private' : require('node:path').join(__dirname, '..', 'uploads-private')),
+  // почта для вопросов о личных данных — показывается на странице политики
+  contact: env.CONTACT_EMAIL || '',
   vk: { appId: env.VK_APP_ID || '', domain: env.VK_DOMAIN || 'id.vk.ru' },
   // вход по телефону: SMS_PROVIDER=smsru и SMS_RU_API_ID; в разработке по умолчанию log — код пишется в журнал
   sms: {
