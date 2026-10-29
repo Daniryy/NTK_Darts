@@ -4,16 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Oche Дартс — Клубная экосистема и счётчик</title>
+<meta name="description" content="Oche — дартс-турниры онлайн: регистрация игроков, сетки и квалификация, счёт с телефона, табло для ТВ, рейтинг и статистика клубов.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Oche">
+<meta property="og:title" content="Oche Дартс — турниры, счёт и рейтинг">
+<meta property="og:description" content="Сетки и квалификация, счёт с телефона, табло для ТВ, рейтинг игроков и клубов.">
+<meta property="og:image" content="icons/icon-512.png">
+<meta name="twitter:card" content="summary">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e1015">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Oche">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet"></noscript>
+<!-- шрифты — с нашего сервера: адрес посетителя не уходит в Google -->
+<link rel="preload" href="/fonts/golos-text-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link href="/fonts/fonts.css" rel="stylesheet">
 <style>
 :root { --top-h: 59px; }
 @media (pointer: coarse) { :root { --top-h: 65px; } }
@@ -365,6 +371,13 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .pill.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-glow); }
 .lnk { color: var(--fg); font-weight: 500; text-decoration: underline; text-decoration-color: var(--line-bright); text-underline-offset: 3px; }
 .lnk:hover { text-decoration-color: var(--green); color: var(--green); }
+.consent { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.45; }
+.consent input { margin-top: 1px; }
+.pd-note { font-size: 12px; margin-top: 4px; }
+.policy h2 { font-size: 17px; margin: 8px 0 -6px; }
+a.mini { text-decoration: none; }
+.policy p, .policy li { line-height: 1.6; color: var(--fg); }
+.policy ul { margin: 6px 0; padding-left: 20px; }
 .pn { font-weight: 500; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pn:hover { color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
 .mini { padding: 6px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface2); font-size: 12.5px; font-weight: 500; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
@@ -1844,7 +1857,8 @@ function recalc() {
   MBY = {}; db.matches.forEach(m => MBY[m.id] = m);
   const r = {}, n = {};
   db.players.forEach(p => { r[p.id] = 1500; n[p.id] = 0; });
-  db.matches.filter(m => m.tid && m.st === 'ok' && m.pl.length === 2 && m.pl[0].id in r && m.pl[1].id in r).sort((a, b) => a.t - b.t).forEach(m => {
+  // рейтинг — только официальные турниры (клубные тоже), как на сервере
+  db.matches.filter(m => m.tid && TBY[m.tid] && TBY[m.tid].official && m.st === 'ok' && m.pl.length === 2 && m.pl[0].id in r && m.pl[1].id in r).sort((a, b) => a.t - b.t).forEach(m => {
     const a = m.pl[0].id, b = m.pl[1].id;
     const ea = 1 / (1 + Math.pow(10, (r[b] - r[a]) / 400)), sa = m.w === 0 ? 1 : 0;
     r[a] += 32 * (sa - ea); r[b] -= 32 * (sa - ea); n[a]++; n[b]++;
@@ -2008,7 +2022,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans', 'clubs', 'help'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'staff', 'title', 'plans', 'clubs', 'help', 'privacy'].includes(h)) return true;
   // на сервере турнир, игрок, матч или клуб загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch|club)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -2268,7 +2282,7 @@ const RR_MAX = 10, BR_MAX = 64;
 const rt = id => RATING[id] ? RATING[id].r : 1500;
 const liveCtxIs = (tid, r, i) => !!(hasLiveGame() && G.ctx && G.ctx.tid === tid && G.ctx.r === r && G.ctx.i === i);
 const gref = (t, g) => t.id + '|' + g.r + '|' + g.i;
-function bctx(t) { const rv = resolver(t); return { rv, nums: gameNums(t, rv), live: tStatus(t) === 'live', score: canDo(t, 'score') }; }
+function bctx(t) { const rv = resolver(t); return { rv, nums: gameNums(t, rv), live: tStatus(t) === 'live', score: canDo(t, 'score'), staff: canDo(t, 'staff') }; }
 // название матча: «A1–A2» (подписи буквами) или «№5»
 const gName = (t, g, n) => (g && gameTag(t, g)) || (n ? '№' + n : '');
 // при подписях NDL: куда идут победитель и проигравший — «победитель → A1 · проигравший → A5»
@@ -2292,7 +2306,7 @@ function gameActs(t, g, st, live) {
   if (lm) return '<button class="mini go" data-act="mview" data-v="' + lm + '">' + I.clock + 'Идёт · смотреть</button>';
   if (!canDo(t, 'score')) return '';
   if (liveCtxIs(t.id, g.r, g.i)) return '<button class="mini go" data-act="tplay" data-v="' + gref(t, g) + '">' + I.clock + 'Идёт · продолжить</button>';
-  return '<button class="mini go" data-act="tplay" data-v="' + gref(t, g) + '">Играть</button><button class="mini" data-act="qscore" data-v="' + gref(t, g) + '">Счёт</button>';
+  return '<button class="mini go" data-act="tplay" data-v="' + gref(t, g) + '">Играть</button>' + (canDo(t, 'staff') ? '<button class="mini" data-act="qscore" data-v="' + gref(t, g) + '">Счёт</button>' : '');
 }
 // «Ваш матч»: готовая к игре встреча, где играет вошедший игрок
 function myGame(t) {
@@ -2391,7 +2405,7 @@ function gameBox(t, g, cx) {
   // вся пара — одна цель: сыгранная открывает протокол, готовая — ввод счёта, идущая — счётчик
   const act = st === 'done' && protoOk(g.res.mid) ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"'
     : lm ? ' role="button" tabindex="0" data-act="mview" data-v="' + lm + '"'
-    : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
+    : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live || !cx.staff ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
   const row = (id, side) => '<div class="gb-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : lm ? liveLegs(t, lm, side) : '') + '</span></div>';
   return '<div class="gb' + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="gb-h"><span>' + gName(t, g, n) + (ready ? ' ' + boardTag(t, g.r, g.i) : '') + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + '</div>' + row(a, 0) + row(b, 1) + '</div>';
 }
@@ -2421,7 +2435,7 @@ function gameCell(t, g, cx, o) {
   const n = cx.nums.get(g.r + ':' + g.i), ready = st === 'ready' && cx.live, lm = ready && !liveCtxIs(t.id, g.r, g.i) ? otherLive(t, g) : null, live = ready && (!!lm || liveCtxIs(t.id, g.r, g.i));
   const act = st === 'done' && protoOk(g.res.mid) ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"'
     : lm ? ' role="button" tabindex="0" data-act="mview" data-v="' + lm + '"'
-    : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
+    : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live || !cx.staff ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
   const row = (id, side) => '<div class="pc-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : lm ? liveLegs(t, lm, side) : '') + '</span></div>';
   return '<div class="' + cls + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="pc-h"><span>' + gName(t, g, n) + '</span>' + (ready ? boardTag(t, g.r, g.i) + '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + tag + '</div>' + row(a, 0) + row(b, 1) + gDest(t, g) + '</div>';
 }
@@ -3041,7 +3055,7 @@ function pagerHTML(page, total, per, act) {
 // общий вид страницы рейтинга; d: { rows: [{ id, rank, city, region, r, avg, n }], total, regions: [{ name, n }] } или null, пока грузится
 function ratingHTML(d, wait) {
   const key = S.rtab === 'a' ? 'avg' : 'r', reg = S.rregion || '';
-  let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по турнирным матчам: старт 1500, до ±32 за матч</p></div></div>';
+  let h = '<div class="phead"><div><h1 class="h1">Рейтинг</h1><p class="meta">Рейтинг Эло по матчам официальных и клубных турниров: старт 1500, до ±32 за матч</p></div></div>';
   h += '<div class="search-row rsearch"><div class="seg2">' + [['r', 'Рейтинг'], ['a', 'Среднее']].map(([v, l]) => '<button class="' + (key === (v === 'a' ? 'avg' : 'r') ? 'on' : '') + '" data-act="rtab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const regs = (d && d.regions) || S.rregs || [];
   if (d) S.rregs = d.regions;
@@ -4213,6 +4227,7 @@ function loginModal() {
     h += '<p class="meta">Ведущий завёл вам аккаунт и дал код из 8 букв и цифр? Введите его — вход сразу, без SMS и VK.</p><input class="inp big code-inp" id="login-code" data-lf="code" autocomplete="off" maxlength="16" placeholder="K7MQ2XRA" aria-label="Код от ведущего" value="' + esc(L.code) + '"><button class="btn" data-act="login-code"' + dis + '>Войти</button>';
   }
   if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
+  if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>. Новый аккаунт создаётся с этим согласием.</p>';
   if (!L.link) h += devBox();
   return h + '</div></div>';
 }
@@ -4235,6 +4250,7 @@ function mailForm(L, c, dis) {
   if (L.link === 'email') return h + '<p class="meta">Пришлём код на почту. Подтверждённая почта — вход по паролю и восстановление пароля, если забудете.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>';
   if (L.mode === 'reg') {
     h += inp('mail-name', 'name', 'text', 'Имя и фамилия', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
+    h += '<label class="consent meta"><input type="checkbox" id="mail-consent"' + (L.consent ? ' checked' : '') + '><span>Согласен на обработку персональных данных по <button class="lnk" data-act="privacy-open">политике</button></span></label>';
     h += '<button class="btn" data-act="mail-reg"' + dis + '>Зарегистрироваться</button><span class="meta">' + (c.email ? 'Пришлём на почту код подтверждения.' : 'Почта понадобится для входа вместе с паролем.') + ' Уже есть аккаунт? ' + linkBtn('login', 'Войти') + '</span>';
     return h;
   }
@@ -4256,8 +4272,10 @@ function mailAct(a) {
   }
   if (a === 'reg') {
     L.name = val('mail-name'); L.city = val('mail-city'); L.email = val('mail-email'); L.regPass = pass();
+    const ck = $('mail-consent'); L.consent = !!(ck && ck.checked);
     if (!L.name || !L.email) { L.err = 'Введите имя и почту.'; return render(); }
-    return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: pass() }), r => r.player ? loggedIn('Аккаунт создан. Добро пожаловать!') : toCode(r));
+    if (!L.consent) { L.err = 'Отметьте согласие на обработку персональных данных.'; return render(); }
+    return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: pass(), consent: true }), r => r.player ? loggedIn('Аккаунт создан. Добро пожаловать!') : toCode(r));
   }
   if (a === 'set') {
     L.email = val('mail-email');
@@ -4268,7 +4286,7 @@ function mailAct(a) {
     if (a === 'send') L.email = val('mail-email');
     if (!L.email) { L.err = 'Введите почту.'; return render(); }
     // повтор кода при регистрации — та же форма регистрации ещё раз
-    if (L.mode === 'reg') return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: L.regPass || '' }), toCode);
+    if (L.mode === 'reg') return loginDo(Api.register({ name: L.name, city: L.city, email: L.email, password: L.regPass || '', consent: true }), toCode);
     return loginDo(Api.mailSend(L.email, L.link === 'email' ? 'link' : 'reset'), toCode);
   }
   if (a === 'verify') {
@@ -4335,7 +4353,16 @@ function meCard() {
   if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
   if (Api.role === 'tech' && (!c.vk || !c.email)) h += '<p class="meta">На сервере пока не подключены: ' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(', ') + '.</p>';
   h += '</div>';
-  return '<div class="acc-grid">' + h + titleCard() + planCard() + clubCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
+  return '<div class="acc-grid">' + h + titleCard() + planCard() + clubCard() + dataCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
+}
+// личные данные: выгрузка всего о себе и удаление аккаунта
+function dataCard() {
+  const adm = Api.role === 'admin' || Api.role === 'tech';
+  let h = '<div class="card sec"><span class="label">Мои данные</span><p class="meta">Что о вас хранится и зачем — в <button class="lnk" data-act="go" data-v="privacy">политике обработки данных</button>.</p>';
+  h += '<div class="row"><a class="mini" href="' + esc(Api.base) + '/api/me/export" download>Скачать мои данные</a>' + (adm || S.meDel ? '' : '<button class="mini dng" data-act="me-del-ask">Удалить аккаунт</button>') + '</div>';
+  if (adm) h += '<p class="meta">Аккаунт администратора удаляет тех. администратор.</p>';
+  else if (S.meDel) h += '<p class="meta">Аккаунт удалится без возврата: профиль, входы, фото, тарифы и заявки на звание. Если вы играли в турнирах — вместо удаления имя заменится на «Удалённый игрок», а результаты останутся в сетках, чтобы не сломать турниры соперникам.</p><div class="ac-btns"><button class="btn sm dng-btn" data-act="me-del">Да, удалить</button><button class="ghost sm" data-act="me-del-no">Отмена</button></div>';
+  return h + '</div>';
 }
 function clubCard() {
   const e = lz('clubs:mine', () => Api.get('/api/clubs/mine'), 60000);
@@ -5942,6 +5969,7 @@ function render() {
     : R === 'plans' ? plansView()
     : R === 'clubs' ? clubsView()
     : R === 'help' ? helpView()
+    : R === 'privacy' ? privacyView()
     : R.startsWith('club.') ? clubView(R.slice(5))
     : R.startsWith('desk.') ? deskView(R.slice(5))
     : R.startsWith('watch.') ? watchView(R.slice(6))
@@ -6069,6 +6097,10 @@ document.addEventListener('click', e => {
     case 'feedf': S.feedF = v; S.feedN = 15; render(); break;
     case 'sv-retry': svNow(v); render(); break;
     case 'login': svLogin(); break;
+    case 'privacy-open': closeModals(); go('privacy'); break;
+    case 'me-del-ask': S.meDel = true; render(); break;
+    case 'me-del-no': S.meDel = false; render(); break;
+    case 'me-del': svDo(Api.req('DELETE', '/api/me', { confirm: true }), () => { S.meDel = false; Api.setMe({}); ME = null; Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); svStale('rating'); go('feed'); toast('Аккаунт удалён.'); }); break;
     case 'logout': svDo(Api.logout(), () => { ME = null; Object.keys(SVC).forEach(k => { SVC[k].at = 0; }); closeModals(); toast('Вы вышли.'); }); break;
     case 'dev-login': { const el = $('dev-id'); svDo(Api.devLogin(el ? el.value.trim() : ''), () => loggedIn()); break; }
     case 'login-tab': if (S.login) { S.login.tab = v; S.login.err = ''; render(); setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30); } break;
@@ -6585,6 +6617,7 @@ document.addEventListener('input', e => {
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
+  if (t.id === 'mail-consent' && S.login) { S.login.consent = t.checked; if (S.login.err) { S.login.err = ''; render(); } return; }
   if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
   if (t.dataset && t.dataset.bnr && S.bnr) { S.bnr[t.dataset.bnr] = t.value; return; }
   if (t.id === 'num-n') { S.numN = t.value; return; }
@@ -6747,7 +6780,7 @@ const HELP = [
     ['Как вести счёт', '«Сумма» — набираете очки за подход и жмёте ввод, это быстрее всего. «По дротикам» — каждый дротик отдельно (Дубль/Трипл перед числом), тогда считаются попытки на дубль. Ошиблись — «Отмена» снимает последний бросок, можно отменять подряд.'],
     ['Подсказки закрытия и озвучка', 'Когда остаётся 170 и меньше, счётчик показывает, как закрыть. В настройках (шестерёнка) можно включить «Озвучка счёта»: телефон проговорит набор, перебор и сколько осталось — не нужно смотреть на экран.'],
     ['Пропала сеть', 'Ничего не теряется: подходы сохраняются на телефоне (вверху видно «не отправлено: N») и уйдут на сервер, когда сеть появится. Если счёт начали на другом телефоне — «Забрать ведение счёта».'],
-    ['Рейтинг и рекорды', 'Рейтинг Эло считается по турнирным матчам: старт 1500, за матч до ±32. После матча счётчик поздравит с личным рекордом: лучший средний набор, закрытие, лег, подход.'],
+    ['Рейтинг и рекорды', 'Рейтинг Эло считается по матчам официальных и клубных турниров: старт 1500, за матч до ±32. Дружеские турниры игроков в рейтинг не идут. После матча счётчик поздравит с личным рекордом: лучший средний набор, закрытие, лег, подход.'],
     ['Как приложение на телефоне', 'Настройки → «Установить на экран телефона» (на iPhone: «Поделиться» → «На экран Домой»). Открывается без адресной строки, экран не гаснет во время игры.']
   ]],
   ['Ведущему', [
@@ -6766,7 +6799,23 @@ function helpView() {
   HELP.forEach(([sec, items]) => {
     h += '<div class="sec"><span class="label">' + sec + '</span><div class="card hlp">' + items.map(([q, a]) => '<details><summary>' + esc(q) + '</summary><p>' + esc(a) + '</p></details>').join('') + '</div></div>';
   });
-  return h + '<p class="meta">Остались вопросы — напишите организатору своего клуба.</p></div>';
+  return h + '<p class="meta">Остались вопросы — напишите организатору своего клуба. <button class="lnk" data-act="go" data-v="privacy">Политика обработки персональных данных</button></p></div>';
+}
+// политика обработки персональных данных (152-ФЗ)
+function privacyView() {
+  const c = (Api.config && Api.config.contact) || '';
+  const li = a => '<ul>' + a.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+  let h = '<div class="narrow policy"><div class="phead"><h1 class="h1">Политика обработки персональных данных</h1></div><div class="card sec">';
+  h += '<p>Oche — сервис для дартс-турниров: регистрация игроков, сетки, счёт, рейтинг и статистика. Здесь — какие данные мы храним, зачем и как вы можете ими управлять.</p>';
+  h += '<h2>Какие данные храним</h2>' + li(['имя, город и клуб, которые вы указали;', 'почту, телефон или привязку VK — для входа;', 'фото профиля, если загрузили;', 'результаты матчей и турниров, рейтинг и статистику;', 'заявки на подтверждение звания и приложенные документы — их видят только вы и проверяющие администраторы;', 'сведения о тарифе;', 'служебные данные входа: сеанс, устройство, IP-адрес — для защиты от подбора пароля.']);
+  h += '<h2>Зачем</h2>' + li(['чтобы вы могли войти и участвовать в турнирах;', 'чтобы показывать сетки, результаты, рейтинг и ленту турниров;', 'чтобы подтвердить спортивное звание и скидку на тариф;', 'чтобы защитить аккаунты от взлома.']);
+  h += '<h2>Что видно всем</h2><p>Имя, город, клуб, фото, звание, результаты турниров, рейтинг и статистика — это публичная часть профиля, как в протоколах соревнований. Почта, телефон, документы и платёжные сведения не показываются никому, кроме вас и администраторов сервиса.</p>';
+  h += '<h2>Сколько храним</h2><p>Пока у вас есть аккаунт. Коды подтверждения — до истечения, журналы SMS — 2 суток, журнал действий администраторов — год. Резервные копии базы хранятся несколько недель и затем удаляются.</p>';
+  h += '<h2>Ваши права</h2><p>В профиле, в разделе «Мои данные», можно скачать всё, что о вас хранится, и удалить аккаунт. Если вы играли в турнирах, вместо полного удаления имя заменяется на «Удалённый игрок», контакты, входы, фото и документы стираются, а результаты остаются в сетках — иначе сломались бы турниры других игроков. Исправить имя, город и клуб можно в профиле.</p>';
+  h += '<h2>Согласие</h2><p>Регистрируясь или входя в Oche, вы даёте согласие на обработку перечисленных данных для этих целей. Отозвать согласие — удалить аккаунт в профиле' + (c ? ' или написать на <a class="lnk" href="mailto:' + esc(c) + '">' + esc(c) + '</a>' : '') + '.</p>';
+  h += '<h2>Передача третьим лицам</h2><p>Данные не продаются и не передаются для рекламы. Для входа и писем используются VK ID, сервис звонков/SMS и почтовый сервис — только в объёме, нужном для входа и отправки кода.</p>';
+  if (c) h += '<h2>Связаться</h2><p>Вопросы о персональных данных: <a class="lnk" href="mailto:' + esc(c) + '">' + esc(c) + '</a></p>';
+  return h + '</div></div>';
 }
 function installBox() {
   if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return '';
@@ -6790,7 +6839,7 @@ async function boot() {
     Api.ob.onchange = () => { if (!(R === 'play' && S.inGame)) $('top').innerHTML = topView(); else if (typeof obChanged === 'function') obChanged(); };
     Api.ob.clean(); Api.ob.kick();
     const lg = (location.search.match(/[?&]login=(\w+)/) || [])[1];
-    if (lg) toast({ fail: 'Не удалось войти через VK. Попробуйте ещё раз.', vk_taken: 'Этот VK уже привязан к другому аккаунту.', linked: 'VK привязан к аккаунту.', blocked: 'Аккаунт заблокирован администратором.' }[lg] || 'Вход не выполнен.');
+    if (lg) toast({ fail: 'Не удалось войти через VK. Попробуйте ещё раз.', vk_taken: 'Этот VK уже привязан к другому аккаунту.', linked: 'VK привязан к аккаунту.', blocked: 'Аккаунт заблокирован администратором.', admin_pass: 'Администраторы входят по логину или почте с паролем.' }[lg] || 'Вход не выполнен.');
   } else loadDb();
   const su = lsGet('oche2.setup');
   S.setup = su && Array.isArray(su.names) && su.names.length ? su : defaultSetup();
