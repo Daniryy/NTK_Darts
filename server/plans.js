@@ -5,12 +5,13 @@ const { all, one } = require('./db');
 const { KINDS } = require('./titles');
 const { RANK, permsOf } = require('./roles');
 
-// скидка, %: ms — МС и выше (МС, МСМК, ЗМС), kms — КМС, r1 — 1 разряд
-let discounts = { ms: 25, kms: 10, r1: 5 };
-const DISC_KEYS = [['ms', 'МС и выше (МС, МСМК, ЗМС)'], ['kms', 'КМС'], ['r1', '1 разряд']];
+// скидка за подтверждённое звание, % — у каждого звания своя (ЗМС в дартсе один на всю Россию, МСМК — 18, МС — 322)
+const DEF = { zms: 90, msmk: 70, ms: 40, kms: 10, r1: 5 };
+let discounts = Object.assign({}, DEF);
+const DISC_KEYS = [['zms', 'ЗМС'], ['msmk', 'МСМК'], ['ms', 'МС'], ['kms', 'КМС'], ['r1', '1 разряд']];
 function setDiscounts(v) {
   const out = {};
-  DISC_KEYS.forEach(([k]) => { const n = v && Number.isInteger(v[k]) ? v[k] : 0; out[k] = Math.max(0, Math.min(90, n)); });
+  DISC_KEYS.forEach(([k]) => { const n = v && Number.isInteger(v[k]) ? v[k] : DEF[k]; out[k] = Math.max(0, Math.min(90, n)); });
   discounts = out;
   return out;
 }
@@ -18,7 +19,7 @@ const getDiscounts = () => Object.assign({}, discounts);
 // скидка по короткому званию из профиля («МС», «КМС», «1 разряд»): { pct, why }
 function discountFor(title) {
   const k = (KINDS.find(x => x[1] === title) || [])[0];
-  const key = k === 'zms' || k === 'msmk' || k === 'ms' ? 'ms' : k === 'kms' ? 'kms' : k === 'r1' ? 'r1' : null;
+  const key = DISC_KEYS.some(x => x[0] === k) ? k : null;
   return key && discounts[key] ? { pct: discounts[key], why: 'звание ' + title } : { pct: 0, why: '' };
 }
 const priceWith = (price, pct) => Math.round(price * (100 - pct) / 100);
