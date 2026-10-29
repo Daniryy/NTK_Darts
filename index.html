@@ -599,13 +599,22 @@ a.mini { text-decoration: none; }
 .no { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.45em; padding: 0 3px; margin-right: 6px; border-radius: 5px; background: var(--surface2); border: 1px solid var(--line-bright); font-family: var(--display); font-size: 11.5px; font-weight: 600; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
 .pc-r .ra, .gb-r .ra { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bd { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; border-radius: 5px; background: var(--brass-glow); color: var(--brass); font-weight: 700; letter-spacing: .04em; }
-.pc.path, .gb.path { box-shadow: inset 0 0 0 2px var(--brass); }
-.gb.path { box-shadow: 0 0 0 2px var(--brass); }
+/* путь игрока: его матчи светятся, остальное затемнено (без мигания) */
+.pc.path, .gb.path { box-shadow: inset 0 0 0 2px var(--brass), 0 0 16px color-mix(in srgb, var(--brass) 40%, transparent); position: relative; z-index: 1; }
+.gb.path { box-shadow: 0 0 0 2px var(--brass), 0 0 18px color-mix(in srgb, var(--brass) 45%, transparent); }
 .pc.path { background: color-mix(in srgb, var(--brass) 12%, transparent); }
-/* путь выбран — его матчи мягко вспыхивают, чтобы сразу найти их в сетке */
-.pflash { animation: pflash 1.2s ease-in-out 2; }
-@keyframes pflash { 50% { box-shadow: 0 0 0 4px var(--brass), 0 0 22px color-mix(in srgb, var(--brass) 55%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .pflash { animation: none; } }
+.has-path .gb, .has-path .pc:not(.void) { transition: opacity .25s ease; }
+.has-path .gb:not(.path), .has-path .pc:not(.path):not(.void) { opacity: .28; }
+.has-path .bk-pair::after, .has-path .bk-slot::before { opacity: .35; }
+/* свёрнутые круги сетки */
+.bk { --bk-fold: 34px; }
+.pg { --bk-fold: 34px; }
+.bk-col.folded { position: relative; }
+.fold-b { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-right: 6px; border-radius: 6px; color: var(--muted); border: 1px solid var(--line); background: var(--surface); font-size: 14px; line-height: 1; vertical-align: middle; }
+.fold-b:hover { color: var(--fg); border-color: var(--green); }
+.folded .fold-b, .pg-fold .fold-b { position: sticky; top: 0; width: 100%; height: auto; min-height: 160px; margin: 0; padding: 10px 0; }
+.fold-v { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.pg-fold { padding: 6px 4px; border-bottom: 0; }
 [data-pid].hp .pn { color: var(--brass); }
 .part-h { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 -4px; }
 .part-h b { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -2452,9 +2461,11 @@ function gameBox(t, g, cx) {
   return '<div class="gb' + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="gb-h"><span>' + gName(t, g, n) + (ready ? ' ' + boardTag(t, g.r, g.i) : '') + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + '</div>' + row(a, 0) + row(b, 1) + '</div>';
 }
 function treeHTML(t, cx, cols) {
-  let h = '<div class="scroll"><div class="bk" style="grid-template-columns:repeat(' + cols.length + ', var(--bk-w))">';
-  cols.forEach(c => {
-    h += '<div class="bk-col"><div class="label bk-lbl" title="' + esc(c.label) + '">' + esc(c.label) + '</div><div class="bk-games">';
+  const fold = colFold(t);
+  let h = '<div class="scroll"><div class="bk' + (S.hp ? ' has-path' : '') + '" style="grid-template-columns:' + cols.map((c, r) => fold.has(r) ? 'var(--bk-fold)' : 'var(--bk-w)').join(' ') + '">';
+  cols.forEach((c, r) => {
+    if (fold.has(r)) { h += '<div class="bk-col folded">' + foldBtn(t, r, c.label) + '</div>'; return; }
+    h += '<div class="bk-col"><div class="label bk-lbl" title="' + esc(c.label) + '">' + (r < cols.length - 1 ? foldBtn(t, r, c.label) : '') + esc(c.label) + '</div><div class="bk-games">';
     if (c.games.length === 1) h += '<div class="bk-pair solo"><div class="bk-slot">' + gameBox(t, c.games[0], cx) + '</div></div>';
     else for (let k = 0; k < c.games.length; k += 2) h += '<div class="bk-pair"><div class="bk-slot">' + gameBox(t, c.games[k], cx) + '</div><div class="bk-slot">' + gameBox(t, c.games[k + 1], cx) + '</div></div>';
     h += '</div></div>';
@@ -2482,11 +2493,14 @@ function gameCell(t, g, cx, o) {
   return '<div class="' + cls + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="pc-h"><span>' + gName(t, g, n) + '</span>' + (ready ? boardTag(t, g.r, g.i) + '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + tag + '</div>' + row(a, 0) + row(b, 1) + gDest(t, g) + '</div>';
 }
 function plGridHTML(t, cx, part) {
-  const R = bRounds(t), H = bSize(t) / 2, i0 = (part || 0) * H;
-  let h = '<div class="scroll"><div class="pg" style="--pg-n:' + R + '">';
-  for (let r = 0; r < R; r++) h += '<div class="pg-h' + (r ? ' pg-l' : '') + '">Круг ' + (r + 1) + (r === R - 1 ? ' · места' : '') + '</div>';
+  const R = bRounds(t), H = bSize(t) / 2, i0 = (part || 0) * H, fold = colFold(t);
+  const open = R - [...fold].filter(r => r < R - 1).length;
+  let h = '<div class="scroll"><div class="pg' + (S.hp ? ' has-path' : '') + '" style="--pg-n:' + open + ';grid-template-columns:' + Array.from({ length: R }, (_, r) => fold.has(r) && r < R - 1 ? 'var(--bk-fold)' : 'minmax(var(--pg-w), 1fr)').join(' ') + ';min-width:calc(' + open + ' * var(--pg-w) + ' + (R - open) + ' * var(--bk-fold))">';
+  for (let r = 0; r < R; r++) h += fold.has(r) && r < R - 1 ? '<div class="pg-h pg-fold' + (r ? ' pg-l' : '') + '" style="grid-row:span ' + (H + 1) + '">' + foldBtn(t, r, 'Круг ' + (r + 1)) + '</div>'
+    : '<div class="pg-h' + (r ? ' pg-l' : '') + '">' + (r < R - 1 ? foldBtn(t, r, 'Круг ' + (r + 1)) : '') + 'Круг ' + (r + 1) + (r === R - 1 ? ' · места' : '') + '</div>';
   for (let i = i0; i < i0 + H; i++) {
     for (let r = 0; r < R; r++) {
+      if (fold.has(r) && r < R - 1) continue;
       const per = bSize(t) / 2 ** (r + 1), first = i % per === 0, fin = r === R - 1;
       let tag = '';
       if (first && (r > 0 || fin)) {
@@ -2503,9 +2517,9 @@ function bracketView(t) {
   if (t.format === 'ko') {
     const cols = [];
     for (let r = 0; r < R; r++) cols.push({ label: roundLabel(t, r), games: Array.from({ length: S / 2 ** (r + 1) }, (_, i) => gameAt(t, r, i)) });
-    return (S > N ? '<p class="meta">Свободных мест: ' + (S - N) + ' — соперники проходят первый круг без игры.</p>' : '') + hpPicker(t) + labelsCtl(t) + treeHTML(t, cx, cols);
+    return (S > N ? '<p class="meta">Свободных мест: ' + (S - N) + ' — соперники проходят первый круг без игры.</p>' : '') + hpPicker(t) + labelsCtl(t) + foldCtl(t, cx) + treeHTML(t, cx, cols);
   }
-  const top = hpPicker(t) + labelsCtl(t);
+  const top = hpPicker(t) + labelsCtl(t) + foldCtl(t, cx);
   if (t.block) {
     const parts = bParts(t);
     let h = '<p class="meta">Сетка разделена на ' + parts + ' ' + pl(parts, 'часть', 'части', 'частей') + ' по ' + S + ' мест: в каждой проигравшие не выбывают и играют за свои места.' + (t.slots.length > N ? ' Свободных мест: ' + (t.slots.length - N) + '.' : '') + '</p>' + top;
@@ -2516,6 +2530,17 @@ function bracketView(t) {
     return h;
   }
   return '<p class="meta">Проигравшие не выбывают — разыгрываются все места 1–' + N + '.' + (S > N ? ' Свободных мест: ' + (S - N) + '.' : '') + ' Линии делят круг на группы: в каждой группе играют за свои места.</p>' + top + plGridHTML(t, cx);
+}
+// свёрнутые круги сетки (на этом устройстве): большая сетка — первые круги в узкую полосу, следующим больше места
+function colFold(t) { const all = lsGet('oche2.fold') || {}; return new Set(all[t.id] || []); }
+function colFoldSet(tid, list) { const all = lsGet('oche2.fold') || {}; if (list.length) all[tid] = list; else delete all[tid]; const ks = Object.keys(all); if (ks.length > 30) delete all[ks[0]]; lsSet('oche2.fold', all); }
+const foldBtn = (t, r, label) => '<button class="fold-b" data-act="col-tog" data-v="' + esc(t.id) + '|' + r + '" title="' + (colFold(t).has(r) ? 'Развернуть: ' : 'Свернуть: ') + esc(label) + '" aria-label="' + (colFold(t).has(r) ? 'Развернуть ' : 'Свернуть ') + esc(label) + '">' + (colFold(t).has(r) ? '<span class="fold-v">' + esc(label) + '</span>' : '‹') + '</button>';
+function foldCtl(t, cx) {
+  const R = bRounds(t);
+  if (R < 3) return '';
+  const fold = colFold(t), done = Bracket.roundProgress(t, cx.rv).filter(x => x.total && x.done >= x.total && x.r < R - 1 && !fold.has(x.r)).map(x => x.r);
+  if (!done.length && !fold.size) return '';
+  return '<div class="hp-row">' + (done.length ? '<button class="mini" data-act="col-done" data-v="' + esc(t.id) + '">Свернуть сыгранные круги (' + done.length + ')</button>' : '') + (fold.size ? '<button class="mini" data-act="col-open" data-v="' + esc(t.id) + '">Развернуть все круги</button>' : '') + '</div>';
 }
 // организатор переключает подписи матчей: буквами (A1, B1) или номерами
 function labelsCtl(t) {
@@ -6222,6 +6247,9 @@ document.addEventListener('click', e => {
     case 'tfa-close': S.tfa = null; render(); break;
     case 'tfa-copy': copyText(S.tfa && S.tfa.backup ? S.tfa.backup.join('\n') : '', 'Коды скопированы.'); break;
     case 'staff-open': closeModals(); go('admin'); break;
+    case 'col-tog': { const [tid, r] = v.split('|'), t = TBY[tid]; if (!t) break; const f = colFold(t); f.has(+r) ? f.delete(+r) : f.add(+r); colFoldSet(tid, [...f]); render(); break; }
+    case 'col-done': { const t = TBY[v]; if (!t) break; const R = bRounds(t), f = colFold(t); Bracket.roundProgress(t, resolver(t)).forEach(x => { if (x.total && x.done >= x.total && x.r < R - 1) f.add(x.r); }); colFoldSet(v, [...f]); render(); break; }
+    case 'col-open': colFoldSet(v, []); render(); break;
     case 'demo-as': svDo(Api.devLogin(v), () => { closeModals(); loggedIn(); }); break;
     case 'mconf': {
       const [id, k] = v.split('|');
@@ -6925,8 +6953,6 @@ function showPath(id) {
   if (!els.length) return;
   // самый дальний круг игрока — последний в разметке (колонки идут по кругам)
   els[els.length - 1].scrollIntoView({ behavior: motionOk() ? 'smooth' : 'auto', block: 'center', inline: 'center' });
-  els.forEach(el => { el.classList.remove('pflash'); void el.offsetWidth; el.classList.add('pflash'); });
-  setTimeout(() => els.forEach(el => el.classList.remove('pflash')), 2400);
 }
 function hoverPath(id, on) {
   document.querySelectorAll('[data-pids~="' + id + '"]').forEach(el => el.classList.toggle('path', on || el.dataset.pids.split(' ').includes(S.hp || '')));
