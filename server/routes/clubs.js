@@ -6,6 +6,7 @@ const { E, V } = require('../errors');
 const { needPlayer, clearCache } = require('../auth');
 const { needPerm } = require('../auth');
 const { audit } = require('../audit');
+const config = require('../config');
 const { can } = require('../roles');
 const { playerShort } = require('../players');
 const T = require('../tour');
@@ -95,7 +96,7 @@ module.exports = async function (app) {
       upcoming: (await T.loadTours(pool, upcoming)).map(t => T.tourCard(t, me)),
       past: (await T.loadTours(pool, past)).map(t => T.tourCard(t, me)),
       players: top.map(p => Object.assign(playerShort(p), { visits: p.visits })),
-      photos: photos.map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h, tid: p.tournament_id })),
+      photos: photos.map(p => ({ id: p.id, url: config.uploadUrl + p.file, w: p.w, h: p.h, tid: p.tournament_id })),
       manage, tools
     };
     if (tools) {

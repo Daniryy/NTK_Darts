@@ -269,8 +269,15 @@ async function seed(c) {
 
 async function main() {
   if (process.argv.includes('--reset')) {
-    if (process.env.NODE_ENV === 'production') throw new Error('--reset запрещён в production');
+    // на VPS сбросить можно только демо-сервер (DEMO=1): его база и фото пересоздаются каждую ночь
+    if (process.env.NODE_ENV === 'production' && process.env.DEMO !== '1') throw new Error('--reset запрещён в production');
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
+    if (process.env.DEMO === '1') {
+      const fs = require('node:fs'), path = require('node:path'), config = require('../server/config');
+      for (const dir of [config.uploadDir, config.privateDir]) {
+        try { for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f), { force: true }); } catch (e) { /* папки ещё нет */ }
+      }
+    }
   }
   await migrate();
   const n = (await pool.query('SELECT count(*) AS n FROM players')).rows[0].n;

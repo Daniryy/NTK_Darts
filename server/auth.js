@@ -11,7 +11,7 @@ const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
 const T = require('./totp');
 
-const SID = 'oche_sid', VKC = 'oche_vk';
+const SID = config.sidName, VKC = 'oche_vk';
 const SESSION_MS = 180 * 864e5;
 const secure = config.publicUrl.startsWith('https://');
 const b64url = buf => buf.toString('base64url');
@@ -139,7 +139,7 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, contact: config.contact }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, demo: config.demo, contact: config.contact }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
@@ -400,6 +400,14 @@ function routes(app) {
         await startSession(reply, c, id, req.device);
       });
       return { ok: true };
+    });
+  }
+  // демо: за кого можно войти — по одному-двум на каждую роль
+  if (config.demo) {
+    app.get('/api/demo/people', async () => {
+      const rows = (await pool.query(`SELECT id, name, role, city FROM players WHERE NOT blocked AND (role <> 'player' OR id IN
+        (SELECT id FROM players WHERE role = 'player' AND rated > 0 ORDER BY rating DESC LIMIT 3)) ORDER BY CASE role WHEN 'tech' THEN 0 WHEN 'admin' THEN 1 WHEN 'host' THEN 2 ELSE 3 END, rating DESC LIMIT 12`)).rows;
+      return { people: rows };
     });
   }
 

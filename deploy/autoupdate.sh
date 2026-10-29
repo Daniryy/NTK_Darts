@@ -57,6 +57,8 @@ run)
   if [[ $cur == "$new" ]]; then
     # сервер, поставленный до nginx-app.conf, переводится на него и без нового кода
     grep -qs nginx-app.conf /etc/nginx/sites-available/oche || bash "$APP/deploy/nginx-sync.sh" || true
+    # демо-сервер — один раз, когда его ещё нет
+    [[ -f /etc/oche-demo.env ]] || bash "$APP/deploy/demo-sync.sh" || true
     exit 0
   fi
   # эта версия уже не встала и была откачена — ждём следующую (вручную: deploy.sh)

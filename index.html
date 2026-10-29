@@ -448,6 +448,10 @@ a.mini { text-decoration: none; }
 .tc:hover { border-color: var(--line-bright); transform: translateY(-2px); }
 .tc-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .tc-h .pill { flex: none; margin-top: 3px; }
+.demo-pill { color: var(--green-ink); background: var(--green); padding: 3px 10px; border-radius: 999px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 11px; cursor: pointer; }
+.demo-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.demo-who { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--line); cursor: pointer; }
+.demo-who:hover { border-color: var(--green); }
 .tc-p { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .qm-names { font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }
 .chip.qm { min-height: 48px; font-size: 18px; }
@@ -1455,8 +1459,10 @@ function playSfx(kind) {
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+// у демо-сервера своя незаконченная игра, комната и отметки — не путаются с настоящим сайтом
+const lsKey = k => window.Api && Api.demo && /^oche2\.(game|undo|room|ym|setup)$/.test(k) ? 'demo.' + k : k;
+function lsGet(k) { try { const v = localStorage.getItem(lsKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function lsSet(k, v) { try { if (v === null) localStorage.removeItem(lsKey(k)); else localStorage.setItem(lsKey(k), JSON.stringify(v)); return true; } catch (e) { return false; } }
 const uid = () => Math.random().toString(36).slice(2, 9);
 const MIN = 6e4, HOUR = 36e5, DAY = 864e5;
 function pl(n, a, b, c) { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; }
@@ -2220,6 +2226,7 @@ function topView() {
     '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + (r === 'p.me' && SRV && Api.confirms ? '<span class="ndot" title="Матчи на подтверждение">' + Api.confirms + '</span>' : '') + '</button>').join('') + '</nav>' +
     '<div class="top-actions">' +
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
+    (Api.demo ? '<button class="pill demo-pill" data-act="open-settings" title="Демо-версия: примеры игроков и турниров, данные сбрасываются каждую ночь">Демо</button>' : '') +
     (SRV && Api.ob.total() ? '<span class="pill" title="Подходы сохранены на телефоне и будут отправлены">не отправлено: ' + Api.ob.total() + '</span>' : '') +
     (SRV && !ME ? '<button class="mini go" data-act="login">Войти</button>' : '') +
     (anyAdm() ? '<button class="icon-btn" data-act="go" data-v="admin" title="Панель управления" aria-label="Панель управления">' + I.shield + '</button>' : '') +
@@ -4291,6 +4298,7 @@ function loginOpen(o) {
 const devBox = () => Api.config && Api.config.dev ? '<details class="meta"><summary>Вход для разработки</summary><div class="nrow" style="margin-top:8px"><input class="inp" id="dev-id" placeholder="id игрока, например p17" value="p17"><button class="mini go" data-act="dev-login">Войти</button></div></details>' : '';
 function loginModal() {
   const L = S.login, c = Api.config || {};
+  if (Api.demo && !L.link) return demoLoginModal();
   const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'Код от ведущего', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
   const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
   let h = '<div class="over" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
@@ -4315,6 +4323,17 @@ function loginModal() {
   if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>. Новый аккаунт создаётся с этим согласием.</p>';
   if (!L.link) h += '<button class="lnk meta" data-act="staff-open" style="justify-self:center">Вход для администраторов по логину</button>' + devBox();
   return h + '</div></div>';
+}
+// демо: войти за любого — игрока, ведущего, администратора
+function demoPeople() {
+  const e = lz('demo:people', () => Api.get('/api/demo/people'), 300000), list = e.data ? e.data.people : [];
+  if (!e.data) return '<div class="meta">Загрузка…</div>';
+  return '<div class="demo-people">' + list.map(p => '<button class="demo-who" data-act="demo-as" data-v="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><span class="meta">' + (p.role === 'player' ? 'игрок' : esc(roleName(p.role))) + (p.city ? ' · ' + esc(p.city) : '') + '</span></button>').join('') + '</div>';
+}
+function demoLoginModal() {
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Вход в демо"><div class="ocard login"><div class="ohead"><h2>Вход в демо</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>' +
+    '<p class="meta">Демо — тот же сайт с примерами игроков и турниров. Войдите за любого: игрок видит свой профиль и матчи, ведущий — свои турниры, администратор — панель управления. Данные сбрасываются каждую ночь.</p>' +
+    demoPeople() + '</div></div>';
 }
 // вкладка «Почта»: вход (почта + пароль), регистрация, новый пароль, привязка почты; step 'code' — ввод кода из письма
 function mailForm(L, c, dis) {
@@ -5174,6 +5193,7 @@ function adminView() {
   const head = '<h1 class="h1">Управление</h1>';
   if (!SRV) return '<div class="narrow">' + head + '<div class="note-box">Панель управления работает с сервером: в демо-режиме все игроки хранятся в этом браузере.</div></div>';
   if (!anyAdm()) return '<div class="narrow">' + head + (ME || !SRV ? '<div class="note-box">Раздел для ведущих клубов и администраторов. Зарегистрируйте клуб в профиле — после подтверждения откроется панель ведущего.</div>' + (ME ? '<button class="btn alt" data-act="go" data-v="p.me">Профиль</button>' : '')
+    : Api.demo ? '<p class="meta">Демо: войдите за администратора или ведущего — пароль и код не нужны.</p>' + demoPeople()
     : staffForm() + '<p class="meta">Ведущий клуба? <button class="lnk" data-act="login">Войти по почте, телефону или коду</button></p>') + '</div>';
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
@@ -6056,8 +6076,9 @@ function profileViewS(id) {
   return profileHTML(p, Object.assign({}, sc, { ms }), d.stats.all, d.tournaments.map(t => ({ id: t.id, name: t.name, start: t.start, badge: t.place ? plcBadge(t.place[0], t.place[1], t.place[0] === t.place[1] || t.status === 'done') : '<span class="meta">' + (t.status === 'reg' ? 'записан' : '—') + '</span>' })), ax);
 }
 function accountBox() {
-  let h = '<div class="field"><span class="label">Данные</span><div class="seg2 full">' + [['server', 'Сервер'], ['demo', 'Демо в браузере']].map(([v, l]) => '<button class="' + ((SRV ? 'server' : 'demo') === v ? 'on' : '') + '" data-act="set-mode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  if (!SRV) h += '<span class="meta">Демо: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Сервер выключен вручную.' : ' Сервер не отвечает.') + '</span>';
+  let h = '<div class="field"><span class="label">Данные</span><div class="seg2 full">' + [['server', 'Сервер'], ['demo', 'Демо']].map(([v, l]) => '<button class="' + ((Api.demo || !SRV ? 'demo' : 'server') === v ? 'on' : '') + '" data-act="set-mode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+  if (Api.demo) h += '<span class="meta">Демо: тот же сайт с примерами игроков и турниров. Входите за любого, пробуйте всё — данные сбрасываются каждую ночь.</span>';
+  else if (!SRV) h += '<span class="meta">Демо в браузере: всё хранится в этом браузере.' + (Api.storedMode() === 'demo' ? ' Демо-сервер не отвечает.' : ' Сервер не отвечает.') + '</span>';
   h += '</div>';
   if (!SRV) return h;
   if (ME) h += '<div class="set-row"><span><b>' + esc(meP().name) + '</b><br><span class="meta">вы вошли' + (Api.role && Api.role !== 'player' ? ' · ' + esc(roleName(Api.role)) : '') + '</span></span><button class="ghost sm" data-act="logout">Выйти</button></div>' + (anyAdm() ? '<button class="btn alt" data-act="go" data-v="admin">Панель управления</button>' : '');
@@ -6172,6 +6193,7 @@ document.addEventListener('click', e => {
     case 'tfa-close': S.tfa = null; render(); break;
     case 'tfa-copy': copyText(S.tfa && S.tfa.backup ? S.tfa.backup.join('\n') : '', 'Коды скопированы.'); break;
     case 'staff-open': closeModals(); go('admin'); break;
+    case 'demo-as': svDo(Api.devLogin(v), () => { closeModals(); loggedIn(); }); break;
     case 'mconf': {
       const [id, k] = v.split('|');
       svDo(Api.post('/api/matches/' + encodeURIComponent(id) + '/confirm', { ok: k === '1' }), r => {
@@ -6573,7 +6595,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'set-mode':
-      if ((v === 'server') === SRV) break;
+      if (v === (Api.demo || !SRV ? 'demo' : 'server')) break;
       Api.setMode(v === 'demo' ? 'demo' : null);
       location.reload(); break;
     case 'more': S.feedN += 15; render(); break;

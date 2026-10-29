@@ -7,9 +7,12 @@
   else root.Api = factory(root);
 })(typeof self !== 'undefined' ? self : this, function (W) {
   'use strict';
+  // у демо-сервера свои очередь, «последний вход» и режим — не путаются с настоящим сайтом
+  let demoNS = false;
+  const lsKey = k => demoNS && /^oche\.(outbox|lastMe|lastMode)$/.test(k) ? 'demo.' + k : k;
   const ls = {
-    get(k) { try { const v = W.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
-    set(k, v) { try { if (v == null) W.localStorage.removeItem(k); else W.localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    get(k) { try { const v = W.localStorage.getItem(lsKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+    set(k, v) { try { if (v == null) W.localStorage.removeItem(lsKey(k)); else W.localStorage.setItem(lsKey(k), JSON.stringify(v)); } catch (e) {} }
   };
   const visible = () => !W.document || W.document.visibilityState !== 'hidden';
 
@@ -33,7 +36,7 @@
   const NET_MSG = 'Нет связи с сервером';
 
   const Api = {
-    mode: 'demo', config: { vk: false, phone: false, dev: false }, me: null, admin: false, role: null, perms: [], clubs: [], base: '',
+    mode: 'demo', demo: false, config: { vk: false, phone: false, dev: false }, me: null, admin: false, role: null, perms: [], clubs: [], base: '',
     ApiError,
     get device() { return deviceId(); },
 
@@ -79,7 +82,22 @@
     setMode(m) { ls.set('oche.mode', m || null); },
     async detect() {
       const want = ls.get('oche.mode');
-      if (want === 'demo') { Api.mode = 'demo'; return Api.mode; }
+      // демо: тот же сервер с демо-базой (/demo/api/) — всё как на настоящем сайте, отличаются только данные.
+      // Демо-сервера нет (страница без сервера) — прежнее демо в браузере
+      if (want === 'demo') {
+        const base = Api.base;
+        try {
+          Api.base = base + '/demo';
+          const c = await Api.get('/api/config', { timeout: 3000 });
+          if (c && c.demo) {
+            Api.demo = true; demoNS = true; Api.config = c; Api.mode = 'server'; Api.offline = false;
+            Api.ob.items = ls.get('oche.outbox') || {};
+            await Api.loadMe().catch(() => {});
+            return Api.mode;
+          }
+        } catch (e) { /* демо-сервера нет */ }
+        Api.base = base; Api.mode = 'demo'; return Api.mode;
+      }
       try {
         Api.config = await Api.get('/api/config', { timeout: 3000 });
         Api.mode = 'server';

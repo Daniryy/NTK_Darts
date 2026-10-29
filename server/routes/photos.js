@@ -14,7 +14,7 @@ const { forget } = require('../versions');
 const { clearCache } = require('../auth');
 
 const MAX_BYTES = 3 * 1024 * 1024, TOUR_MAX = 60;
-const urlOf = file => '/uploads/' + file;
+const urlOf = file => config.uploadUrl + file;
 const photoJSON = p => ({ id: p.id, url: urlOf(p.file), w: p.w, h: p.h });
 
 // тип по первым байтам: подпись файла, а не заголовок запроса
@@ -82,7 +82,7 @@ module.exports = async function (app) {
         if (kind === 'club') {
           const cur = await one(c, 'SELECT logo FROM clubs WHERE id = $1 FOR UPDATE', [clubId]);
           if (!cur) throw E.notFound('Клуб не найден');
-          if (cur.logo) (await all(c, `DELETE FROM photos WHERE file = $1 AND kind = 'club' RETURNING file`, [cur.logo.replace('/uploads/', '')])).forEach(x => old.push(x.file));
+          if (cur.logo) (await all(c, `DELETE FROM photos WHERE file = $1 AND kind = 'club' RETURNING file`, [cur.logo.replace(config.uploadUrl, '')])).forEach(x => old.push(x.file));
           const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'club', $3, $4, $5, $6, $7) RETURNING *`,
             [id, file, me.id, w, h, buf.length, Date.now()]);
           await c.query('UPDATE clubs SET logo = $2 WHERE id = $1', [clubId, urlOf(file)]);
