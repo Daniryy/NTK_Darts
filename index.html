@@ -560,6 +560,11 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .bd { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; border-radius: 5px; background: var(--brass-glow); color: var(--brass); font-weight: 700; letter-spacing: .04em; }
 .pc.path, .gb.path { box-shadow: inset 0 0 0 2px var(--brass); }
 .gb.path { box-shadow: 0 0 0 2px var(--brass); }
+.pc.path { background: color-mix(in srgb, var(--brass) 12%, transparent); }
+/* путь выбран — его матчи мягко вспыхивают, чтобы сразу найти их в сетке */
+.pflash { animation: pflash 1.2s ease-in-out 2; }
+@keyframes pflash { 50% { box-shadow: 0 0 0 4px var(--brass), 0 0 22px color-mix(in srgb, var(--brass) 55%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .pflash { animation: none; } }
 [data-pid].hp .pn { color: var(--brass); }
 .part-h { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 -4px; }
 .part-h b { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -591,7 +596,11 @@ body.ingame .toast { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px)
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
 .boards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .boards .num { min-width: 1.6em; text-align: center; font-size: 18px; }
-.boards .bnames { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.boards .bnames { flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.nt-bd { display: flex; gap: 10px; flex-wrap: wrap; }
+.nt-bd label { display: grid; gap: 4px; }
+.nt-bn { flex: 0 0 110px; }
+.nt-bl { flex: 1 1 220px; min-width: 0; }
 .nums { display: grid; gap: 6px; }
 .nrow2 { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .nrow2:last-child { border-bottom: 0; }
@@ -1263,6 +1272,22 @@ img.av { object-fit: cover; padding: 0; }
 }
 @media (prefers-reduced-motion: no-preference) { .pill.live i { animation: pulse 1.8s ease-in-out infinite; } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 0%, transparent); } }
+/* ПК: аккуратные анимации при наведении. На телефоне (нет наведения) и при «уменьшить движение» их нет */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn, .mini, .ghost, .chip, .fchip, .pick, .selchip, .seg2 button, .nav button, .icon-btn, .tc, .mc, .trow, .grow, .card.plan, .banner, .tvcall, .adm-row.click, .pc, .gb {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease, color .18s ease, filter .18s ease;
+  }
+  .btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 24px var(--green-glow); }
+  .btn:not(:disabled):active, .mini:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .mini:not(:disabled):not(.on):not(.go):hover, .ghost:not(:disabled):hover, .fchip:not(.on):hover, .chip:not(:disabled):not(.on):hover, .pick:not(.on):hover, .selchip:hover, .icon-btn:hover { border-color: var(--line-bright); color: var(--fg); }
+  .mini.go:not(:disabled):hover { filter: brightness(1.08); box-shadow: 0 4px 14px var(--green-glow); }
+  .tc:hover, .mc[data-act]:hover, .card.plan:hover, .banner:hover { transform: translateY(-2px); border-color: var(--line-bright); box-shadow: 0 12px 30px rgba(0, 0, 0, .32); }
+  .trow.click:hover, .grow[data-act]:hover, .adm-row.click:hover { border-color: var(--line-bright); background: var(--surface2); }
+  .card.plan:hover { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+  /* переход на другую страницу — содержимое мягко проявляется */
+  #app.enter > * { animation: pageIn .26s ease-out; }
+}
+@keyframes pageIn { from { opacity: 0; transform: translateY(6px); } }
 </style>
 </head>
 <body>
@@ -1646,7 +1671,8 @@ function makeSeed() {
   qualTour({ name: 'Открытый чемпионат Петербурга', official: true, org: { name: 'Клуб «Северный дубль»', ver: true }, city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3 }, ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], 25 * MIN);
   const fr = T({ name: 'Дартс и пицца у Анны', official: false, org: { name: 'Анна Мельникова', ver: false }, city: 'Москва', venue: 'Квартирник', start: NOW - 10 * DAY, ltw: 2, cap: 5 });
   bracket(fr, 'pl', ['me', 'p9', 'p12', 'p15', 'p6'], null, 30 * MIN);
-  const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3 });
+  // мишени в зале с разрывами в номерах: игры получают их сами, игрокам пишет «пройдите к мишени 7»
+  const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3, boards: { n: 4, at: {}, names: [3, 4, 7, 8] } });
   bracket(live, 'pl', ALL16, 18, 15 * MIN);
   const rr = T({ name: 'Пятничная лига «Оче-бара»', official: false, org: { name: 'Денис Карпов', ver: false }, city: 'Москва', venue: '«Оче-бар»', start: NOW - 14 * DAY - 3 * HOUR, ltw: 2, cap: 6, format: 'rr' });
   rr.players = ['me', 'p6', 'p9', 'p12', 'p15', 'p4'];
@@ -1689,13 +1715,13 @@ function makeSeed() {
   ndl.games.forEach(g => { if (k < 17 && gameState(ndl, g).st === 'ready') { scoreMatch(ndl, g, ndl.start + 70 * MIN + k * 6 * MIN); k++; } });
   Bracket.assignBoards(ndl);
   // следующий этап: идёт квалификация, часть игроков уже сдала
-  const nq = T({ name: 'Лига NDL · этап 3', official: true, org: NDL_ORG, city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', stage: 'qual', format: 'pl', games: [] });
+  const nq = T({ name: 'Лига NDL · этап 3', official: true, org: NDL_ORG, city: 'Новоуральск', venue: 'Клуб NDL', start: NOW - 40 * MIN, ltw: 2, cap: 20, ex: SCORE, split: 8, layout: 'ndl', labels: 'ab', stage: 'qual', format: 'pl', games: [], boards: { n: 4, at: {} } });
   nq.players = NDL20.filter(id => id !== 'me').concat(['me']);
   nq.qual = { ex: SCORE, tries: 2, res: qualOf(nq.players.slice(0, 12)) };
   return { v: DB_V, players, tournaments: tours, matches };
 }
 
-const DB_V = 5;
+const DB_V = 6;
 let db = null, P = {}, TBY = {}, MBY = {}, RATING = {}, RANK = {};
 // кто «я»: в демо — игрок me, на сервере — вошедший игрок (null без входа)
 let ME = 'me';
@@ -1936,12 +1962,14 @@ const toTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
 const motionOk = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function go(r, fromHash) {
   if (r !== R) {
-    if (r.startsWith('t.')) { S.camEdit = null; S.ttab = null; S.gf = 'all'; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
+    if (r.startsWith('t.')) { S.camEdit = null; S.ttab = null; S.gf = 'all'; S.gst = null; S.tdef = null; S.confirmDelT = null; S.confirmLaunch = null; }
     if (r.startsWith('p.')) { S.pMore = false; S.editName = false; }
   }
   // матч уже записан: без этого «отмена» могла бы снять результат после следующих матчей
   if (r !== 'play' && G && G.over === 'match') { G = null; undo = []; S.inGame = false; saveGame(); }
+  const nav = r !== R;
   R = r; closeModals(); render(); toTop();
+  if (nav) { const app = $('app'); if (app) { app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter'); clearTimeout(go.t); go.t = setTimeout(() => app.classList.remove('enter'), 400); } }
   if (!fromHash) try { if (location.hash.slice(1) !== r) location.hash = r; } catch (e) {}
 }
 window.addEventListener('hashchange', () => {
@@ -2445,7 +2473,15 @@ function gamesList(t) {
   const all = t.games.map(g => ({ g, st: gameState(t, g, cx.rv).st })).filter(x => x.st !== 'void' && x.st !== 'bye');
   const pick = k => all.filter(x => k === 'all' || (k === 'ready' ? x.st === 'ready' : x.st === 'done'));
   let h = '<div class="fchips" role="group" aria-label="Фильтр матчей">' + [['ready', 'Можно играть'], ['all', 'Все'], ['done', 'Сыграны']].map(([v, l]) => '<button class="fchip' + (f === v ? ' on' : '') + '" data-act="gf" data-v="' + v + '">' + l + ' <span class="muted">' + pick(v).length + '</span></button>').join('') + '</div>';
-  const list = pick(f);
+  // этапы по порядку: финал отдельно (его не ищут в конце длинного списка), затем круги
+  const last = isBracket(t) ? bRounds(t) - 1 : -1;
+  const isFin = g => g.r === last && (t.format === 'ko' || (t.format === 'pl' && plGroup(t, g.r, g.i).lo === 1));
+  const rounds = [...new Set(all.map(x => x.g.r))].sort((x, y) => x - y);
+  const stages = [['all', 'Все этапы']].concat(all.some(x => isFin(x.g)) ? [['fin', 'Финал']] : [], rounds.length > 1 ? rounds.map(r => ['r' + r, cap1(roundLabel(t, r))]) : []);
+  const gst = stages.some(x => x[0] === S.gst) ? S.gst : 'all';
+  const inStage = x => gst === 'all' || (gst === 'fin' ? isFin(x.g) : x.g.r === +gst.slice(1));
+  if (stages.length > 2) h += '<div class="fchips stg-f" role="group" aria-label="Этап">' + stages.map(([v, l]) => '<button class="fchip' + (gst === v ? ' on' : '') + '" data-act="gst" data-v="' + v + '">' + esc(l) + ' <span class="muted">' + pick(f).filter(x => v === 'all' || (v === 'fin' ? isFin(x.g) : x.g.r === +v.slice(1))).length + '</span></button>').join('') + '</div>';
+  const list = pick(f).filter(inStage);
   if (!list.length) return h + '<div class="note-box">' + (f === 'ready' ? 'Сейчас нет матчей, готовых к игре: ждём результатов предыдущего круга.' : 'Таких матчей пока нет.') + '</div>';
   const rows = xs => '<div class="glist">' + xs.slice().sort((x, y) => num(x.g) - num(y.g)).map(x => gameRow(t, x.g, cx)).join('') + '</div>';
   [...new Set(list.map(x => x.g.r))].forEach(r => {
@@ -2657,8 +2693,7 @@ function stagesView(t, rv) {
 }
 
 /* Мишени: сколько их в зале; готовые матчи получают свободные по порядку номеров */
-// номера мишеней строкой: «1-6», «3, 5, 7», «1-4, 9»
-const boardsTxt = t => { const bd = t.boards; if (!bd || !bd.n) return ''; return bd.names ? bd.names.join(', ') : bd.n === 1 ? '1' : '1-' + bd.n; };
+// свои номера мишеней строкой: «3, 5, 7», «1-4, 9»
 function parseBoards(v) {
   const out = [];
   for (const part of String(v || '').split(/[\s,;]+/).filter(Boolean)) {
@@ -2670,12 +2705,24 @@ function parseBoards(v) {
   }
   return out.length <= 64 ? out : null;
 }
+// мишени из двух полей: сколько (номера 1…N по порядку) и свои номера, если с разрывами; ответ — список или текст ошибки
+function boardsFrom(count, names) {
+  const n = String(count || '').trim() === '' ? null : +String(count).replace(/\D/g, '');
+  if (n != null && !(n >= 0 && n <= 64)) return 'Мишеней — от 0 до 64.';
+  if (String(names || '').trim()) {
+    const list = parseBoards(names);
+    if (!list) return 'Номера мишеней: например 3, 5, 7 или 1-4, 9 (числа до 999).';
+    if (n && list.length !== n) return 'Мишеней указано ' + n + ', а номеров — ' + list.length + '. Поправьте одно из полей.';
+    return list;
+  }
+  return Array.from({ length: n || 0 }, (_, k) => k + 1);
+}
 /* Мишени в зале: сколько их и какие номера. Готовые игры и квалификация (по двое на мишень) получают их сами */
 function boardsCtl(t) {
   if (!(canDo(t, 'org') || canDo(t, 'staff')) || tStatus(t) === 'done') return '';
   const n = t.boards ? t.boards.n : 0;
   return '<div class="boards"><span class="label">Мишени</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button>' +
-    '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(boardsTxt(t)) + '" placeholder="номера: 1-8 или 3, 5, 7" aria-label="Номера мишеней в зале" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить</button>' +
+    '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(t.boards && t.boards.names ? t.boards.names.join(', ') : '') + '" placeholder="' + (n ? 'номера по порядку 1–' + n + ' — или свои: 3, 5, 7' : 'свои номера: 3, 5, 7') + '" aria-label="Номера мишеней, если не по порядку" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить номера</button>' +
     '<span class="meta" style="flex-basis:100%">' + (n ? (t.stage === 'qual' ? 'Квалификация идёт по двое на мишень' : 'Готовые матчи получают свободные мишени') + ' — игрокам приходит, куда пройти.' : 'Укажите мишени — сайт сам разведёт игроков по ним.') + '</span></div>';
 }
 function saveBoards(t, names) {
@@ -2881,7 +2928,7 @@ function newTourView() {
   if (nt.fmt !== 'rr' && nt.fmt !== 'ndl') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
     (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
-  h += '<div class="field"><label class="label" for="nt-boards">Мишени в зале</label><input class="inp" id="nt-boards" data-nt="boards" inputmode="numeric" maxlength="120" value="' + esc(nt.boards || '') + '" placeholder="например 1-6 или 3, 5, 7" style="max-width:320px"><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
+  h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — с тарифом «Ведущий».</span><button class="lnk meta" data-act="go" data-v="plans" style="justify-self:start">Тарифы →</button></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
   const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
@@ -2911,8 +2958,8 @@ function createTour() {
   const ids = nt.sel.filter(id => P[id]), sm = ntSummary(nt);
   if (!nt.name.trim()) { nt.err = 'Введите название турнира.'; return render(); }
   if (!sm.ok) { nt.err = sm.txt; return render(); }
-  const boards = parseBoards(nt.boards);
-  if (!boards) { nt.err = 'Мишени: например 1-6 или 3, 5, 7 (до 64, числа до 999).'; return render(); }
+  const boards = boardsFrom(nt.bcount, nt.bnames);
+  if (typeof boards === 'string') { nt.err = boards; return render(); }
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
@@ -5890,9 +5937,11 @@ document.addEventListener('click', e => {
     case 'gready': gameReady(v); break;
     case 'notify-on': try { Notification.requestPermission().then(() => render()); } catch (e) {} break;
     case 'bnames': {
-      const t = TBY[v], names = parseBoards(($('bn-' + v) || {}).value);
+      const t = TBY[v], raw = (($('bn-' + v) || {}).value || '').trim();
       if (!t) break;
-      if (!names) { toast('Номера мишеней: например 1-8 или 3, 5, 7 (до 64, числа до 999)'); break; }
+      // пусто — номера по порядку 1…N (сколько мишеней сейчас)
+      const names = raw ? parseBoards(raw) : Array.from({ length: t.boards ? t.boards.n : 0 }, (_, k) => k + 1);
+      if (!names) { toast('Номера мишеней: например 3, 5, 7 или 1-4, 9 (до 64, числа до 999)'); break; }
       saveBoards(t, names);
       break;
     }
@@ -6227,6 +6276,7 @@ document.addEventListener('click', e => {
     case 'tf': S.tf = v; render(); break;
     case 'ttab': S.ttab = v; render(); break;
     case 'gf': S.gf = v; render(); break;
+    case 'gst': S.gst = v; render(); break;
     case 'ready-games': S.ttab = 'games'; S.gf = 'ready'; render(); break;
     case 'jump': { const el = $(v); if (el) el.scrollIntoView({ behavior: motionOk() ? 'smooth' : 'instant', block: 'start' }); break; }
     case 'join': {
@@ -6413,7 +6463,6 @@ document.addEventListener('input', e => {
     const [tid, id] = t.dataset.num.split('|'), n = +t.value;
     if (Number.isInteger(n) && n >= 1 && n <= 999) setNum(tid, id, n);
   }
-  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); }
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
@@ -6440,6 +6489,8 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset && t.dataset.rregion) { S.rregion = t.value; S.rpage = 0; render(); return; }
+  // путь игрока: подсветить и прокрутить сетку к его последнему матчу
+  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); if (S.hp) showPath(S.hp); return; }
   if (t.dataset && t.dataset.roleOf) {
     const role = t.value;
     svDo(Api.patch('/api/admin/players/' + t.dataset.roleOf, { role }), () => { svStale('admin:'); svStale('acard:'); svStale('astats'); toast('Роль: ' + roleName(role) + '.'); });
@@ -6507,6 +6558,14 @@ document.addEventListener('keydown', e => {
   }
 });
 
+function showPath(id) {
+  const els = [...document.querySelectorAll('.bk [data-pids~="' + id + '"], .pg [data-pids~="' + id + '"]')];
+  if (!els.length) return;
+  // самый дальний круг игрока — последний в разметке (колонки идут по кругам)
+  els[els.length - 1].scrollIntoView({ behavior: motionOk() ? 'smooth' : 'auto', block: 'center', inline: 'center' });
+  els.forEach(el => { el.classList.remove('pflash'); void el.offsetWidth; el.classList.add('pflash'); });
+  setTimeout(() => els.forEach(el => el.classList.remove('pflash')), 2400);
+}
 function hoverPath(id, on) {
   document.querySelectorAll('[data-pids~="' + id + '"]').forEach(el => el.classList.toggle('path', on || el.dataset.pids.split(' ').includes(S.hp || '')));
   document.querySelectorAll('[data-pid="' + id + '"]').forEach(el => el.classList.toggle('hp', on));
