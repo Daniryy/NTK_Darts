@@ -16,7 +16,7 @@ const anon = () => ({ dev: 'device_mail_' + String(++seq).padStart(10, '0'), coo
 async function call(u, method, url, body) {
   const headers = {};
   if (u) { headers['x-device-id'] = u.dev; if (u.cookie) headers.cookie = u.cookie; }
-  const r = await app.inject({ method, url, payload: body, headers });
+  const r = await app.inject(Object.assign({ method, url, payload: body, headers }, u && u.ip ? { remoteAddress: u.ip } : {}));
   const sid = r.cookies.find(c => c.name === 'oche_sid');
   if (u && sid) u.cookie = 'oche_sid=' + sid.value;
   return { s: r.statusCode, b: r.body ? JSON.parse(r.body) : null, h: r.headers };
@@ -40,16 +40,16 @@ test.beforeEach(() => limits.reset());
 test('регистрация: письмо с кодом, неверный код, аккаунт и вход; почта занята', async () => {
   assert.equal(ok(await call(null, 'GET', '/api/config')).email, true);
   const u = anon();
-  err(await call(u, 'POST', '/api/auth/register', { name: 'Иван Петров', email: 'не почта', password: 'darts-2026' }), 400);
-  err(await call(u, 'POST', '/api/auth/register', { name: 'Иван Петров', email: 'ivan@mail.ru', password: '1234567' }), 400);
-  err(await call(u, 'POST', '/api/auth/register', { name: 'Иван Петров', email: 'ivan@mail.ru', password: '12345678' }), 400);
-  const r = ok(await call(u, 'POST', '/api/auth/register', { name: 'Иван Петров', city: 'Казань', email: ' Ivan@Mail.RU ', password: 'darts-2026' }));
+  err(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Иван Петров', email: 'не почта', password: 'darts-2026' }), 400);
+  err(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Иван Петров', email: 'ivan@mail.ru', password: '1234567' }), 400);
+  err(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Иван Петров', email: 'ivan@mail.ru', password: '12345678' }), 400);
+  const r = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Иван Петров', city: 'Казань', email: ' Ivan@Mail.RU ', password: 'darts-2026' }));
   assert.equal(r.sent, true);
   assert.match(r.devCode, /^\d{6}$/);
   // аккаунта ещё нет, пока код не введён
   assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
   // повтор раньше чем через минуту — 429
-  err(await call(u, 'POST', '/api/auth/register', { name: 'Иван Петров', email: 'ivan@mail.ru', password: 'darts-2026' }), 429, 'too_many');
+  err(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Иван Петров', email: 'ivan@mail.ru', password: 'darts-2026' }), 429, 'too_many');
   const wrong = r.devCode === '000000' ? '111111' : '000000';
   err(await call(u, 'POST', '/api/auth/email/verify', { email: 'ivan@mail.ru', purpose: 'reg', code: wrong }), 409, 'bad_code');
   const me = ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'ivan@mail.ru', purpose: 'reg', code: r.devCode }));
@@ -63,7 +63,7 @@ test('регистрация: письмо с кодом, неверный ко�
   // код одноразовый
   err(await call(anon(), 'POST', '/api/auth/email/verify', { email: 'ivan@mail.ru', purpose: 'reg', code: r.devCode }), 409, 'code_expired');
   // почта уже занята
-  err(await call(anon(), 'POST', '/api/auth/register', { name: 'Другой', email: 'IVAN@mail.ru', password: 'darts-2026' }), 409, 'email_taken');
+  err(await call(anon(), 'POST', '/api/auth/register', { consent: true, name: 'Другой', email: 'IVAN@mail.ru', password: 'darts-2026' }), 409, 'email_taken');
   // почта в чужом профиле не видна, только своя
   assert.equal(ok(await call(null, 'GET', '/api/players/' + me.player.id)).player.email, undefined);
 });
@@ -75,9 +75,14 @@ test('вход по почте и паролю: верный, неверный, 
   err(await call(u, 'POST', '/api/auth/email/login', { email: 'x', password: 'darts-2026' }), 409, 'bad_login');
   const r = ok(await call(u, 'POST', '/api/auth/email/login', { email: 'IVAN@mail.ru', password: 'darts-2026' }));
   assert.equal(r.player.email, 'ivan@mail.ru');
-  for (let k = 0; k < 5; k++) err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'ivan@mail.ru', password: 'nope-nope-' + k }), 409, 'bad_login');
+  // 5 неверных с одного адреса — с него закрыто; владелец с другого адреса входит
+  const bad = () => Object.assign(anon(), { ip: '10.8.8.8' });
+  for (let k = 0; k < 5; k++) err(await call(bad(), 'POST', '/api/auth/email/login', { email: 'ivan@mail.ru', password: 'nope-nope-' + k }), 409, 'bad_login');
+  err(await call(bad(), 'POST', '/api/auth/email/login', { email: 'ivan@mail.ru', password: 'darts-2026' }), 429, 'too_many');
+  ok(await call(Object.assign(anon(), { ip: '10.2.2.2' }), 'POST', '/api/auth/email/login', { email: 'ivan@mail.ru', password: 'darts-2026' }));
+  // 25 регистраций с одного адреса (зал) — без отказов
+  for (let k = 0; k < 25; k++) ok(await call(Object.assign(anon(), { ip: '10.3.3.3' }), 'POST', '/api/auth/register', { consent: true, name: 'Игрок Зала ' + k, email: 'hall' + k + '@mail.ru', password: 'darts-2026' }));
   limits.reset();
-  err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'ivan@mail.ru', password: 'darts-2026' }), 429, 'too_many');
 });
 
 test('новый пароль по письму: снимает блокировку, закрывает старые входы', async () => {
@@ -146,7 +151,7 @@ test('почта на сервере не настроена: регистрац
   try {
     assert.equal(ok(await call(null, 'GET', '/api/config')).email, false);
     const u = anon();
-    const r = ok(await call(u, 'POST', '/api/auth/register', { name: 'Без Письма', email: 'nomail@mail.ru', password: 'darts-2026' }));
+    const r = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Без Письма', email: 'nomail@mail.ru', password: 'darts-2026' }));
     assert.equal(r.created, true);
     assert.equal(r.player.emailOk, false);
     assert.equal(ok(await call(u, 'GET', '/api/me')).player.name, 'Без Письма');
@@ -170,10 +175,64 @@ test('код от ведущего: аккаунт с почтой забира�
   const HOST = await login('p1');
   const acc = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Новичок Клуба' }), 201).player;
   const u = anon();
-  const reg = ok(await call(u, 'POST', '/api/auth/register', { name: 'Новичок', email: 'novice@mail.ru', password: 'darts-2026' }));
+  const reg = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Новичок', email: 'novice@mail.ru', password: 'darts-2026' }));
   ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'novice@mail.ru', purpose: 'reg', code: reg.devCode }));
   const me = ok(await call(u, 'POST', '/api/me/claim', { code: acc.claim }));
   assert.equal(me.player.id, acc.id);
   assert.equal(me.player.email, 'novice@mail.ru');
   ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'novice@mail.ru', password: 'darts-2026' }));
+});
+
+test('личные данные: согласие при регистрации, выгрузка, удаление аккаунта и обезличивание', async () => {
+  const u = anon();
+  err(await call(u, 'POST', '/api/auth/register', { name: 'Без Согласия', email: 'noconsent@mail.ru', password: 'darts-2026' }), 400);
+  const r = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Анна Удалова', email: 'anna.del@mail.ru', password: 'darts-2026' }));
+  const me = ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'anna.del@mail.ru', purpose: 'reg', code: r.devCode })).player;
+  const x = await call(u, 'GET', '/api/me/export');
+  assert.equal(x.s, 200);
+  assert.match(x.h['content-disposition'], /attachment/);
+  assert.equal(x.b.profile.email, 'anna.del@mail.ru');
+  assert.ok(x.b.profile.consent_at > 0);
+  assert.equal(x.b.profile.pass_hash, undefined);
+  assert.ok(Array.isArray(x.b.matches) && Array.isArray(x.b.sessions) && x.b.sessions.length === 1);
+  err(await call(null, 'GET', '/api/me/export'), 401);
+  // без подтверждения — нет; администратора — нет
+  err(await call(u, 'DELETE', '/api/me', {}), 400);
+  await pool.query(`UPDATE players SET role = 'admin' WHERE id = $1`, [me.id]);
+  require('../server/auth').clearCache();
+  err(await call(u, 'DELETE', '/api/me', { confirm: true }), 403);
+  await pool.query(`UPDATE players SET role = 'player' WHERE id = $1`, [me.id]);
+  require('../server/auth').clearCache();
+  // без турниров — удаляется целиком, почта свободна
+  ok(await call(u, 'DELETE', '/api/me', { confirm: true }));
+  assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
+  assert.equal((await pool.query('SELECT 1 FROM players WHERE id = $1', [me.id])).rowCount, 0);
+  forget('anna.del@mail.ru');
+  ok(await call(anon(), 'POST', '/api/auth/register', { consent: true, name: 'Анна Снова', email: 'anna.del@mail.ru', password: 'darts-2026' }));
+  // сыгравший в турнире — обезличивается, матчи остаются
+  const pl = (await pool.query(`SELECT e.player_id AS id FROM entries e JOIN tournaments t ON t.id = e.tournament_id JOIN players p ON p.id = e.player_id
+    WHERE t.status <> 'reg' AND p.role = 'player' AND EXISTS (SELECT 1 FROM match_lines l WHERE l.player_id = p.id) LIMIT 1`)).rows[0];
+  assert.ok(pl, 'в демо есть игрок турнира');
+  const v = await login(pl.id);
+  const before = (await pool.query('SELECT count(*)::int AS n FROM match_lines WHERE player_id = $1', [pl.id])).rows[0].n;
+  assert.ok(ok(await call(v, 'GET', '/api/me/export')).tournaments.length > 0);
+  ok(await call(v, 'DELETE', '/api/me', { confirm: true }));
+  const row = (await pool.query('SELECT * FROM players WHERE id = $1', [pl.id])).rows[0];
+  assert.equal(row.name, 'Удалённый игрок');
+  assert.equal(row.blocked, true);
+  assert.equal(row.phone, null);
+  assert.equal(row.vk_id, null);
+  assert.equal(row.photo, null);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM sessions WHERE player_id = $1', [pl.id])).rows[0].n, 0);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM match_lines WHERE player_id = $1', [pl.id])).rows[0].n, before);
+  assert.equal(ok(await call(v, 'GET', '/api/me')).player, null);
+});
+
+test('квота: не больше 100 новых гостей в сутки у игрока; тот же гость повторно — не новый', async () => {
+  const u = anon();
+  const r = ok(await call(u, 'POST', '/api/auth/register', { consent: true, name: 'Квота Гостей', email: 'quota@mail.ru', password: 'darts-2026' }));
+  ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'quota@mail.ru', purpose: 'reg', code: r.devCode }));
+  for (let i = 0; i < 100; i++) ok(await call(u, 'POST', '/api/players', { name: 'Гость ' + i }));
+  ok(await call(u, 'POST', '/api/players', { name: 'Гость 7' }));
+  err(await call(u, 'POST', '/api/players', { name: 'Гость 100' }), 429, 'quota');
 });

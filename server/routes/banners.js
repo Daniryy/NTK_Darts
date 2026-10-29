@@ -2,6 +2,7 @@
 // Заводит тех. администратор; переходы по баннеру считаются. У клуба с тарифом «Ведущий» на его турнирах —
 // свои спонсоры (banners.club_id) вместо баннеров Oche.
 const { pool, tx, one, all } = require('../db');
+const { hit } = require('../limits');
 const { E, V } = require('../errors');
 const { needPerm } = require('../auth');
 const { can, ROLES, RANK } = require('../roles');
@@ -55,9 +56,12 @@ module.exports = async function (app) {
     const rows = await all(pool, `SELECT * FROM banners WHERE place = $1 AND club_id IS NULL AND ${live} ORDER BY created_at DESC LIMIT 5`, [place, now]);
     return { banners: rows.map(pub) };
   });
-  // переход по баннеру: страница шлёт перед открытием ссылки
+  // переход по баннеру: страница шлёт перед открытием ссылки. Считается один раз в сутки с устройства
+  // и не больше 30 в сутки с одного адреса (в зале весь Wi-Fi за одним IP) — иначе счётчик не накрутить
   app.post('/api/banners/:id/click', async req => {
-    await pool.query('UPDATE banners SET clicks = clicks + 1 WHERE id = $1', [req.params.id]);
+    const id = String(req.params.id), day = 864e5;
+    if (hit('bc:' + id + ':' + req.device, 1, day) || hit('bci:' + id + ':' + req.ip, 30, day)) return { ok: true };
+    await pool.query('UPDATE banners SET clicks = clicks + 1 WHERE id = $1', [id]);
     return { ok: true };
   });
 

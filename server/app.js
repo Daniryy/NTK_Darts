@@ -66,6 +66,7 @@ function build(opts = {}) {
     api.register(require('./routes/titles'));
     api.register(require('./routes/plans'));
     api.register(require('./routes/pro'));
+    api.register(require('./routes/privacy'));
   });
 
   if (config.serveStatic) {
@@ -80,6 +81,8 @@ function build(opts = {}) {
     app.get('/sw.js', (req, reply) => reply.sendFile('sw.js'));
     app.get('/manifest.webmanifest', (req, reply) => reply.type('application/manifest+json').sendFile('manifest.webmanifest'));
     app.get('/icons/:f', (req, reply) => /^[\w-]+\.png$/.test(req.params.f) ? reply.sendFile('icons/' + req.params.f) : reply.code(404).send());
+    app.get('/fonts/:f', (req, reply) => /^[\w-]+\.(woff2|css)$/.test(req.params.f) ? reply.sendFile('fonts/' + req.params.f) : reply.code(404).send());
+    app.get('/robots.txt', (req, reply) => reply.sendFile('robots.txt'));
     app.register(require('@fastify/static'), { root: config.uploadDir, prefix: '/uploads/', decorateReply: false });
   }
   return app;

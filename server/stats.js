@@ -14,11 +14,12 @@ async function eloAdd(c, a, b, aWon) {
   await c.query('UPDATE players SET rating = rating - $2, rated = rated + 1 WHERE id = $1', [b, d]);
 }
 
-// полный пересчёт: после отмены результата или удаления турнира (как recalc() на странице)
+// полный пересчёт: после отмены результата или удаления турнира (как recalc() на странице).
+// В рейтинг идут только официальные турниры (клубные — тоже официальные)
 async function eloAll(c) {
-  const ms = await all(c, `SELECT m.w, a.player_id AS a, b.player_id AS b FROM matches m
+  const ms = await all(c, `SELECT m.w, a.player_id AS a, b.player_id AS b FROM matches m JOIN tournaments t ON t.id = m.tournament_id AND t.official
     JOIN match_lines a ON a.match_id = m.id AND a.idx = 0 JOIN match_lines b ON b.match_id = m.id AND b.idx = 1
-    WHERE m.status = 'done' AND m.tournament_id IS NOT NULL AND a.player_id IS NOT NULL AND b.player_id IS NOT NULL
+    WHERE m.status = 'done' AND a.player_id IS NOT NULL AND b.player_id IS NOT NULL
     ORDER BY m.finished, m.id`);
   const r = new Map(), n = new Map(), get = id => r.has(id) ? r.get(id) : 1500;
   ms.forEach(m => {
@@ -32,6 +33,10 @@ async function eloAll(c) {
     [ids, ids.map(id => r.get(id)), ids.map(id => n.get(id))]);
 }
 
+// матч засчитан игроку: турнирный, или его вёл сам игрок, или игрок — гость того, кто вёл.
+// Дружеский матч с чужим аккаунтом может создать кто угодно — в статистику, профиль и ленту этого игрока он не идёт
+const TRUSTED = (l, m) => `(${m}.tournament_id IS NOT NULL OR ${m}.created_by = ${l}.player_id OR EXISTS (SELECT 1 FROM players tp WHERE tp.id = ${l}.player_id AND tp.owner_id = ${m}.created_by))`;
+
 const FIELDS = ['n', 'w', 'pts', 'darts', 'f9s', 'f9n', 'coh', 'coa', 'hco', 'hi', 'c180', 'c140', 'c100', 'bl'];
 
 // как pStats() на странице, для «всех матчей» и «турнирных»
@@ -40,7 +45,7 @@ async function refreshStats(c, ids) {
   if (!ids.length) return;
   // попытки квалификации — не матчи; упражнения считаются матчами, но в средние x01 не входят
   const rows = await all(c, `SELECT l.*, m.mode, m.ex, m.w AS mw, m.tournament_id IS NOT NULL AS tour FROM match_lines l
-    JOIN matches m ON m.id = l.match_id WHERE l.player_id = ANY($1) AND m.status = 'done' AND m.q_player IS NULL`, [ids]);
+    JOIN matches m ON m.id = l.match_id WHERE l.player_id = ANY($1) AND m.status = 'done' AND m.q_player IS NULL AND ${TRUSTED('l', 'm')}`, [ids]);
   const acc = {};
   ids.forEach(id => { acc[id] = { all: blank(), tour: blank() }; });
   rows.forEach(l => {
@@ -79,4 +84,4 @@ function statsJSON(o) {
   };
 }
 
-module.exports = { eloAdd, eloAll, refreshStats, statsJSON };
+module.exports = { eloAdd, eloAll, refreshStats, statsJSON, TRUSTED };

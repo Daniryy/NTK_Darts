@@ -26,13 +26,21 @@ async function uniqueCode(c) {
   }
 }
 
-// p: { name, city, club, vk_id, phone, owner_id }; в транзакции, чтобы handle и code не заняли параллельно
+// p: { name, city, club, vk_id, phone, owner_id, consent }. Без блокировки всей таблицы: handle и code уникальны в базе,
+// если их параллельно заняли — пробуем снова с новыми
 async function createPlayer(c, p) {
-  await c.query('LOCK TABLE players IN SHARE ROW EXCLUSIVE MODE');
-  const handle = await uniqueHandle(c, p.name), code = await uniqueCode(c);
-  return one(c, `INSERT INTO players (name, handle, code, city, club, vk_id, phone, owner_id, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-  [p.name, handle, code, p.city || '', p.club || '', p.vk_id || null, p.phone || null, p.owner_id || null, Date.now()]);
+  for (let k = 0; k < 5; k++) {
+    const handle = await uniqueHandle(c, p.name), code = await uniqueCode(c);
+    const row = await one(c, `INSERT INTO players (name, handle, code, city, club, vk_id, phone, owner_id, created_at, consent_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING RETURNING *`,
+    [p.name, handle + (k ? '_' + crypto.randomInt(100, 1000) : ''), code, p.city || '', p.club || '', p.vk_id || null, p.phone || null, p.owner_id || null, Date.now(), p.consent ? Date.now() : null]);
+    if (row) return row;
+    // тот же VK или телефон уже занят параллельным входом — повтор не поможет
+    if ((p.vk_id && await one(c, 'SELECT 1 FROM players WHERE vk_id = $1', [p.vk_id])) || (p.phone && await one(c, 'SELECT 1 FROM players WHERE phone = $1', [p.phone]))) {
+      throw new (require('./errors').ApiError)(409, 'conflict', 'Аккаунт уже создан — войдите ещё раз');
+    }
+  }
+  throw new Error('createPlayer: не удалось подобрать handle и code');
 }
 
 const playerShort = p => ({ id: p.id, name: p.name, handle: p.handle, code: p.code, city: p.city, club: p.club, ver: p.ver, r: Math.round(p.rating), n: p.rated, photo: p.photo || null, title: p.title || '', role: p.role, walkon: p.walkon || '' });

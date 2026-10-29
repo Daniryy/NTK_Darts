@@ -88,3 +88,25 @@ test('роль, выданная вручную, возвращается пос
   ok(await call(ADMIN, 'PATCH', '/api/admin/players/p9', { role: 'player' }));
   assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'player');
 });
+
+test('рейтинг честно: итог без игры вносит только организатор; Эло — только официальные турниры', async () => {
+  const rat = async ids => (await pool.query('SELECT id, rating, rated FROM players WHERE id = ANY($1) ORDER BY id', [ids])).rows.map(x => x.rating + '/' + x.rated).join(' ');
+  const ids = ['p6', 'p7', 'p8', 'p9'];
+  const t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Дружеский кубок', format: 'ko', mode: 501, ltw: 1, players: ids }), 201).tournament;
+  assert.equal(t.official, false);
+  const g = t.games.find(x => x.r === 0 && [x.a, x.b].includes('p6')) || t.games.find(x => x.r === 0);
+  const before = await rat(ids);
+  // игрок пары — только сыграть в счётчике
+  err(await call(PL, 'POST', '/api/tournaments/' + t.id + '/games/0/' + g.i + '/result', { la: 1, lb: 0 }), 403);
+  ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/' + g.i + '/result', { la: 1, lb: 0 }));
+  assert.equal(await rat(ids), before, 'неофициальный турнир не меняет Эло');
+  const o = ok(await call(TECH, 'POST', '/api/tournaments', { name: 'Официальный кубок', official: true, format: 'ko', mode: 501, ltw: 1, players: ids }), 201).tournament;
+  assert.equal(o.official, true);
+  const og = o.games.find(x => x.r === 0);
+  ok(await call(TECH, 'POST', '/api/tournaments/' + o.id + '/games/0/' + og.i + '/result', { la: 1, lb: 0 }));
+  assert.notEqual(await rat(ids), before, 'официальный — меняет');
+  // полный пересчёт даёт то же самое
+  const now = await rat(ids);
+  await tx(require('../server/stats').eloAll);
+  assert.equal(await rat(ids), now);
+});

@@ -68,7 +68,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 
 test('чтение без входа и базовые ошибки', async () => {
   ok(await call(null, 'GET', '/api/health'));
-  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true });
+  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true, contact: '' });
   assert.equal(ok(await call(null, 'GET', '/api/me')).player, null);
   err(await call(null, 'POST', '/api/tournaments', {}), 400, 'bad_request'); // нет X-Device-Id
   err(await call({ dev: dev(), cookie: '' }, 'POST', '/api/tournaments', {}), 401, 'unauthorized');
@@ -349,4 +349,36 @@ test('вход через VK: обмен кода, новый игрок, защ
     const forged = await app.inject({ method: 'GET', url: `/api/auth/vk/callback?code=c1&state=${state}&device_id=d1`, headers: { cookie: 'oche_vk=' + encodeURIComponent(JSON.stringify({ v: 'x', s: state, r: '/' })) } });
     assert.match(forged.headers.location, /login=fail/);
   } finally { global.fetch = realFetch; }
+});
+
+test('статистику не подделать: итоги строк считает сервер; чужой дружеский матч не идёт в статистику и ленту', async () => {
+  const P1 = (await pool.query(`SELECT id FROM players WHERE id <> $1 AND owner_id IS NULL ORDER BY id LIMIT 1`, [ME])).rows[0].id;
+  const stat = async id => ok(await call(null, 'GET', '/api/players/' + id)).stats.all;
+  // 301 до 1 лега: 180, 121 закрытие (3 дротика); гость — один подход 60
+  const fin = (m, pl) => [
+    { type: 'visit', leg: 1, p: 0, s: 301, pts: 180, n: 3, b: 0 },
+    { type: 'visit', leg: 1, p: 1, s: 301, pts: 60, n: 3, b: 0 },
+    { type: 'visit', leg: 1, p: 0, s: 121, pts: 121, n: 3, b: 0 },
+    { type: 'finish', w: 0, pl }
+  ].map((e, k) => Object.assign({ seq: k + 1 }, e));
+  const fake = (id, gid) => [{ id, legs: 1, pts: 301, darts: 6, f9: 150.5, hi: 180, hco: 170, c180: 50, c140: 50, c100: 50, coh: 1, coa: 1, bl: 9 }, { id: gid || null, legs: 0, pts: 60, darts: 3, f9: null, hi: 60, hco: 0, c180: 0, c140: 0, c100: 0, coh: 0, coa: 0, bl: 0 }];
+  // свой матч: числа телефона не принимаются — 180 одно, закрытие 121, лучший лег 6 дротиков
+  const b0 = await stat(ME), id0 = mid();
+  const m0 = ok(await call(A, 'PUT', '/api/matches/' + id0, { mode: 301, ltw: 1, dbl: true, players: [{ id: ME }, { name: 'Гость' }] }), 201).match;
+  ok(await call(A, 'POST', `/api/matches/${id0}/events`, { events: fin(m0, fake(ME)) }));
+  const a0 = await stat(ME);
+  assert.equal(a0.c180 - b0.c180, 1);
+  assert.equal(a0.c140 - b0.c140, 1);
+  assert.equal(a0.c100 - b0.c100, 2);
+  assert.ok(a0.hco >= 121 && a0.hco < 170 || b0.hco >= 170);
+  // матч от имени другого игрока: в его статистику, профиль и ленту не попадает
+  const b1 = await stat(P1), id1 = mid();
+  const m1 = ok(await call(A, 'PUT', '/api/matches/' + id1, { mode: 301, ltw: 1, dbl: true, players: [{ id: P1 }, { name: 'Гость' }] }), 201).match;
+  ok(await call(A, 'POST', `/api/matches/${id1}/events`, { events: fin(m1, fake(P1)) }));
+  assert.deepEqual(await stat(P1), b1);
+  const prof = ok(await call(null, 'GET', '/api/players/' + P1));
+  assert.ok(!prof.matches.some(x => x.id === id1));
+  const feed = ok(await call(null, 'GET', '/api/feed?limit=50')).items;
+  assert.ok(!feed.some(x => x.match && x.match.id === id1));
+  assert.ok(feed.some(x => x.match && x.match.id === id0));
 });

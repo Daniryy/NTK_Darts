@@ -1,7 +1,8 @@
 /* Oche: страница открывается и без сети. Оболочка (страница и её скрипты) — сначала из сети, без сети — из кэша.
    Запросы к /api не кэшируются: счёт без сети копит очередь api.js. Фото — из кэша, если уже открывались. */
-const SHELL = 'oche-shell-v1', MEDIA = 'oche-media-v1', MEDIA_MAX = 300;
-const FILES = ['./', 'index.html', 'api.js', 'shared/bracket.js', 'shared/games.js', 'vendor/qrcode.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const SHELL = 'oche-shell-v2', MEDIA = 'oche-media-v1', MEDIA_MAX = 300;
+const FILES = ['./', 'index.html', 'api.js', 'shared/bracket.js', 'shared/games.js', 'vendor/qrcode.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
+  'fonts/fonts.css', 'fonts/golos-text-cyrillic.woff2', 'fonts/golos-text-latin.woff2', 'fonts/oswald-cyrillic.woff2', 'fonts/oswald-latin.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

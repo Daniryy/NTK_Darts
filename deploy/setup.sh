@@ -70,7 +70,8 @@ for _ in $(seq 1 20); do sudo -u postgres psql -tAc 'SELECT 1' >/dev/null 2>&1 &
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'oche'" | grep -q 1; then
   DB_PASS=$(openssl rand -hex 24)
   sudo -u postgres psql -qc "CREATE ROLE oche LOGIN PASSWORD '$DB_PASS'"
-  sudo -u postgres psql -qc "CREATE DATABASE oche OWNER oche"
+  # UTF-8 с локалью C.UTF-8: lower() и поиск работают и для кириллицы, независимо от локали самой системы
+  sudo -u postgres psql -qc "CREATE DATABASE oche OWNER oche TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C.UTF-8' LC_CTYPE 'C.UTF-8'"
 else
   DB_PASS=""
 fi

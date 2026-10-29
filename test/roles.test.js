@@ -233,8 +233,11 @@ test('баннеры: ведёт тех. администратор, показ 
   const list = ok(await call(null, 'GET', '/api/banners?place=tour')).banners;
   assert.deepEqual(list.map(x => x.id), [b.id]);
   assert.equal(list[0].clicks, undefined, 'счётчик видит только тех. администратор');
+  const one1 = anon();
+  ok(await call(one1, 'POST', '/api/banners/' + b.id + '/click'));
   ok(await call(anon(), 'POST', '/api/banners/' + b.id + '/click'));
-  ok(await call(anon(), 'POST', '/api/banners/' + b.id + '/click'));
+  // повтор с того же устройства за сутки не считается
+  ok(await call(one1, 'POST', '/api/banners/' + b.id + '/click'));
   assert.equal(ok(await call(TECH, 'GET', '/api/admin/banners')).banners.find(x => x.id === b.id).clicks, 2);
   ok(await call(TECH, 'PATCH', '/api/admin/banners/' + b.id, { active: false }));
   assert.equal(ok(await call(null, 'GET', '/api/banners?place=tour')).banners.length, 0);

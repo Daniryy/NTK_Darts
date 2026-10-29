@@ -74,13 +74,15 @@ module.exports = function routes(app) {
   // Почта на сервере не настроена — аккаунт сразу, адрес неподтверждённый.
   app.post('/api/auth/register', async (req, reply) => {
     const b = req.body || {}, name = V.str(b.name, 'name', 2, 32), city = V.optStr(b.city, 'city', 40), email = normEmail(b.email), pw = needPass(b.password);
-    A.ipLimit(req, 'reg', 20, 36e5);
+    if (b.consent !== true) throw E.bad('Нужно согласие на обработку персональных данных', 'consent');
+    // в зале регистрируются десятки человек с одного адреса — порог с большим запасом
+    A.ipLimit(req, 'reg', 300, 36e5);
     if (await one(pool, 'SELECT 1 FROM players WHERE email = $1', [email])) throw taken();
     const pass = await hashPassword(pw);
     if (mailOn()) return sendCode(req, email, 'reg', { data: { name, city, pass } });
     const p = await tx(async c => {
       if (await one(c, 'SELECT 1 FROM players WHERE email = $1 FOR UPDATE', [email])) throw taken();
-      const t = await createPlayer(c, { name, city });
+      const t = await createPlayer(c, { name, city, consent: true });
       await c.query('UPDATE players SET email = $2, pass_hash = $3 WHERE id = $1', [t.id, email, pass]);
       await A.startSession(reply, c, t.id, req.device);
       return one(c, 'SELECT * FROM players WHERE id = $1', [t.id]);
@@ -93,7 +95,7 @@ module.exports = function routes(app) {
   app.post('/api/auth/email/send', async req => {
     const b = req.body || {}, purpose = V.oneOf(b.purpose, 'purpose', ['link', 'reset']), email = normEmail(b.email);
     if (!mailOn()) throw E.notFound('Письма на сервере не настроены — обратитесь к администратору');
-    A.ipLimit(req, 'mail', 30, 36e5);
+    A.ipLimit(req, 'mail', 100, 36e5);
     if (purpose === 'link') {
       const me = A.needPlayer(req), owner = await one(pool, 'SELECT id FROM players WHERE email = $1', [email]);
       if (owner && owner.id !== me.id) throw taken();
@@ -108,9 +110,12 @@ module.exports = function routes(app) {
   // reset: новый пароль (password) и вход
   app.post('/api/auth/email/verify', async (req, reply) => {
     const b = req.body || {}, purpose = V.oneOf(b.purpose, 'purpose', ['reg', 'link', 'reset']), email = normEmail(b.email);
-    A.ipLimit(req, 'verify', 60, 10 * 6e4);
+    // неверные коды: на адрес — 10 в час, с одного IP — 60 за 10 минут
+    const keys = [['ev:' + email, 10, 36e5], ['evip:' + req.ip, 60, 10 * 6e4]];
+    A.failCheck(keys);
     const me = purpose === 'link' ? A.needPlayer(req) : null, pw = purpose === 'reset' ? needPass(b.password) : null;
-    const row = await takeCode(email, purpose, b.code);
+    let row;
+    try { row = await takeCode(email, purpose, b.code); } catch (e) { A.failAdd(keys); throw e; }
     if (me && row.player_id !== me.id) throw E.conflict('code_expired', 'Код запрошен с другого аккаунта — запросите новый');
     const pass = pw ? await hashPassword(pw) : null;
     let created = false;
@@ -125,7 +130,7 @@ module.exports = function routes(app) {
       }
       if (purpose === 'reg') {
         if (owner) throw taken();
-        const d = row.data || {}, t = await createPlayer(c, { name: d.name, city: d.city });
+        const d = row.data || {}, t = await createPlayer(c, { name: d.name, city: d.city, consent: true });
         const out = await one(c, 'UPDATE players SET email = $2, email_ok = true, pass_hash = $3 WHERE id = $1 RETURNING *', [t.id, email, d.pass]);
         created = true;
         await A.startSession(reply, c, out.id, req.device);
@@ -136,8 +141,9 @@ module.exports = function routes(app) {
       // у администратора с логином пароль строже — от 10 символов
       if (owner.login && passwordProblem(pw)) throw E.bad(passwordProblem(pw), 'password');
       const out = await one(c, 'UPDATE players SET pass_hash = $2, email_ok = true, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [owner.id, pass]);
-      // новый пароль — старые входы закрываются
+      // новый пароль — старые входы закрываются, неудачные попытки забываются
       await c.query('DELETE FROM sessions WHERE player_id = $1', [owner.id]);
+      require('./limits').clear('pw:e:' + email);
       await A.startSession(reply, c, out.id, req.device, sessionMs(out));
       await audit(c, out, 'password.reset', out, { ip: req.ip });
       return out;
@@ -151,7 +157,7 @@ module.exports = function routes(app) {
   app.put('/api/me/email', async req => {
     const me = A.needPlayer(req), b = req.body || {}, email = normEmail(b.email);
     if (mailOn()) throw E.conflict('need_code', 'Подтвердите почту кодом из письма');
-    A.ipLimit(req, 'mail', 30, 36e5);
+    A.ipLimit(req, 'mail', 100, 36e5);
     const pass = b.password ? await hashPassword(needPass(b.password)) : null;
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
@@ -169,20 +175,17 @@ module.exports = function routes(app) {
   // вход по почте и паролю: { email, password }. 5 неверных паролей — вход закрыт на 15 минут
   app.post('/api/auth/email/login', async (req, reply) => {
     const b = req.body || {}, pw = typeof b.password === 'string' ? b.password : '';
-    A.ipLimit(req, 'pass', 10, 10 * 6e4);
-    const bad = () => E.conflict('bad_login', 'Неверная почта или пароль');
     let email;
-    try { email = normEmail(b.email); } catch (e) { throw bad(); }
-    if (!pw || pw.length > 200) throw bad();
+    try { email = normEmail(b.email); } catch (e) { email = ''; }
+    // считаются только неверные пароли: на аккаунт с одного адреса, на аккаунт и на адрес (auth.js)
+    const keys = A.passKeys(req, 'e:' + email);
+    A.failCheck(keys);
+    const bad = () => { A.failAdd(keys); return E.conflict('bad_login', 'Неверная почта или пароль'); };
+    if (!email || !pw || pw.length > 200) throw bad();
     const p = await one(pool, 'SELECT * FROM players WHERE email = $1', [email]);
     // нет такой почты — всё равно считаем хэш: ответ по времени не выдаёт, есть ли аккаунт
     if (!p || !p.pass_hash) { await verifyPassword(pw, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'); throw bad(); }
-    const now = Date.now();
-    if (p.pass_lock_until && p.pass_lock_until > now) throw A.tooMany(Math.ceil((p.pass_lock_until - now) / 1000), 'Вход временно закрыт после неверных паролей — повторите через ' + Math.ceil((p.pass_lock_until - now) / 6e4) + ' мин или восстановите пароль');
-    if (!await verifyPassword(pw, p.pass_hash)) {
-      await pool.query('UPDATE players SET pass_fails = pass_fails + 1, pass_lock_until = CASE WHEN pass_fails + 1 >= $2 THEN $3 ELSE pass_lock_until END WHERE id = $1', [p.id, A.PASS_FAILS, now + A.PASS_LOCK]);
-      throw bad();
-    }
+    if (!await verifyPassword(pw, p.pass_hash)) throw bad();
     if (p.blocked) throw A.blockedErr();
     await tx(async c => {
       await c.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);

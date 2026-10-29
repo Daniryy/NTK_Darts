@@ -66,12 +66,57 @@ function checkFinish(m, st, ev) {
   return null;
 }
 
-// строка для match_lines из finish (имя берём из матча, итоги легов — из подходов)
-const lineOf = (m, l, k, st) => ({
-  idx: k, player_id: m.players[k].id || null, name: m.players[k].name, legs: l.legs, pts: l.pts, darts: l.darts,
-  f9: l.f9 == null ? null : Math.round(l.f9 * 10) / 10, hi: l.hi || 0, hco: l.hco || 0, c180: l.c180 || 0, c140: l.c140 || 0,
-  c100: l.c100 || 0, coh: l.coh != null ? l.coh : l.legs, coa: Math.max(l.coa || 0, l.legs), bl: l.bl || 0,
-  sc: m.ex && st ? st.legsLog.map(L => L.tot[k]) : null
-});
+// дротик по подписи счётчика: «T20» 60, «D16» 32, «Bull» 50, «25», «7»; промах — 0
+function dartVal(l) {
+  const s = String(l == null ? '' : l), t = s.match(/^([TD]?)(\d{1,2})$/);
+  if (s === 'Bull') return 50;
+  if (!t) return 0;
+  return +t[2] * (t[1] === 'T' ? 3 : t[1] === 'D' ? 2 : 1);
+}
+// закрытие с этого остатка одним дротиком и наименьшее число дротиков на закрытие
+const oneDart = (rem, dbl) => rem > 0 && (dbl ? Games.FIN[1].has(rem) : rem <= 60 && Games.SUM[1].has(rem));
+function minDarts(rem, dbl) { for (let n = 1; n <= 3; n++) if ((dbl ? Games.FIN[n] : Games.SUM[n]).has(rem)) return n; return 0; }
 
-module.exports = { IMPOSSIBLE, exOf, stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, activeVisits };
+// статистика строки x01 — только из принятых подходов: максимумы, 180/140/100, закрытие, первые 9, лучший лег, попытки на дубль.
+// Что прислал телефон, не используется (иначе любую статистику можно было вписать руками)
+function lineStats(m, visits) {
+  const ex = exOf(m), dbl = ex.dbl !== false, out = m.players.map(() => ({ hi: 0, hco: 0, c180: 0, c140: 0, c100: 0, f9p: 0, f9d: 0, coa: 0, bl: 0 }));
+  if (ex.k !== 'x01') return out;
+  const legVis = {}, legDarts = {};
+  for (const v of visits) {
+    if (v.tb || !out[v.p]) continue;
+    const o = out[v.p], key = v.leg + ':' + v.p, n = v.n || 3, pts = v.b ? 0 : v.pts, win = !v.b && v.s - v.pts === 0;
+    legVis[key] = (legVis[key] || 0) + 1;
+    legDarts[key] = (legDarts[key] || 0) + n;
+    if (legVis[key] <= 3) { o.f9p += pts; o.f9d += n; }
+    if (!v.b) {
+      o.hi = Math.max(o.hi, pts);
+      if (pts >= 100) o.c100++;
+      if (pts >= 140) o.c140++;
+      if (pts === 180) o.c180++;
+    }
+    // попытки на дубль: по дротикам, если их отметили; иначе — как считает счётчик по сумме
+    if (Array.isArray(v.d) && v.d.length) {
+      let rem = v.s;
+      for (const l of v.d) { if (oneDart(rem, dbl)) o.coa++; rem -= dartVal(l); }
+    } else o.coa += win ? Math.max(1, n - (minDarts(v.s, dbl) - 1)) : oneDart(v.s, dbl) ? 3 : 0;
+    if (win) {
+      o.hco = Math.max(o.hco, v.pts);
+      if (!o.bl || legDarts[key] < o.bl) o.bl = legDarts[key];
+    }
+  }
+  return out;
+}
+
+// строка для match_lines из finish (имя берём из матча, итоги легов и статистика — из подходов)
+const lineOf = (m, l, k, st, calc) => {
+  const c = calc[k];
+  return {
+    idx: k, player_id: m.players[k].id || null, name: m.players[k].name, legs: l.legs, pts: l.pts, darts: l.darts,
+    f9: c.f9d ? Math.round(c.f9p / c.f9d * 30) / 10 : null, hi: c.hi, hco: c.hco, c180: c.c180, c140: c.c140,
+    c100: c.c100, coh: l.legs, coa: Math.max(Math.min(c.coa, l.darts), l.legs), bl: c.bl,
+    sc: m.ex && st ? st.legsLog.map(L => L.tot[k]) : null
+  };
+};
+
+module.exports = { IMPOSSIBLE, exOf, stateOf, liveState, visitOf, checkVisit, checkFinish, lineOf, lineStats, activeVisits };
