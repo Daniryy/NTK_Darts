@@ -125,3 +125,13 @@ test('тех. администратор: тарифы, скидки, свои �
   assert.deepEqual([v.discount, v.final], [30, 314]);
   err(await call(TECH, 'PUT', '/api/admin/discounts', { ms: 95 }), 400);
 });
+
+test('Pro и «Ведущий» сразу: роль ведущего, даже если Pro кончается позже; кончился «Ведущий» — Pro', async () => {
+  const host = plans.find(p => p.role === 'host'), plus = plans.find(p => p.role === 'plus');
+  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p8', planId: host.id, days: 10 }));
+  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p8', planId: plus.id, days: 60 }));
+  assert.equal(await role('p8'), 'host');
+  await pool.query(`UPDATE player_plans pp SET ends = $1 FROM plans pl WHERE pl.id = pp.plan_id AND pl.role = 'host' AND pp.player_id = 'p8' AND pp.status = 'active'`, [Date.now() - 1000]);
+  await tx(sweepPlans);
+  assert.equal(await role('p8'), 'plus');
+});

@@ -198,3 +198,36 @@ test('очистка сервера от демо-данных: право clean
   assert.equal(ok(await call(null, 'GET', '/api/rating')).total, 0);
   assert.equal(ok(await call(TECH, 'GET', '/api/me')).player.id, ME);
 });
+
+test('роль игроку с почтой и снятие входа по логину не стирают пароль от почты', async () => {
+  // игрок зарегистрировался по почте
+  const u = anon();
+  const reg = ok(await call(u, 'POST', '/api/auth/register', { name: 'Почтовый Игрок', email: 'mailer@mail.ru', password: 'darts-2026' }));
+  const id = ok(await call(u, 'POST', '/api/auth/email/verify', { email: 'mailer@mail.ru', purpose: 'reg', code: reg.devCode })).player.id;
+  // выдали роль ведущего — вход по почте и сеанс остаются
+  ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'host' }));
+  assert.equal(ok(await call(u, 'GET', '/api/me')).player.id, id);
+  ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'darts-2026' }));
+  // администратор с логином и почтой: снятие логина оставляет вход по почте
+  ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'admin' }));
+  ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
+  const off = ok(await call(TECH, 'DELETE', '/api/admin/players/' + id + '/login'));
+  assert.equal(off.player.login, null);
+  err(await call(anon(), 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' }), 409, 'bad_login');
+  ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }));
+  // понижение администратора с логином: логин снят, сеансы закрыты, почта по-прежнему пускает
+  ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
+  const a = anon();
+  ok(await call(a, 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' }));
+  const down = ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'player' }));
+  assert.equal(down.player.login, null);
+  err(await call(a, 'GET', '/api/admin/stats'), 401);
+  ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }));
+});
+
+test('кривые параметры журнала и нулевой байт в строке — 400, не ошибка сервера', async () => {
+  err(await call(TECH, 'GET', '/api/admin/audit?before=abc'), 400);
+  err(await call(TECH, 'GET', '/api/admin/audit?target=%00'), 400);
+  err(await call(TECH, 'GET', '/api/admin/players?q=a%00b'), 400);
+  ok(await call(TECH, 'GET', '/api/admin/audit?before=' + Date.now()));
+});
