@@ -26,7 +26,8 @@
 
   const BYE = '~';
   const isReal = x => !!x && x !== BYE;
-  const isBracket = t => t.format === 'ko' || t.format === 'pl';
+  // пока идёт групповой этап, турнир живёт как круговой: сетка (ko / pl) строится после групп
+  const isBracket = t => (t.format === 'ko' || t.format === 'pl') && t.stage !== 'groups';
   const slotsOf = t => t.slots || t.players;
   // размер одной части сетки; без частей — вся сетка
   const bSize = t => (t.format === 'pl' && t.block) || slotsOf(t).length;
@@ -71,8 +72,9 @@
   }
   // стадия матча (r, i) для «до скольких побед»: f — финал, sf — полуфинал, qf — четвертьфинал, early — ранние круги,
   // places — матчи за места ниже первого (pl); у круговой — null
-  const STAGES = ['early', 'qf', 'sf', 'f', 'places'];
+  const STAGES = ['groups', 'early', 'qf', 'sf', 'f', 'places'];
   function stageOf(t, r, i) {
+    if (t.stage === 'groups') return 'groups';
     if (!isBracket(t) || r == null) return null;
     if (t.format === 'pl' && plGroup(t, r, i).lo !== 1) return 'places';
     const d = bRounds(t) - 1 - r;
@@ -176,6 +178,7 @@
   }
   // название матча при подписях NDL: «A1–A2», «B3–B4»; в первом круге — номера посева «1–8». null — подписи номерами
   function gameTag(t, g) {
+    if (t.stage === 'groups' && g.grp != null) return 'группа ' + groupName(g.grp);
     if (t.labels !== 'ab' || !isBracket(t)) return null;
     if (g.r > 0) return slotTag(g.r, g.i, 0) + '–' + slotTag(g.r, g.i, 1);
     const B = bSize(t), base = partOf(t, g.i) * B, o = orderOf(t, B), k = (2 * g.i) % B;
@@ -229,10 +232,55 @@
     return games;
   }
 
+  // группы змейкой по посеву: 1-й — в A, 2-й — в B, …, последний в ряду — снова в ту же группу и обратно
+  function drawGroups(ids, n) {
+    const g = Array.from({ length: n }, () => []);
+    ids.forEach((id, k) => { const row = Math.floor(k / n), col = k % n; g[row % 2 ? n - 1 - col : col].push(id); });
+    return g;
+  }
+  // матчи групп: каждый с каждым внутри группы; круг общий, i — сквозной номер в круге, grp — номер группы
+  function groupGames(groups) {
+    const out = [], cnt = {};
+    groups.forEach((ids, gi) => rrGames(ids).forEach(g => { const i = cnt[g.r] || 0; cnt[g.r] = i + 1; out.push(Object.assign(g, { i, grp: gi })); }));
+    return out.sort((a, b) => a.r - b.r || a.i - b.i);
+  }
+  // таблица: победы, затем разница легов, выигранные леги, личная встреча
+  function table(ids, games) {
+    const s = {};
+    ids.forEach(id => { s[id] = { id, n: 0, w: 0, l: 0, lf: 0, la: 0 }; });
+    games.forEach(g => {
+      if (!g.res || !s[g.a] || !s[g.b]) return;
+      const A = s[g.a], Bb = s[g.b];
+      A.n++; Bb.n++; A.lf += g.res.la; A.la += g.res.lb; Bb.lf += g.res.lb; Bb.la += g.res.la;
+      if (g.res.w === g.a) { A.w++; Bb.l++; } else { Bb.w++; A.l++; }
+    });
+    const h2h = (x, y) => { const g = games.find(g => g.res && ((g.a === x.id && g.b === y.id) || (g.a === y.id && g.b === x.id))); return g ? (g.res.w === x.id ? -1 : 1) : 0; };
+    return Object.values(s).sort((x, y) => y.w - x.w || (y.lf - y.la) - (x.lf - x.la) || y.lf - x.lf || h2h(x, y));
+  }
+  // кто выходит в сетку: первые adv из каждой группы — сначала все первые места, потом вторые…
+  // посев сетки разводит игроков одной группы: 1A — 2D, 1B — 2C и т. д.
+  function groupAdvance(t) {
+    const G = t.groups, tabs = G.ids.map((ids, k) => table(ids, G.games.filter(g => g.grp === k))), out = [];
+    for (let p = 0; p < G.adv; p++) tabs.forEach(tb => { if (tb[p]) out.push(tb[p].id); });
+    return out;
+  }
+  const groupName = k => String.fromCharCode(65 + k);
   const finalGame = t => isBracket(t) ? gameAt(t, bRounds(t) - 1, 0) : null;
 
   // места игрока [от, до]; пока место не решено, это диапазон. null — игрока нет в сетке.
+  // не вышел из группы: место по месту в группе — после всех, кто в сетке
+  function groupPlace(t, pid) {
+    const G = t.groups, gi = G.ids.findIndex(ids => ids.includes(pid));
+    if (gi < 0) return null;
+    const tabs = G.ids.map((ids, k) => table(ids, G.games.filter(g => g.grp === k)));
+    const k = tabs[gi].findIndex(x => x.id === pid), adv = slotsOf(t).filter(isReal).length;
+    let lo = adv + 1;
+    for (let j = G.adv; j < k; j++) lo += tabs.filter(x => x.length > j).length;
+    return [lo, lo + tabs.filter(x => x.length > k).length - 1];
+  }
   function placeRange(t, pid, rv) {
+    if (!isBracket(t)) return null;
+    if (t.groups && t.groups.games && isBracket(t) && t.slots && !t.slots.includes(pid)) return groupPlace(t, pid);
     rv = rv || resolver(t);
     const R = bRounds(t), S = bSize(t), N = t.players.length;
     for (let r = R - 1; r >= 0; r--) {
@@ -315,6 +363,6 @@
     BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
     roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
     srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards,
-    NDL_ORDER, slotTag, nextOf, gameTag, STAGES, stageOf, ltwOf
+    NDL_ORDER, slotTag, nextOf, gameTag, STAGES, stageOf, ltwOf, drawGroups, groupGames, table, groupAdvance, groupName
   };
 });
