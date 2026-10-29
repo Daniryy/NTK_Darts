@@ -42,7 +42,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 test('режим, вход для разработки, выход', async () => {
   const w = browser(), Api = makeApi(w);
   assert.equal(await Api.detect(), 'server');
-  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, contact: '' });
+  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '' });
   assert.equal(Api.me, null);
   await Api.devLogin(ME);
   assert.equal(Api.me.id, ME);
@@ -59,8 +59,9 @@ test('режим, вход для разработки, выход', async () =>
   assert.equal(await A2.detect(), 'server');
   assert.equal(A2.offline, true);
   const w3 = browser(); w3.localStorage.setItem('oche.mode', '"demo"');
-  assert.equal(await makeApi(w3).detect(), 'demo', 'закреплённое демо');
-  assert.equal(w3.calls.length, 0);
+  assert.equal(await makeApi(w3).detect(), 'demo', 'закреплённое демо: демо-сервера нет — демо в браузере');
+  assert.equal(w3.calls.length, 1, 'спросили только демо-сервер');
+  assert.match(w3.calls[0].url || String(w3.calls[0]), /\/demo\/api\/config/);
 });
 
 test('очередь: без сети копится, при появлении сети уходит по порядку; повтор безопасен', async () => {

@@ -2,6 +2,7 @@
 const B = require('../shared/bracket.js');
 const { all } = require('./db');
 const { can, RANK } = require('./roles');
+const config = require('./config');
 
 const RR_MAX = 10, BR_MAX = 64;
 // строки турниров всегда берём с именем владельца
@@ -28,7 +29,7 @@ async function loadTours(c, rows) {
   const logos = cids.length ? await all(c, 'SELECT id, logo FROM clubs WHERE id = ANY($1)', [cids]) : [];
   return rows.map(row => {
     const t = build(row, ents.filter(e => e.tournament_id === row.id), ms.filter(m => m.tournament_id === row.id), qs.filter(q => q.tournament_id === row.id));
-    t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: '/uploads/' + p.file, w: p.w, h: p.h }));
+    t.photos = ph.filter(p => p.tournament_id === row.id).map(p => ({ id: p.id, url: config.uploadUrl + p.file, w: p.w, h: p.h }));
     // общее фото игроков — одно из фото турнира
     t.cover = row.cover ? t.photos.find(p => p.id === row.cover) || null : null;
     t.links = row.links || [];

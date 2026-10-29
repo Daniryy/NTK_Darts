@@ -7,7 +7,7 @@ const { E } = require('../errors');
 const { needPlayer, clearCache } = require('../auth');
 const { RANK } = require('../roles');
 
-const SID = 'oche_sid';
+const SID = config.sidName;
 const HIDDEN = ['pass_hash', 'pass_fails', 'pass_lock_until', 'claim'];
 
 async function exportData(c, id) {

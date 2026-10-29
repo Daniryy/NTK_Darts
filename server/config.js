@@ -2,6 +2,8 @@ const env = process.env;
 const prod = env.NODE_ENV === 'production';
 
 if (prod && !env.COOKIE_SECRET) throw new Error('COOKIE_SECRET не задан');
+// демо-сервер (DEMO=1): та же программа с отдельной базой демо-данных — вход «как любой игрок», данные сбрасываются каждую ночь
+const demo = env.DEMO === '1';
 
 module.exports = {
   prod,
@@ -13,7 +15,12 @@ module.exports = {
   publicUrl: (env.PUBLIC_URL || 'http://localhost:' + (+env.PORT || 3000)).replace(/\/$/, ''),
   // в разработке сервер сам отдаёт index.html и shared/; на VPS это делает nginx
   serveStatic: env.SERVE_STATIC ? env.SERVE_STATIC === '1' : !prod,
-  devLogin: !prod && env.DEV_LOGIN !== '0',
+  demo,
+  devLogin: demo || (!prod && env.DEV_LOGIN !== '0'),
+  // cookie сеанса: у демо своя, чтобы вход в демо не путался с настоящим
+  sidName: demo ? 'oche_demo_sid' : 'oche_sid',
+  // адрес загруженных фото: у демо — /demo/uploads/
+  uploadUrl: env.UPLOAD_URL || '/uploads/',
   // загруженные фото; на VPS — /srv/oche/uploads (nginx отдаёт их по /uploads/)
   uploadDir: env.UPLOAD_DIR || (prod ? '/srv/oche/uploads' : require('node:path').join(__dirname, '..', 'uploads')),
   // документы заявок на звания: закрытая папка, nginx её не отдаёт; на VPS — /srv/oche/private
