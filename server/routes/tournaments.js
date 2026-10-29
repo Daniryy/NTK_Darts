@@ -507,6 +507,64 @@ module.exports = async function (app) {
     });
   });
 
+  // судьи: { chief: { name, city } | null } — главный судья, { pool: [имена] } — судьи турнира (организатор);
+  // { r, i, ref: имя | null } — кто судит матч, { auto: true } — раздать судей матчам без судьи по очереди (организатор или помощник)
+  app.patch('/api/tournaments/:id/refs', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needStaff(t, me);
+      const cur = t.refs || {}, rf = { chief: cur.chief || null, pool: (cur.pool || []).slice(), at: Object.assign({}, cur.at) };
+      if (b.chief !== undefined || b.pool !== undefined) needOwner(t, me);
+      if (b.chief !== undefined) {
+        const ch = b.chief;
+        if (ch !== null && (typeof ch !== 'object' || Array.isArray(ch))) throw E.bad('chief: { name, city }', 'chief');
+        rf.chief = ch === null || !ch.name ? null : { name: V.str(ch.name, 'chief.name', 2, 60), city: V.optStr(ch.city, 'chief.city', 40) };
+      }
+      if (b.pool !== undefined) {
+        const pool = b.pool == null ? [] : b.pool;
+        if (!Array.isArray(pool) || pool.length > 40) throw E.bad('Судьи: список до 40 имён', 'pool');
+        rf.pool = [...new Set(pool.map(x => V.str(x, 'pool', 2, 60)))];
+        // снятый из списка судья больше не стоит на матчах
+        Object.keys(rf.at).forEach(k => { if (!rf.pool.includes(rf.at[k])) delete rf.at[k]; });
+      }
+      if (b.ref !== undefined || b.auto) {
+        if (t.status === 'reg') throw E.conflict('bad_state', 'Судей матчам — после старта');
+        if (!t.games.length) throw E.conflict('bad_state', 'Матчей ещё нет');
+      }
+      if (b.ref !== undefined) {
+        const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63);
+        if (!B.gameAt(t, r, i)) throw E.notFound('Матч не найден');
+        if (b.ref === null) delete rf.at[r + ':' + i];
+        else {
+          const name = V.str(b.ref, 'ref', 2, 60);
+          if (!rf.pool.includes(name)) throw E.bad('Сначала добавьте судью в список турнира', 'ref');
+          rf.at[r + ':' + i] = name;
+        }
+      }
+      // по очереди: матчам, которые можно играть (и идущим), — судья, у которого меньше всего матчей
+      if (b.auto) {
+        if (!rf.pool.length) throw E.conflict('bad_state', 'Добавьте судей в список турнира');
+        const rv = B.resolver(t), load = Object.fromEntries(rf.pool.map(n => [n, 0]));
+        Object.values(rf.at).forEach(n => { if (n in load) load[n]++; });
+        for (const g of t.games) {
+          const k = g.r + ':' + g.i, gs = B.gameState(t, g, rv);
+          if (rf.at[k] || gs.st !== 'ready') continue;
+          // сам себя не судит
+          const pl = [gs.a, gs.b].map(id => (t._ents.find(e => e.player_id === id) || {}).name);
+          const free = rf.pool.filter(n => !pl.includes(n));
+          if (!free.length) continue;
+          const pick = free.reduce((a, n) => load[n] < load[a] ? n : a);
+          rf.at[k] = pick; load[pick]++;
+        }
+      }
+      const empty = !rf.chief && !rf.pool.length && !Object.keys(rf.at).length;
+      await c.query('UPDATE tournaments SET refs = $2 WHERE id = $1', [t.id, empty ? null : JSON.stringify(rf)]);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
   // номера игроков (организатор): { nums: { id: номер } } — только меняемые; null — номера по порядку
   app.patch('/api/tournaments/:id/nums', async req => {
     const me = needPlayer(req), b = req.body || {};

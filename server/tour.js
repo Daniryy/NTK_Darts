@@ -56,6 +56,7 @@ function build(row, ents, ms, qs) {
   if (row.split) t.split = row.split;
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
+  if (row.refs) t.refs = row.refs;
   if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
   if (row.layout) t.layout = row.layout;
