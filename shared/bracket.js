@@ -69,6 +69,17 @@
     const per = B / 2 ** (r + 1), lg = Math.floor((i % half) / per);
     return { grp: part * 2 ** r + lg, per, lo: part * B + lg * per * 2 + 1, part, lg };
   }
+  // стадия матча (r, i) для «до скольких побед»: f — финал, sf — полуфинал, qf — четвертьфинал, early — ранние круги,
+  // places — матчи за места ниже первого (pl); у круговой — null
+  const STAGES = ['early', 'qf', 'sf', 'f', 'places'];
+  function stageOf(t, r, i) {
+    if (!isBracket(t) || r == null) return null;
+    if (t.format === 'pl' && plGroup(t, r, i).lo !== 1) return 'places';
+    const d = bRounds(t) - 1 - r;
+    return d === 0 ? 'f' : d === 1 ? 'sf' : d === 2 ? 'qf' : 'early';
+  }
+  // до скольких побед в матче (r, i): своё значение стадии из t.ltwBy, иначе общее t.ltw
+  const ltwOf = (t, r, i) => { const s = stageOf(t, r, i); return (s && t.ltwBy && t.ltwBy[s]) || t.ltw; };
   const partOf = (t, i) => t.format === 'pl' && t.block ? Math.floor(i / (t.block / 2)) : 0;
   // откуда берутся игроки матча (r, i): [[i в круге r-1, 'w' | 'l'], ...]
   function feeders(t, r, i) {
@@ -304,6 +315,6 @@
     BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
     roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
     srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards,
-    NDL_ORDER, slotTag, nextOf, gameTag
+    NDL_ORDER, slotTag, nextOf, gameTag, STAGES, stageOf, ltwOf
   };
 });

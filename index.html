@@ -923,6 +923,11 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tfa-codes span { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; user-select: all; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
+.stg-row { display: grid; gap: 4px; margin-top: 10px; }
+.stg-row .chips { gap: 6px; }
+.stg-row .chip { min-width: 42px; padding: 6px 10px; font-size: 17px; }
+.stg-row .chip.txt { font-size: 13px; }
+.stg-tg { justify-self: start; text-align: left; }
 .qrc { display: flex; gap: 14px; align-items: flex-start; }
 .qrc-q .qrbox { width: 120px; padding: 6px; border-radius: 8px; }
 .qrc-t { display: grid; gap: 6px; min-width: 0; align-content: start; }
@@ -1635,7 +1640,7 @@ const CHECKOUTS = [16, 20, 24, 32, 36, 40, 32, 40, 50, 56, 60, 64, 68, 72, 76, 8
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 /* Логика сеток (ko, pl, rr) живёт в shared/bracket.js и общая с сервером. Здесь только имена для страницы. */
-const { BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket, roundGames, plGroup, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums, srcText, tProgress, rrGames, finalGame, placeRange, slotTag, nextOf, gameTag } = Bracket;
+const { BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket, roundGames, plGroup, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums, srcText, tProgress, rrGames, finalGame, placeRange, slotTag, nextOf, gameTag, STAGES, ltwOf } = Bracket;
 // упражнение матчей турнира: t.ex или обычный x01 по t.mode
 const exOf = t => t.ex || Games.x01(t.mode, t.dbl);
 // протокол матча есть: в демо — если матч в базе, на сервере — по id
@@ -1645,6 +1650,25 @@ function canDo(t, k) { if (!SRV) return k === 'delete' ? /^u/.test(t.id) : true;
 const exOfMatch = m => m.ex || Games.x01(m.mode, m.dbl);
 const isPlainX01 = m => !m.ex || m.ex.k === 'x01';
 const ltwTxt = n => 'до ' + n + ' ' + pl(n, 'победы', 'побед', 'побед');
+// стадии сетки для «до скольких побед»: от ранних кругов к финалу, матчи за места — у формата с розыгрышем всех мест
+const STAGE_NAME = { early: 'Ранние круги', qf: 'Четвертьфинал', sf: 'Полуфинал', f: 'Финал', places: 'Матчи за места' };
+const STAGE_SHORT = { early: 'ранние', qf: '¼', sf: '½', f: 'финал', places: 'за места' };
+const LTW_LIST = [1, 2, 3, 4, 5, 6, 7, 9, 11];
+const ltwStages = fmt => fmt === 'rr' ? [] : STAGES.filter(k => k !== 'places' || fmt !== 'ko');
+const ltwInfo = t => ltwTxt(t.ltw) + (t.ltwBy && Object.keys(t.ltwBy).length ? ' (' + STAGES.filter(k => t.ltwBy[k]).map(k => STAGE_SHORT[k] + ' — до ' + t.ltwBy[k]).join(', ') + ')' : '');
+// выбор «до скольких побед» по стадиям: act|стадия|число ('' — как общее)
+function stageLtwHTML(by, fmt, act) {
+  return ltwStages(fmt).map(k => '<div class="stg-row"><span class="meta">' + STAGE_NAME[k] + '</span><div class="chips">' + [''].concat(LTW_LIST).map(v => '<button class="chip' + (v === '' ? ' txt' : '') + ((by && by[k] || '') === v ? ' on' : '') + '" data-act="' + act + '" data-v="' + k + '|' + v + '">' + (v === '' ? 'как все' : v) + '</button>').join('') + '</div></div>').join('');
+}
+function ltwEditModal() {
+  const e = S.ltwEdit, t = TBY[e.tid];
+  if (!t) { S.ltwEdit = null; return ''; }
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="До скольких побед"><div class="ocard"><div class="ohead"><span class="label">До скольких побед</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>' +
+    '<div class="field"><span class="label">Все матчи</span><div class="chips">' + chips(LTW_LIST, e.ltw, 'le-ltw') + '</div></div>' +
+    (ltwStages(t.format).length ? '<div class="field"><span class="label">По стадиям сетки</span>' + stageLtwHTML(e.by, t.format, 'le-stg') + '</div>' : '') +
+    (t.status === 'live' ? '<p class="meta">Матчи, которые уже начаты или сыграны, остаются как были — новое число побед получат следующие.</p>' : '') +
+    '<button class="btn" data-act="le-save">Сохранить</button></div></div>';
+}
 // номер игрока в турнире: задаёт организатор, по умолчанию — порядок в списке (после старта — посев)
 const numOf = (t, id) => (t.nums && t.nums[id]) || t.players.indexOf(id) + 1;
 const noBadge = (t, id) => t && isReal(id) && t.players.includes(id) ? '<span class="no" title="Номер в турнире">' + numOf(t, id) + '</span>' : '';
@@ -2017,8 +2041,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2100,7 +2124,7 @@ const venueOf = t => t.venue && t.venue !== 'место уточняется' ? 
 const fmtName = t => t.qual ? 'Квалификация + ' + ((t.cap || (t.players || []).length) > (t.split || 8) ? 'сетки по ' + (t.split || 8) : 'сетка') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
 function fmtLine(t) {
   const n = t.status === 'reg' ? t.cap : t.players.length;
-  return fmtName(t) + ' · ' + (t.status === 'reg' ? 'до ' : '') + n + ' ' + pl(n, 'игрок', 'игрока', 'игроков') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwTxt(t.ltw) + (t.qual ? ' · квалификация: ' + Games.label(t.qual.ex) : '');
+  return fmtName(t) + ' · ' + (t.status === 'reg' ? 'до ' : '') + n + ' ' + pl(n, 'игрок', 'игрока', 'игроков') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwInfo(t) + (t.qual ? ' · квалификация: ' + Games.label(t.qual.ex) : '');
 }
 // название игры для подписи матча: «501», «Набор очков»
 const exName = m => Games.name(exOfMatch(m));
@@ -2185,7 +2209,7 @@ function renderModals() {
     const t = TBY[tid], g = t ? gameAt(t, r, i) : null;
     const gs = t && g ? gameState(t, g) : null;
     if (!gs || gs.st !== 'ready' || !P[gs.a] || !P[gs.b]) { S.quickModal = null; return ''; }
-    const pa = P[gs.a], pb = P[gs.b], ltw = t.ltw, n = gameNums(t, resolver(t)).get(r + ':' + i);
+    const pa = P[gs.a], pb = P[gs.b], ltw = ltwOf(t, r, i), n = gameNums(t, resolver(t)).get(r + ':' + i);
     const valid = (la === ltw && lb >= 0 && lb < ltw) || (lb === ltw && la >= 0 && la < ltw);
     let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Счёт матча"><div class="ocard">';
     h += '<div class="ohead"><span class="label">' + (gName(t, g, n) ? gName(t, g, n) + ' · ' : '') + gameLabel(t, g) + '</span>' + closeBtn + '</div>';
@@ -2221,6 +2245,7 @@ function renderModals() {
   }
   if (S.crop && cropImg) return cropModal();
   if (S.qrAsk) return qrAskModal();
+  if (S.ltwEdit) return ltwEditModal();
   if (S.cardsT) return cardsModal();
   if (S.qr) {
     const t = TBY[S.qr], url = tourUrl(S.qr);
@@ -2665,7 +2690,7 @@ function tourView(id) {
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
-  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + '</div>';
+  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + (canDo(t, 'org') && t.status !== 'done' ? ' <button class="lnk" data-act="ltw-edit" data-v="' + t.id + '">изменить победы</button>' : '') + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
   if (st === 'live') h += yourMatch(t);
@@ -3038,7 +3063,12 @@ function newTourView() {
     h += '<div class="field"><span class="label">Попыток квалификации</span><div class="chips">' + chips([1, 2], nt.tries, 'nt-tries', v => v === 1 ? 'Одна' : 'Две, идёт лучшая') + '</div></div>';
   }
   h += '<div class="field"><span class="label">' + (nt.fmt === 'ndl' ? 'Игра в сетках' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
-  h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips([1, 2, 3, 4, 5], nt.ltw, 'nt-ltw') + '</div></div>';
+  h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips(LTW_LIST, nt.ltw, 'nt-ltw') + '</div></div>';
+  if (nt.fmt !== 'rr') {
+    const by = nt.ltwBy || {}, n = Object.keys(by).length;
+    h += '<div class="field ltw-stg"><button class="lnk stg-tg" data-act="nt-stg-tg" aria-expanded="' + !!nt.stgOpen + '">' + (nt.stgOpen ? '▾' : '▸') + ' По стадиям сетки' + (n ? ': ' + STAGES.filter(k => by[k]).map(k => STAGE_SHORT[k] + ' до ' + by[k]).join(', ') : '') + '</button>' +
+      (nt.stgOpen ? '<p class="meta">Например: финал до 5, полуфинал до 3, ранние круги до 2. «Как все» — общее число выше.</p>' + stageLtwHTML(by, nt.fmt === 'ndl' ? 'pl' : nt.fmt, 'nt-stg') : '') + '</div>';
+  }
   if (nt.fmt !== 'rr') {
     // вид сетки: порядок матчей сверху вниз и подписи; по умолчанию — классический порядок и подписи A/B
     const lab = nt.labels || 'ab';
@@ -3083,6 +3113,7 @@ function createTour() {
   const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
   if (SRV) {
     const body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
+    if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) body.ltwBy = nt.ltwBy;
     if (nt.fmt !== 'rr') { body.layout = nt.layout || 'std'; body.labels = nt.labels || 'ab'; }
     if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
     const fee = ntFee(nt);
@@ -3095,6 +3126,7 @@ function createTour() {
   const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: meP().name, ver: false }, city: (nt.city || meP().city || '').trim() || '—', venue: (nt.venue || '').trim(), start: Date.now(), dbl: true, mode: ex.k === 'x01' ? ex.mode : 501, ltw: nt.ltw, status: null, cap: ids.length, format: ndl ? 'pl' : nt.fmt, players: [], games: [] };
   if (!(ex.k === 'x01' && !ex.lim)) t.ex = ex;
   if (ntFee(nt)) t.fee = ntFee(nt);
+  if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) t.ltwBy = Object.assign({}, nt.ltwBy);
   if (nt.fmt !== 'rr') { t.layout = nt.layout || 'std'; t.labels = nt.labels || 'ab'; }
   const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
   if (ndl) { t.players = ids.slice(); t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; t.split = 8; t.stage = 'qual'; }
@@ -3504,7 +3536,7 @@ function startTourGame(v) {
   const x = readyGame(tid, r, i);
   if (!x) { toast('Этот матч сейчас нельзя начать.'); return render(); }
   if (SRV && !ME) { toast('Войдите, чтобы вести счёт.'); return svLogin(); }
-  newGame([{ id: x.a, name: P[x.a].name }, { id: x.b, name: P[x.b].name }], { legsToWin: x.t.ltw, ex: exOf(x.t), srv: SRV }, { tid, r, i }, 0);
+  newGame([{ id: x.a, name: P[x.a].name }, { id: x.b, name: P[x.b].name }], { legsToWin: ltwOf(x.t, r, i), ex: exOf(x.t), srv: SRV }, { tid, r, i }, 0);
   go('play');
 }
 function saveQuickTourScore() {
@@ -3512,14 +3544,14 @@ function saveQuickTourScore() {
   if (!q) return;
   const x = readyGame(q.tid, q.r, q.i);
   if (!x || liveCtxIs(q.tid, q.r, q.i)) { S.quickModal = null; toast('Счёт этого матча уже вносится или внесён.'); return render(); }
-  const { t, g, a, b } = x, pa = P[a], pb = P[b], ltw = t.ltw;
+  const { t, g, a, b } = x, pa = P[a], pb = P[b], ltw = ltwOf(t, q.r, q.i);
   if (!((q.la === ltw && q.lb >= 0 && q.lb < ltw) || (q.lb === ltw && q.la >= 0 && q.la < ltw))) { q.err = 'Победитель должен выиграть ' + ltw + ' ' + pl(ltw, 'лег', 'лега', 'легов') + '.'; return render(); }
   if (SRV) return svDo(Api.post('/api/tournaments/' + t.id + '/games/' + q.r + '/' + q.i + '/result', { la: q.la, lb: q.lb }), r => { svTourSet(r); S.quickModal = null; toast('Счёт сохранён в сетку.'); });
   const la = q.la, lb = q.lb, isAW = la > lb;
   // без бросков: darts 0, в средние не попадает
   const mkLine = (p, won) => ({ id: p.id, n: p.name, legs: won, pts: 0, darts: 0, f9: null, hi: 0, hco: 0, c180: 0, c140: 0, c100: 0, coh: 0, coa: 0, bl: 0 });
   const m = {
-    id: 'q' + uid(), t: Date.now(), tid: t.id, off: !!t.official, st: 'ok', by: a, mode: t.mode, ltw: t.ltw, dbl: t.dbl, w: isAW ? 0 : 1, quick: true,
+    id: 'q' + uid(), t: Date.now(), tid: t.id, off: !!t.official, st: 'ok', by: a, mode: t.mode, ltw, dbl: t.dbl, w: isAW ? 0 : 1, quick: true,
     pl: [mkLine(pa, la), mkLine(pb, lb)]
   };
   db.matches.push(m);
@@ -6740,6 +6772,21 @@ document.addEventListener('click', e => {
     case 'nt-qk': S.nt.qk = v; render(); break;
     case 'nt-tries': S.nt.tries = +v; render(); break;
     case 'nt-ltw': S.nt.ltw = +v; render(); break;
+    case 'nt-stg-tg': S.nt.stgOpen = !S.nt.stgOpen; render(); break;
+    case 'nt-stg': case 'le-stg': {
+      const [k, n] = v.split('|'), o = a === 'nt-stg' ? S.nt : S.ltwEdit, by = Object.assign({}, o.ltwBy || o.by);
+      if (n) by[k] = +n; else delete by[k];
+      if (a === 'nt-stg') S.nt.ltwBy = by; else S.ltwEdit.by = by;
+      render(); break;
+    }
+    case 'ltw-edit': { const t = TBY[v]; if (t) { closeModals(); S.ltwEdit = { tid: v, ltw: t.ltw, by: Object.assign({}, t.ltwBy || {}) }; render(); } break; }
+    case 'le-ltw': S.ltwEdit.ltw = +v; render(); break;
+    case 'le-save': {
+      const e = S.ltwEdit, t = TBY[e.tid], by = Object.keys(e.by).length ? e.by : null;
+      if (SRV) { svDo(Api.patch('/api/tournaments/' + e.tid, { ltw: e.ltw, ltwBy: by }), r => { svTourSet(r); closeModals(); toast('Сохранено.'); }); break; }
+      t.ltw = e.ltw; if (by) t.ltwBy = by; else delete t.ltwBy;
+      saveDb(); closeModals(); toast('Сохранено.'); render(); break;
+    }
     case 'nt-seed': S.nt.seed = v; render(); break;
     case 'nt-p': {
       const k = S.nt.sel.indexOf(v);

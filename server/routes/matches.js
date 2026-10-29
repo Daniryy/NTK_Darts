@@ -67,7 +67,7 @@ async function startTourMatch(c, req, me, b, id) {
   if (!canScoreGame(t, me, x.a, x.b)) throw E.forbidden('Вести счёт может организатор или игрок этой пары');
   const nm = pid => t._ents.find(e => e.player_id === pid).name;
   const starter = b.starter == null ? 0 : V.int(b.starter, 'starter', 0, 1);
-  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: B.ltwOf(t, r, i), dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
   // матч начался — отметки «Готов» этой игры больше не нужны
   await c.query(`UPDATE tournaments SET version = version + 1, ready = ready - $2 WHERE id = $1`, [tid, r + ':' + i]);
   forget('t', tid);
@@ -101,7 +101,7 @@ async function startFriendly(c, req, me, b, id) {
     mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
     dbl = b.dbl == null ? true : V.bool(b.dbl, 'dbl');
   }
-  const ltw = V.int(b.ltw, 'ltw', 1, 5);
+  const ltw = V.int(b.ltw, 'ltw', 1, 11);
   if (!Array.isArray(b.players) || b.players.length < 1 || b.players.length > 4) throw E.bad('Игроков от 1 до 4', 'players');
   const ids = b.players.map(x => x && x.id != null ? V.id(x.id, 'players') : null).filter(Boolean);
   if (!ids.length) throw E.bad('Нужен хотя бы один игрок из базы', 'players');
@@ -163,7 +163,7 @@ module.exports = async function (app) {
         delete all[key];
         const id = 'g' + require('node:crypto').randomBytes(10).toString('hex');
         const nm = pid => t._ents.find(e => e.player_id === pid).name;
-        await insertMatch(c, req, me, { id, tid: t.id, r, i, mode: t.mode, ltw: t.ltw, dbl: t.dbl, ex: t.ex || null, starter: 0, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+        await insertMatch(c, req, me, { id, tid: t.id, r, i, mode: t.mode, ltw: B.ltwOf(t, r, i), dbl: t.dbl, ex: t.ex || null, starter: 0, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
         // оба отметились со своих телефонов — каждый вносит свои подходы сам
         await c.query('UPDATE matches SET duo = true WHERE id = $1', [id]);
         match = matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]), req);

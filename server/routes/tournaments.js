@@ -62,6 +62,17 @@ function exField(v, field) {
   return ex;
 }
 const QUAL_KINDS = ['score', 'round', 'sector'];
+const LTW_MAX = 11;
+function ltwByField(v) {
+  if (v === null) return null;
+  if (typeof v !== 'object' || Array.isArray(v)) throw E.bad('ltwBy: { f, sf, qf, early, places }', 'ltwBy');
+  const o = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (!B.STAGES.includes(k)) throw E.bad('ltwBy: стадии f, sf, qf, early, places', 'ltwBy');
+    if (x != null) o[k] = V.int(x, 'ltwBy.' + k, 1, LTW_MAX);
+  }
+  return Object.keys(o).length ? o : null;
+}
 
 // общие поля создания и правки; full — все обязательны
 function tourFields(b, full, me) {
@@ -71,7 +82,9 @@ function tourFields(b, full, me) {
   if (full || b.venue !== undefined) o.venue = V.optStr(b.venue, 'venue', 60);
   if (full || b.format !== undefined) o.format = V.oneOf(b.format, 'format', ['pl', 'ko', 'rr']);
   if ((full && b.ex == null) || b.mode !== undefined) o.mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
-  if (full || b.ltw !== undefined) o.ltw = V.int(b.ltw, 'ltw', 1, 5);
+  if (full || b.ltw !== undefined) o.ltw = V.int(b.ltw, 'ltw', 1, LTW_MAX);
+  // до скольких побед по стадиям сетки: { f, sf, qf, early, places }; пустое — как общее
+  if (b.ltwBy !== undefined) o.ltw_by = ltwByField(b.ltwBy);
   if (b.ex != null) {
     const ex = exField(b.ex, 'ex');
     if (ex.k === 'x01') { o.mode = ex.mode; o.dbl = ex.dbl; o.ex = ex.lim ? ex : null; }
@@ -175,10 +188,10 @@ module.exports = async function (app) {
       if (b.clubId != null) Object.assign(f, await clubFields(c, b.clubId, me));
       // по умолчанию: порядок как на листе NDL; подписи A/B — у турниров с квалификацией, остальным номера
       const layout = f.layout || 'ndl', labels = f.labels || (f.qual ? 'ab' : 'num');
-      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, layout, labels, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
+      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, layout, labels, created_at, ltw_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
-        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now()]);
+        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now(), f.ltw_by ? JSON.stringify(f.ltw_by) : null]);
       if (f.fee != null) await c.query('UPDATE tournaments SET fee = $2 WHERE id = $1', [row.id, f.fee]);
       // мишени в зале: сразу при создании — после старта игры и квалификация распределяются по ним сами
       if (b.boards != null) {
@@ -200,14 +213,15 @@ module.exports = async function (app) {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
       const b = req.body || {};
-      // подписи матчей и взнос можно менять и после старта
-      if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => k === 'labels' || k === 'fee'))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
+      // подписи матчей, взнос и «до скольких побед» можно менять и после старта — для матчей, которые ещё не начаты
+      const LATE = ['labels', 'fee', 'ltw', 'ltwBy'];
+      if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => LATE.includes(k)))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
       // с учётом того, что уже стоит у турнира: смена формата не должна оставить квалификацию у ko или rr
       const qual = 'qual' in f ? f.qual : t._row.qual, split = 'split' in f ? f.split : t._row.split;
       if ((qual || split) && (f.format || t.format) !== 'pl') throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
-      ['ex', 'qual'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
+      ['ex', 'qual', 'ltw_by'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
       if (b.cap !== undefined) f.cap = V.int(b.cap, 'cap', Math.max(3, t.players.length), T.maxPlayers(f.format || t.format));
       if (f.format && t.players.length > T.maxPlayers(f.format)) throw E.bad('Для этого формата слишком много участников', 'format');
       if (f.format && !f.cap && t.cap > T.maxPlayers(f.format)) f.cap = T.maxPlayers(f.format);
@@ -354,13 +368,13 @@ module.exports = async function (app) {
       if (!x) throw E.conflict('bad_state', 'Счёт этого матча сейчас внести нельзя');
       // итог без бросков меняет рейтинг — вносит только команда турнира; игроки пары играют матч в счётчике
       if (!T.isStaff(t, me)) throw E.forbidden('Итог без игры вносит организатор турнира — сыграйте матч в счётчике');
-      const la = V.int(b.la, 'la', 0, t.ltw), lb = V.int(b.lb, 'lb', 0, t.ltw);
-      if (!((la === t.ltw && lb < t.ltw) || (lb === t.ltw && la < t.ltw))) throw E.bad('Победитель должен выиграть ' + t.ltw + ' лег(а)', 'la');
+      const ltw = B.ltwOf(t, r, i), la = V.int(b.la, 'la', 0, ltw), lb = V.int(b.lb, 'lb', 0, ltw);
+      if (!((la === ltw && lb < ltw) || (lb === ltw && la < ltw))) throw E.bad('Победитель должен выиграть ' + ltw + ' лег(а)', 'la');
       const id = 'q' + crypto.randomBytes(8).toString('hex'), now = Date.now(), w = la > lb ? 0 : 1;
       const nm = pid => t._ents.find(e => e.player_id === pid).name;
       await c.query(`INSERT INTO matches (id, tournament_id, r, i, status, mode, ltw, dbl, ex, players, legs, w, quick, created_by, started, finished)
         VALUES ($1, $2, $3, $4, 'done', $5, $6, $7, $8, $9, $10, $11, true, $12, $13, $13)`,
-      [id, t.id, r, i, t.mode, t.ltw, t.dbl, t.ex ? JSON.stringify(t.ex) : null, JSON.stringify([{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }]), JSON.stringify([la, lb]), w, me.id, now]);
+      [id, t.id, r, i, t.mode, ltw, t.dbl, t.ex ? JSON.stringify(t.ex) : null, JSON.stringify([{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }]), JSON.stringify([la, lb]), w, me.id, now]);
       // без бросков: в средние не попадает (darts 0), как на странице
       for (const [k, pid, legs] of [[0, x.a, la], [1, x.b, lb]]) {
         await c.query(`INSERT INTO match_lines (match_id, idx, player_id, name, legs, pts, darts, f9) VALUES ($1, $2, $3, $4, $5, 0, 0, NULL)`, [id, k, pid, nm(pid), legs]);
