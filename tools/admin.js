@@ -72,7 +72,7 @@ const who = p => p.name + ' (' + p.code + ', ' + p.role + (p.login ? ', логи
       await audit(c, null, 'cli.login', out, { login, role });
       return out;
     });
-    console.log('Готово: ' + who(p) + '. Вход: страница /#staff, логин ' + login + '.');
+    console.log('Готово: ' + who(p) + '. Вход: страница /#admin, логин ' + login + ', затем код из Google Authenticator (привязка при первом входе).');
   } else if (cmd === 'password' || cmd === 'unlock' || cmd === 'off' || cmd === '2fa-off') {
     const login = normLogin(argv[1]);
     const p = await one(pool, 'SELECT * FROM players WHERE login = $1', [login]);

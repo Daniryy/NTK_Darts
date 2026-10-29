@@ -232,14 +232,15 @@ test('роль игроку с почтой и снятие входа по ло
   ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'host' }));
   assert.equal(ok(await call(u, 'GET', '/api/me')).player.id, id);
   ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'darts-2026' }));
-  // администратор с логином и почтой: снятие логина оставляет вход по почте
+  // администратор с логином и почтой: без логина он не войдёт (по почте админы не входят)
   ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'admin' }));
   ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
   const off = ok(await call(TECH, 'DELETE', '/api/admin/players/' + id + '/login'));
   assert.equal(off.player.login, null);
   err(await call(anon(), 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' }), 409, 'bad_login');
-  ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }));
-  // понижение администратора с логином: логин снят, сеансы закрыты, почта по-прежнему пускает
+  // администратор по почте не входит — только по логину
+  err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }), 403);
+  // понижение администратора с логином: логин снят, сеансы закрыты, почта снова пускает
   ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
   const a = anon();
   await full(a, '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' });
@@ -343,9 +344,9 @@ test('двухфакторный вход администраторов: при
   for (let k = 0; k < 5; k++) err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c3.ticket, code: '00000' + k }), 409, 'bad_code');
   err(await call(anon(), 'POST', '/api/auth/2fa', { ticket: c3.ticket, code: nb[1] }), 429, 'too_many');
   limits.reset();
-  // вход по почте у администратора — тоже с кодом
+  // по почте администратор не входит вовсе
   await pool.query(`UPDATE players SET email = 'twofa@mail.ru' WHERE id = $1`, [AID]);
-  assert.equal(ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'twofa@mail.ru', password: 'Twofa-Secret-1' })).need2fa, 'code');
+  err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'twofa@mail.ru', password: 'Twofa-Secret-1' }), 403);
   // сброс: только тех. администратор, сеансы закрываются, при входе — привязка заново
   err(await call(await login((await tx(c => require('../server/players').createPlayer(c, { name: 'Простой Игрок' }))).id), 'DELETE', '/api/admin/players/' + AID + '/2fa'), 403);
   assert.equal(ok(await call(TECH, 'DELETE', '/api/admin/players/' + AID + '/2fa')).player.twofa, false);

@@ -186,7 +186,7 @@ echo
 echo "Готово: $URL"
 if [[ -z $DOMAIN ]]; then
   echo "Тестовый режим: без HTTPS не работают вход через VK и установка на экран телефона."
-  echo "Вход администратора: $URL/#staff — игрокам выдаёте коды в «Панели управления»."
+  echo "Вход администратора: $URL/#admin (логин, пароль и код из Google Authenticator) — игрокам выдаёте коды в «Панели управления»."
   echo "Когда будет домен: DOMAIN=ваш.домен EMAIL=почта bash $0"
 fi
 [[ $has != 0 ]] || echo "Администратор: cd $APP && sudo -u oche bash -c 'set -a; . $ENV_FILE; set +a; node tools/admin.js new \"Имя Фамилия\" --login логин'"

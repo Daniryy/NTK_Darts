@@ -150,7 +150,8 @@ module.exports = function routes(app) {
       return out;
     });
     A.clearCache();
-    if (purpose === 'reset' && atLeast(p, 'admin')) return Object.assign(A.adminTicket(p, 'login.email'), { created: false });
+    // администратору новый пароль — для входа по логину на #admin (с кодом из приложения)
+    if (purpose === 'reset' && atLeast(p, 'admin')) return { ok: true, adminLogin: true, created: false };
     return Object.assign(await A.meResp(pool, p), { created });
   });
 
@@ -189,12 +190,11 @@ module.exports = function routes(app) {
     if (!p || !p.pass_hash) { await verifyPassword(pw, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'); throw bad(); }
     if (!await verifyPassword(pw, p.pass_hash)) throw bad();
     if (p.blocked) throw A.blockedErr();
-    // администратор — ещё код из приложения (двухфакторный вход)
-    if (atLeast(p, 'admin')) return A.adminTicket(p, 'login.email');
+    // администраторы входят только по логину (страница #admin) и коду из приложения
+    if (atLeast(p, 'admin')) throw E.forbidden('Администраторы входят по логину на странице /#admin');
     await tx(async c => {
       await c.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
       await A.startSession(reply, c, p.id, req.device, sessionMs(p));
-      if (atLeast(p, 'admin')) await audit(c, p, 'login.email', p, { ip: req.ip });
     });
     return A.meResp(pool, p);
   });
