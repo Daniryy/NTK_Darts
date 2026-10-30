@@ -42,6 +42,12 @@ async function seedOrder(c, ids, seed) {
 }
 
 // посев и сетка; турнир становится live. С квалификацией сетки ещё нет: сначала стадия qual.
+// участники в порядке посева; отметки «оплатил» сохраняются
+async function reseed(c, id, order) {
+  const paid = (await all(c, 'SELECT player_id FROM entries WHERE tournament_id = $1 AND paid', [id])).map(x => x.player_id);
+  await c.query('DELETE FROM entries WHERE tournament_id = $1', [id]);
+  await c.query('INSERT INTO entries (tournament_id, player_id, seed_no, paid) SELECT $1, x.id, x.n, x.id = ANY($3) FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [id, order, paid]);
+}
 // групповой этап: в каждой группе должно быть больше игроков, чем из неё выходит
 function groupsCheck(G, n) {
   if (Math.floor(n / G.n) < Math.max(2, G.adv + 1)) throw E.conflict('bad_state', 'Мало участников для ' + G.n + ' ' + (G.n === 1 ? 'группы' : 'групп') + ': в каждой нужно больше, чем выходит из неё (' + G.adv + ')');
@@ -56,8 +62,7 @@ async function launch(c, id, fmt, order, row) {
   else if (row.groups) groups = groupsRow(row.groups, B.drawGroups(order, row.groups.n));
   else if (fmt === 'rr') t.players = order;
   else { B.setBracket(t, fmt, order, row.split); slots = t.slots; }
-  await c.query('DELETE FROM entries WHERE tournament_id = $1', [id]);
-  await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [id, order]);
+  await reseed(c, id, order);
   await c.query(`UPDATE tournaments SET status = 'live', slots = $2, block = $3, stage = $4, start = $5, groups = $6 WHERE id = $1`,
     [id, slots && JSON.stringify(slots), t.block || null, row.qual ? 'qual' : row.groups ? 'groups' : null, Date.now(), groups && (typeof groups === 'string' ? groups : JSON.stringify(groups))]);
   await T.refreshTour(c, await getTour(c, id, false));
@@ -404,12 +409,21 @@ module.exports = async function (app) {
     });
   });
 
+  // { paidOnly: true } — играют только отмеченные «оплатил» (пришли и оплатили на регистрации в клубе),
+  // остальные убираются из турнира; отметки — у команды турнира с тарифом «Ведущий»
   app.post('/api/tournaments/:id/launch', async req => {
-    const me = needPlayer(req);
+    const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
       if (t.status !== 'reg') throw E.conflict('bad_state', 'Турнир уже начался');
+      if (b.paidOnly === true) {
+        if (!T.feesOn(t, me)) throw E.forbidden('Отметки об оплате — в тарифе «Ведущий»');
+        const paid = new Set(t._ents.filter(e => e.paid).map(e => e.player_id));
+        if (paid.size < 3) throw E.conflict('bad_state', 'Оплатили меньше трёх — отметьте оплативших во вкладке «Взносы»');
+        await c.query('DELETE FROM entries WHERE tournament_id = $1 AND NOT paid', [t.id]);
+        t.players = t.players.filter(id => paid.has(id));
+      }
       const max = T.maxPlayers(t.format);
       if (t.players.length < 3) throw E.conflict('bad_state', 'Нужно минимум 3 участника');
       if (t.players.length > max) throw E.conflict('bad_state', 'Для этого формата максимум ' + max + ' участников');
@@ -505,8 +519,7 @@ module.exports = async function (app) {
       const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout }, G = t._row.groups;
       // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
       if (G) groupsCheck(G, order.length); else if (t.format !== 'rr') B.setBracket(g, t.format, order, t.format === 'pl' ? t.split : undefined);
-      await c.query('DELETE FROM entries WHERE tournament_id = $1', [t.id]);
-      await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, order]);
+      await reseed(c, t.id, order);
       const nums = JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])));
       if (G) await c.query(`UPDATE tournaments SET stage = 'groups', groups = $2, nums = $3 WHERE id = $1`, [t.id, groupsRow(G, B.drawGroups(order, G.n)), nums]);
       else await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = $3, nums = $4 WHERE id = $1`, [t.id, g.slots ? JSON.stringify(g.slots) : null, g.block || null, nums]);
