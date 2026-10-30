@@ -9,6 +9,10 @@
                                                          (дубль — 2 попадания, трипл — 3; 25 — 1, булл 50 — 2, по 25 очков)
      { k: 'sector', sec: 20, lim: 10 }                   «Сектор»: число попаданий в сектор sec (дубль 2, трипл 3)
      { k: 'cricket', lim: 10 }                           «Крикет» 15–20 и булл; lim — подходов на игрока (0 — до закрытия)
+     { k: 'lives', lives: 7, lim: 15 }                   «7 жизней»: каждый должен набрать больше, чем предыдущий подход;
+                                                         столько же или меньше — минус жизнь, без жизней — выбыл, остался
+                                                         один — он выиграл. lim подходов (15 = 45 дротиков) кончились —
+                                                         побеждает тот, у кого больше жизней, поровну — бросок в булл
 
    Матч — несколько легов, лег — одно упражнение. Игроки бросают по очереди, лег k начинает (starter + k − 1) mod n.
    Лег без закрытия (лимит подходов) выигрывает лучший результат; при равенстве — бросок в булл (событие tb).
@@ -23,7 +27,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const KINDS = ['x01', 'score', 'round', 'sector', 'cricket'];
+  const KINDS = ['x01', 'score', 'round', 'sector', 'cricket', 'lives'];
   const IMPOSSIBLE = new Set([163, 166, 169, 172, 173, 175, 176, 178, 179]);
   const CRICKET = [20, 19, 18, 17, 16, 15, 25];
   const ROUND_N = 21;
@@ -57,6 +61,11 @@
         return { k: 'sector', sec, lim: lim || 10 };
       }
       case 'cricket': return { k: 'cricket', lim: lim == null ? 10 : lim };
+      case 'lives': {
+        const lives = ex.lives == null ? 7 : ex.lives;
+        if (!isInt(lives, 1, 20)) return null;
+        return { k: 'lives', lives, lim: lim == null ? 15 : lim };
+      }
     }
     return null;
   }
@@ -70,6 +79,7 @@
     if (ex.k === 'score') return 'Набор очков';
     if (ex.k === 'round') return 'Большой раунд';
     if (ex.k === 'sector') return 'Сектор ' + (ex.sec === 25 ? 'булл' : ex.sec);
+    if (ex.k === 'lives') return ex.lives + ' ' + plural(ex.lives, 'жизнь', 'жизни', 'жизней');
     return 'Крикет';
   }
   // имя и лимит: «501 · 10 подходов», «Набор очков · 10 подходов»
@@ -96,6 +106,7 @@
     if (ex.k === 'sector') return { tot: 'попаданий', avg: 'попад. за подход' };
     if (ex.k === 'cricket') return { tot: 'очков', avg: 'меток за подход' };
     if (ex.k === 'x01') return { tot: 'остаток', avg: 'ср. за 3 дротика' };
+    if (ex.k === 'lives') return { tot: 'жизней', avg: 'ср. за подход' };
     return { tot: 'очков', avg: 'ср. за подход' };
   }
 
@@ -115,7 +126,7 @@
   const nOf = (ex, v) => ex.k === 'x01' ? v.n : v.d ? v.d.length : 3;
 
   // начальное значение лега: остаток x01 или 0
-  const start = (ex, np) => Array(np).fill(ex.k === 'x01' ? ex.mode : 0);
+  const start = (ex, np) => Array(np).fill(ex.k === 'x01' ? ex.mode : ex.k === 'lives' ? ex.lives : 0);
 
   // крикет: дротики подхода игрока p; меняет marks и pts, возвращает число меток
   function cricketVisit(st, p, d) {
@@ -138,7 +149,8 @@
      leg, cur (кто бросает; null — нужен бросок в булл или матч окончен), legs — выиграно легов,
      tot — счёт лега (остаток x01, очки, попадания, очки крикета), vis — подходов в леге,
      marks — метки крикета [{ 20: 3, … }], need: 'tb' и tie — кто разыгрывает булл,
-     pts и darts — за матч (для строки матча и среднего), legsLog — итоги сыгранных легов, winner. */
+     pts и darts — за матч (для строки матча и среднего), legsLog — итоги сыгранных легов, winner;
+     «7 жизней»: tot — жизни, prev — очки предыдущего подхода (их надо перебить). */
   function state(cfg, visits) {
     const ex = norm(cfg.ex), np = cfg.np, N = perLeg(ex), ltw = cfg.ltw, st0 = cfg.starter || 0;
     const st = {
@@ -146,7 +158,7 @@
       pts: Array(np).fill(0), darts: Array(np).fill(0), legsLog: [], winner: null, last: null
     };
     const begin = () => {
-      st.tot = start(ex, np); st.vis = Array(np).fill(0); st.need = null; st.tie = null;
+      st.tot = start(ex, np); st.vis = Array(np).fill(0); st.need = null; st.tie = null; st.prev = null;
       st.marks = ex.k === 'cricket' ? Array.from({ length: np }, () => ({})) : null;
       st.cur = (st0 + st.leg - 1) % np;
     };
@@ -171,12 +183,30 @@
       } else if (ex.k === 'cricket') {
         st.pts[p] += cricketVisit(st, p, v.d || []);
         if (closedAll(st.marks[p]) && st.tot.every((x, j) => j === p || st.tot[p] >= x)) w = p;
+      } else if (ex.k === 'lives') {
+        st.pts[p] += v.v;
+        if (st.prev != null && v.v <= st.prev) st.tot[p]--;
+        st.prev = v.v;
       } else {
         const add = ex.k === 'round' ? v.v * roundTarget(st.vis[p]) : v.v;
         st.pts[p] += add; st.tot[p] += add;
       }
       st.vis[p]++;
       if (w != null) { legWon(w); continue; }
+      if (ex.k === 'lives') {
+        const alive = st.tot.map((_, j) => j).filter(j => st.tot[j] > 0);
+        // остался один — он выиграл лег; в одиночку — пока есть жизни
+        if (np > 1 ? alive.length === 1 : !alive.length) { legWon(np > 1 ? alive[0] : 0); continue; }
+        let q = (p + 1) % np;
+        while (st.tot[q] <= 0) q = (q + 1) % np;
+        st.cur = q;
+        if (N && alive.every(j => st.vis[j] >= N)) {
+          const tie = leaders(ex, st);
+          if (tie.length === 1) legWon(tie[0]);
+          else { st.need = 'tb'; st.tie = tie; st.cur = null; }
+        }
+        continue;
+      }
       st.cur = (p + 1) % np;
       if (N && st.vis.every(x => x >= N)) {
         const tie = leaders(ex, st);
@@ -216,7 +246,7 @@
       return null;
     }
     if (v.d != null && !validDarts(v.d)) return 'Неверные метки дротиков';
-    if (ex.k === 'score') {
+    if (ex.k === 'score' || ex.k === 'lives') {
       if (!isInt(v.v, 0, 180) || !SUM[3].has(v.v)) return v.v + ' нельзя набрать тремя дротиками';
       if (v.d && v.d.reduce((a, l) => { const x = dart(l); return a + x.n * x.m; }, 0) !== v.v) return 'Сумма дротиков не равна ' + v.v;
       return null;
