@@ -2051,8 +2051,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2257,6 +2257,8 @@ function renderModals() {
   if (S.crop && cropImg) return cropModal();
   if (S.qrAsk) return qrAskModal();
   if (S.ltwEdit) return ltwEditModal();
+  if (S.proto) return protoModal();
+  if (S.post) return '<div class="over" role="dialog" aria-modal="true" aria-label="Текст для поста"><div class="ocard"><div class="ohead"><span class="label">Пост с итогами</span>' + closeBtn + '</div><p class="meta">Проверьте и поправьте текст, затем скопируйте и опубликуйте в сообществе VK или в Telegram.</p><textarea class="inp" id="post-txt" rows="14" aria-label="Текст поста">' + esc(S.post.txt) + '</textarea><button class="btn" data-act="post-copy">Скопировать текст</button></div></div>';
   if (S.cardsT) return cardsModal();
   if (S.qr) {
     const t = TBY[S.qr], url = tourUrl(S.qr);
@@ -2788,6 +2790,43 @@ function groupsView(t) {
   }).join('') + '</div>';
   return h;
 }
+// протокол результатов: шапка, выполненные разряды; печать — А4 по образцу протокола соревнований
+const placeTxt2 = (lo, hi) => lo == null ? '—' : lo === hi ? String(lo) : lo + '–' + hi;
+const protoName = x => x.lastName && x.firstName ? x.lastName + ' ' + x.firstName : x.name;
+function protoRegl(t) {
+  const fmt = t.format === 'rr' ? 'круговая система' : t.format === 'pl' ? 'олимпийская система с розыгрышем всех мест' : 'олимпийская система';
+  return ['«' + Games.label(exOf(t)) + '»', t.qual ? 'квалификация: ' + Games.label(t.qual.ex) : '', t.groups ? (t.groups.n === 1 ? 'одна группа' : t.groups.n + ' ' + pl(t.groups.n, 'группа', 'группы', 'групп')) + ', из группы выходят ' + t.groups.adv : '', fmt, ltwInfo(t)].filter(Boolean).join('; ');
+}
+function protoModal() {
+  const tid = S.proto, t = TBY[tid], e = lz('proto:' + tid, () => Api.get('/api/tournaments/' + tid + '/protocol'), 60000);
+  let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Протокол результатов"><div class="ocard acard"><div class="ohead"><span class="label">Протокол результатов</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  const st = svState(e, 'протокола');
+  if (st || !t) return h + (st || '') + '</div></div>';
+  const d = e.data, pr = d.proto || {}, org = canDo(t, 'org');
+  h += '<input class="inp" id="pr-league" maxlength="120" value="' + esc(pr.league || (t.org && t.org.name) || '') + '" placeholder="Лига или организатор" aria-label="Лига"' + (org ? '' : ' disabled') + '>';
+  h += '<input class="inp" id="pr-tour" maxlength="120" value="' + esc(pr.tour || '') + '" placeholder="Этап, например «1 тур»" aria-label="Этап"' + (org ? '' : ' disabled') + '>';
+  h += '<div class="meta">Главный судья: ' + (d.chief ? '<b>' + esc(d.chief.name) + '</b>' + (d.chief.city ? ', ' + esc(d.chief.city) : '') : 'не назначен — <button class="lnk" data-act="ttab-refs" data-v="' + tid + '">назначить во вкладке «Судьи»</button>') + '</div>';
+  h += '<div class="meta">Регламент: ' + esc(protoRegl(t)) + '</div>';
+  const miss = d.rows.filter(x => !x.birthYear || !x.lastName).length;
+  if (miss) h += '<div class="note-box">У ' + miss + ' ' + pl(miss, 'игрока', 'игроков', 'игроков') + ' не заполнены фамилия или год рождения — в протоколе будет имя из профиля. Заполнить: игрок — в своём профиле, ведущий — в карточке аккаунта.</div>';
+  h += '<div class="scroll"><table class="tbl"><thead><tr><th>Место</th><th>Игрок</th><th>Г. р.</th><th>Субъект</th><th>Выполн. разряд</th></tr></thead><tbody>' + d.rows.map(x => '<tr><td>' + placeTxt2(x.lo, x.hi) + '</td><td>' + esc(protoName(x)) + (x.title ? ' <span class="meta">' + esc(x.title) + '</span>' : '') + '</td><td>' + (x.birthYear || '—') + '</td><td>' + esc(regShort(x.region) || '—') + '</td><td><input class="inp sm" data-done="' + x.id + '" maxlength="20" value="' + esc((pr.done || {})[x.id] || '') + '" placeholder="—" aria-label="Выполненный разряд" style="max-width:110px"' + (org ? '' : ' disabled') + '></td></tr>').join('') + '</tbody></table></div>';
+  h += '<textarea class="inp" id="pr-about" rows="3" maxlength="1500" placeholder="О клубе — в конце протокола: адрес, контакты, расписание" aria-label="О клубе"' + (org ? '' : ' disabled') + '>' + esc(pr.about || '') + '</textarea>';
+  h += '<div class="ac-btns">' + (org ? '<button class="ghost sm" data-act="proto-save" data-v="' + tid + '">Сохранить</button><button class="btn sm" data-act="proto-print" data-v="' + tid + '">Печать / PDF</button>' : '<button class="btn sm" data-act="proto-pdf" data-v="' + tid + '">Печать / PDF</button>') + '</div><p class="meta">В окне печати выберите «Сохранить как PDF», чтобы получить файл.</p>';
+  return h + '</div></div>';
+}
+function protoPrint(w, t, d) {
+  const pr = d.proto || {}, ch = d.chief, date = new Date(t.start).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const short = n => { const p = String(n || '').split(/\s+/); return p.length > 1 ? p[0] + ' ' + p.slice(1).map(x => x[0] + '.').join('') : n || ''; };
+  const rows = d.rows.map(x => '<tr><td class="c">' + placeTxt2(x.lo, x.hi) + '</td><td>' + esc(protoName(x)) + '</td><td class="c">' + (x.birthYear || '') + '</td><td class="c">' + esc(x.title || '') + '</td><td>' + esc(x.region || '') + '</td><td>' + esc([x.city, x.club].filter(Boolean).join(', ')) + '</td><td class="c">' + esc((pr.done || {})[x.id] || '') + '</td></tr>').join('');
+  w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Протокол — ' + esc(t.name) + '</title><style>@page{size:A4;margin:15mm 12mm}body{font:12pt "Times New Roman",Times,serif;color:#000;background:#fff;margin:0}.c{text-align:center}h1{font-size:15pt;text-align:center;margin:10px 0 2px;letter-spacing:.04em}.hd{display:flex;justify-content:space-between;margin:12px 0 6px}p{margin:4px 0}table.t{width:100%;border-collapse:collapse;font-size:11pt;margin-top:8px}.t th,.t td{border:1px solid #000;padding:3px 5px;vertical-align:top}.t th{font-weight:bold;text-align:center}.sign{margin-top:16mm;display:flex;justify-content:space-between}.about{margin-top:10mm;padding-top:4mm;border-top:1px solid #000;font-size:11pt;white-space:pre-wrap}</style></head><body>' +
+    '<div class="c"><b>' + esc(pr.league || (t.org && t.org.name) || '') + '</b>' + (pr.tour ? '<br>' + esc(pr.tour) : '') + '</div><div class="c">' + esc(t.name) + '</div><h1>ПРОТОКОЛ РЕЗУЛЬТАТОВ</h1><div class="c">Дартс · одиночный разряд</div>' +
+    '<div class="hd"><span>' + esc([venueOf(t), t.city].filter(Boolean).join(', ')) + '</span><span>' + date + '</span></div>' +
+    '<p>Главный судья: ' + (ch ? esc(ch.name) + (ch.city ? ' (' + esc(ch.city) + ')' : '') : '') + '</p><p>Регламент: ' + esc(protoRegl(t)) + '</p>' +
+    '<table class="t"><thead><tr><th>Место</th><th>Фамилия Имя</th><th>Год рождения</th><th>Звание, разряд</th><th>Субъект РФ</th><th>Город / клуб</th><th>Выполненный разряд</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="sign"><span>Главный судья</span><span>_______________ / ' + esc(short(ch && ch.name)) + ' /</span></div>' + (pr.about ? '<div class="about">' + esc(pr.about) + '</div>' : '') +
+    '<script>onload=()=>print()<\/script></body></html>');
+  w.document.close();
+}
 const cardsBtn = t => SRV && canDo(t, 'org') ? '<div class="row"><button class="mini" data-act="cards-show" data-v="' + t.id + '">QR-карточки игроков</button><span class="meta">вход для тех, у кого нет своего</span></div>' : '';
 function deleteTour(tid) {
   const t = TBY[tid];
@@ -3302,6 +3341,22 @@ function profileView(id) {
 // p — игрок, s — статистика выбранных матчей (с ms — матчами), all — по всем, tours — [{ id, name, start, badge }]
 // ax — { best, wins } для достижений
 // правка своего профиля: имя, город (подсказки городов), клуб — из зарегистрированных клубов
+// данные для протокола: фамилия, имя, отчество, год рождения, пол, субъект РФ (пусто — по городу)
+function infoForm(p, pre) {
+  regionsLoad();
+  const v = k => esc(p[k] || ''), auto = regionOf(p.city), regs = REG ? REG.list.map(r => r[0]) : p.region ? [p.region] : [];
+  const inp = (k, key, ph, extra) => '<input class="inp" id="' + pre + '-' + k + '" maxlength="40" value="' + v(key) + '" placeholder="' + ph + '" aria-label="' + ph + '"' + (extra || '') + '>';
+  return '<div class="field"><span class="label">Для протокола соревнований</span><div class="nrow">' + inp('ln', 'lastName', 'Фамилия') + inp('fn', 'firstName', 'Имя') + '</div><div class="nrow">' + inp('mn', 'midName', 'Отчество') +
+    '<input class="inp" id="' + pre + '-by" inputmode="numeric" maxlength="4" value="' + (p.birthYear || '') + '" placeholder="Год рождения" aria-label="Год рождения"></div><div class="nrow">' +
+    '<select class="inp" id="' + pre + '-sex" aria-label="Пол"><option value="">Пол</option><option value="m"' + (p.sex === 'm' ? ' selected' : '') + '>Мужской</option><option value="f"' + (p.sex === 'f' ? ' selected' : '') + '>Женский</option></select>' +
+    '<select class="inp" id="' + pre + '-reg" aria-label="Субъект РФ"><option value="">' + (auto ? 'По городу: ' + esc(auto) : 'Субъект РФ') + '</option>' + regs.map(r => '<option' + (p.region === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('') + '</select></div>' +
+    '<span class="meta">Видят только организаторы ваших турниров и администраторы — для протокола результатов.</span></div>';
+}
+const infoVals = pre => {
+  const g = k => { const el = $(pre + '-' + k); return el ? el.value.trim() : undefined; };
+  if (g('ln') === undefined) return {};
+  return { lastName: g('ln'), firstName: g('fn'), midName: g('mn'), birthYear: g('by') ? +g('by') : null, sex: g('sex') || null, region: g('reg') };
+};
 function profileForm(p) {
   regionsLoad();
   const cities = REG ? REG.list.flatMap(r => r[1]).sort((a, b) => a.localeCompare(b, 'ru')) : [];
@@ -3315,6 +3370,7 @@ function profileForm(p) {
   h += '<div class="nrow"><div class="field"><label class="label" for="me-city">Город</label><input class="inp" id="me-city" maxlength="40" list="city-list" value="' + esc(p.city || '') + '" placeholder="Например, Новоуральск" autocomplete="address-level2"></div>';
   h += '<div class="field"><label class="label" for="me-club">Клуб</label>' + club + '</div></div><datalist id="city-list">' + cities.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
   if (SRV) h += '<span class="meta">Клуб — из зарегистрированных в Oche. Нет вашего — его ведущий регистрирует клуб в профиле. Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button>.</span>';
+  if (SRV && Api.me) h += infoForm(Api.me, 'me');
   return h + '<div class="row"><button class="btn sm" data-act="savename">Сохранить</button><button class="ghost sm" data-act="cancelname">Отмена</button></div></div>';
 }
 function profileHTML(p, s, all, tours, ax) {
@@ -5104,7 +5160,7 @@ function coverBlock(t) {
   if (org) h += '<div class="row" style="align-items:center;flex-wrap:wrap">' + (c ? '<button class="mini" data-act="photo-pick" data-v="cover|' + t.id + '">Сменить общее фото</button><button class="mini dng" data-act="cover-rm" data-v="' + t.id + '">Убрать из итогов</button>' : '<button class="mini go" data-act="photo-pick" data-v="cover|' + t.id + '">+ Общее фото игроков</button><span class="meta" style="flex-basis:100%">Покажется в итогах и в ленте</span>') + '</div>';
   return h;
 }
-const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button></div>';
+const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button>' + (SRV && canDo(t, 'staff') ? '<button class="mini go" data-act="proto-open" data-v="' + t.id + '">Протокол (PDF)</button>' : '') + '</div>';
 // места: [{ id, lo, hi }]
 const placesList = t => isBracket(t) ? bracketStandings(t) : standings(t).map((s, i) => ({ id: s.id, lo: i + 1, hi: i + 1, w: s.w, lf: s.lf, la: s.la }));
 // лучшее в турнире: на сервере приходит в best, в демо — из матчей
@@ -5496,7 +5552,7 @@ function admCardModal() {
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
-  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + (p.contacts ? infoForm(p, 'ac') + '<textarea class="inp" id="ac-note" maxlength="500" rows="2" placeholder="Заметки ведущего — видят только ведущие и администраторы" aria-label="Заметки">' + esc(p.note || '') + '</textarea>' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
   // роль и доступ
   // пока список ролей грузится — хотя бы текущая роль, без пустого выбора
   const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [{ key: p.role, rank: RANKS_UI[p.role] != null ? RANKS_UI[p.role] : 1 }] }).roles;
@@ -6547,7 +6603,19 @@ document.addEventListener('click', e => {
     case 'pro-p': S.proP = v; render(); break;
     case 'res-img': resultsImage(v).catch(() => toast('Не удалось сделать картинку.')); break;
     case 'ics': if (TBY[v]) saveBlob(new Blob([tourIcs(TBY[v])], { type: 'text/calendar' }), 'Turnir-' + (latin(TBY[v].name) || 'oche') + '.ics'); break;
-    case 'res-post': if (TBY[v]) copyText(resultsPost(TBY[v]), 'Текст для поста скопирован — вставьте в VK или Telegram.'); break;
+    case 'res-post': if (TBY[v]) { closeModals(); S.post = { tid: v, txt: resultsPost(TBY[v]) }; render(); } break;
+    case 'post-copy': { const el = $('post-txt'); if (el) copyText(el.value, 'Текст скопирован — вставьте пост в VK или Telegram.'); break; }
+    case 'proto-open': closeModals(); S.proto = v; if (SVC['proto:' + v]) SVC['proto:' + v].at = 0; render(); break;
+    case 'proto-save': case 'proto-print': {
+      const t = TBY[v], g = id => { const el = $(id); return el ? el.value.trim() : ''; }, done = {};
+      document.querySelectorAll('[data-done]').forEach(el => { if (el.value.trim()) done[el.dataset.done] = el.value.trim(); });
+      const w = a === 'proto-print' ? window.open('', '_blank') : null;
+      svDo(Api.patch('/api/tournaments/' + v + '/protocol', { league: g('pr-league'), tour: g('pr-tour'), about: g('pr-about'), done }), r => {
+        const e = SVC['proto:' + v]; if (e && e.data) e.data.proto = r.proto;
+        if (w) protoPrint(w, t, e.data); else toast('Протокол сохранён.');
+      });
+      break;
+    }
     case 'res-doc': if (TBY[v]) { saveBlob(resultsDocx(TBY[v]), 'Itogi-' + (latin(TBY[v].name) || TBY[v].id) + '.docx'); toast('Документ сохранён — откроется в Word.'); } break;
     case 'cover-set': case 'cover-rm': {
       const [tid, ph] = a === 'cover-set' ? v.split('|') : [v, null];
@@ -6680,7 +6748,7 @@ document.addEventListener('click', e => {
     case 'ac-save': {
       const val = k => { const el = $('ac-' + k); return el ? el.value.trim() : ''; };
       if (val('name').length < 2) { toast('Имя — от 2 символов.'); break; }
-      svDo(Api.patch('/api/admin/players/' + v, Object.assign({ name: val('name'), city: val('city'), club: val('club') }, $('ac-title') ? { title: val('title') } : {})), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
+      svDo(Api.patch('/api/admin/players/' + v, Object.assign({ name: val('name'), city: val('city'), club: val('club') }, $('ac-title') ? { title: val('title') } : {}, infoVals('ac'), $('ac-note') ? { note: val('note') } : {})), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
       break;
     }
     case 'ac-logout': svDo(Api.post('/api/admin/players/' + v + '/logout'), r => { svStale('acard:'); toast('Сеансы завершены: ' + r.sessions + '.'); }); break;
@@ -6886,7 +6954,7 @@ document.addEventListener('click', e => {
       const nv = val('name'), city = val('city'), club = val('club');
       if (!nv) { toast('Имя не может быть пустым.'); break; }
       if (SRV) {
-        svDo(Api.patch('/api/me', { name: nv, city: city || '', club: club || '' }), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
+        svDo(Api.patch('/api/me', Object.assign({ name: nv, city: city || '', club: club || '' }, infoVals('me'))), r => { Api.setMe(r); svPlayer(r.player); S.editName = false; svStale('player:'); toast('Профиль обновлён.'); });
         break;
       }
       const old = meP().name; meP().name = nv;
@@ -6957,6 +7025,8 @@ document.addEventListener('click', e => {
     case 'rf-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (!t || !t.refs) break; svDo(Api.patch('/api/tournaments/' + tid + '/refs', { pool: t.refs.pool.filter((_, j) => j !== +k) }), r => svTourSet(r)); break; }
     case 'rf-auto': svDo(Api.patch('/api/tournaments/' + v + '/refs', { auto: true }), r => { svTourSet(r); toast('Судьи расставлены.'); }); break;
     case 'grp-close': svDo(Api.post('/api/tournaments/' + v + '/groups/close'), r => { svTourSet(r); S.ttab = 'grid'; toast('Сетка построена: вышли ' + r.tournament.slots.filter(Boolean).length + ' ' + pl(r.tournament.slots.filter(Boolean).length, 'игрок', 'игрока', 'игроков') + '.'); }); break;
+    case 'proto-pdf': { const e = SVC['proto:' + v]; if (e && e.data && TBY[v]) protoPrint(window.open('', '_blank'), TBY[v], e.data); break; }
+    case 'ttab-refs': closeModals(); go('t.' + v); S.ttab = 'refs'; render(); break;
     case 'cards-show': closeModals(); S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
     case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
     case 'card-print': if (CARDS[v]) printCards([CARDS[v]], ''); break;

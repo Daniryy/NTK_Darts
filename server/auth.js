@@ -155,6 +155,7 @@ function routes(app) {
       if (!can(me, 'pro')) throw E.forbidden('Выходная музыка — в тарифе Pro');
       set.walkon = V.optStr(b.walkon, 'walkon', 60);
     }
+    Object.assign(set, require('./players').infoFields(b));
     // звание — только через подтверждение (POST /api/titles)
     if (b.title !== undefined && b.title !== (me.title || '')) throw E.bad('Звание подтверждается заявкой с документом', 'title');
     const keys = Object.keys(set);

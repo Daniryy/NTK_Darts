@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer, needPerm, clearCache, normPhone } = require('../auth');
-const { createPlayer, playerShort } = require('../players');
+const { createPlayer, playerShort, infoFields, infoJSON } = require('../players');
 const { RANK, ROLES, ROLE_NAME, PERM, grantable, can, permTable, setPerms } = require('../roles');
 const { audit } = require('../audit');
 const { hashPassword, passwordProblem, LOGIN_RE, normLogin } = require('../password');
@@ -25,7 +25,7 @@ async function newClaim(c) {
 const seesContacts = (me, p) => !me || can(me, 'contacts') || p.owner_id === me.id || p.id === me.id;
 const adminJSON = (p, me) => {
   const c = seesContacts(me, p);
-  return Object.assign(playerShort(p), {
+  return Object.assign(playerShort(p), c ? Object.assign(infoJSON(p), { note: p.note || '' }) : {}, {
     vk: p.vk_id != null, phone: c ? p.phone || null : p.phone ? 'скрыт' : null, claim: p.claim || null, role: p.role, blocked: p.blocked, owner: p.owner_id, created: p.created_at,
     login: p.login || null, twofa: !!p.totp_on, email: c ? p.email || null : p.email ? 'скрыта' : null, emailOk: !!p.email_ok, contacts: c
   });
@@ -115,6 +115,9 @@ module.exports = async function (app) {
       if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
       if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
       if (b.club !== undefined) set.club = V.optStr(b.club, 'club', 40);
+      Object.assign(set, infoFields(b));
+      // заметки ведущего — видят те, кому видны контакты игрока
+      if (b.note !== undefined) set.note = V.optStr(b.note, 'note', 500);
       if (b.title !== undefined && b.title !== (cur.title || '')) {
         if (!can(me, 'titles')) throw E.forbidden('Звание подтверждается заявкой — меняет его администратор');
         set.title = V.optStr(b.title, 'title', 40);
@@ -149,7 +152,7 @@ module.exports = async function (app) {
       if (!keys.length) throw E.bad('Нечего менять');
       if (set.blocked || 'login' in set) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
-      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role'].includes(k)).map(k => [k, set[k]]));
+      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
       if (b.claim === true) log.code = 'новый';
       await audit(c, me, set.role ? 'player.role' : set.blocked !== undefined ? 'player.block' : 'player.edit', out, log);
