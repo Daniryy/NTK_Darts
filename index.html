@@ -925,6 +925,7 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tfa-codes span { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; user-select: all; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
+.de-gf { max-width: var(--bk-w, 240px); }
 .grp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .card.grp { padding: 10px 14px; display: grid; gap: 6px; }
 .tbl tr.adv td:first-child { color: var(--green); font-weight: 700; }
@@ -1666,7 +1667,7 @@ const ltwTxt = n => 'до ' + n + ' ' + pl(n, 'победы', 'побед', 'п�
 const STAGE_NAME = { groups: 'Групповой этап', early: 'Ранние круги', qf: 'Четвертьфинал', sf: 'Полуфинал', f: 'Финал', places: 'Матчи за места' };
 const STAGE_SHORT = { groups: 'группы', early: 'ранние', qf: '¼', sf: '½', f: 'финал', places: 'за места' };
 const LTW_LIST = [1, 2, 3, 4, 5, 6, 7, 9, 11];
-const ltwStages = (fmt, grp) => (grp ? ['groups'] : []).concat(fmt === 'rr' ? [] : STAGES.filter(k => k !== 'groups' && (k !== 'places' || fmt !== 'ko')));
+const ltwStages = (fmt, grp) => (grp ? ['groups'] : []).concat(fmt === 'rr' || fmt === 'sw' ? [] : STAGES.filter(k => k !== 'groups' && (k !== 'places' || fmt === 'pl') && (k !== 'qf' || fmt !== 'de')));
 const ltwInfo = t => ltwTxt(t.ltw) + (t.ltwBy && Object.keys(t.ltwBy).length ? ' (' + STAGES.filter(k => t.ltwBy[k]).map(k => STAGE_SHORT[k] + ' — до ' + t.ltwBy[k]).join(', ') + ')' : '');
 // выбор «до скольких побед» по стадиям: act|стадия|число ('' — как общее)
 function stageLtwHTML(by, fmt, act, grp) {
@@ -1962,7 +1963,8 @@ function recalc() {
 const cap1 = s => s.charAt(0).toUpperCase() + s.slice(1);
 const koName = k => k === 1 ? 'финал' : k === 2 ? '1/2 финала' : k === 3 ? '1/4 финала' : '1/' + 2 ** (k - 1) + ' финала';
 function roundLabel(t, r) {
-  if (t.format === 'rr' || t.stage === 'groups') return 'тур ' + (r + 1);
+  if (t.format === 'rr' || t.format === 'sw' || t.stage === 'groups') return 'тур ' + (r + 1);
+  if (t.format === 'de') { const k = Bracket.deK(t), s = Bracket.deSide(t, r); return s === 'f' ? 'суперфинал' : s === 'w' ? (r === k - 1 ? 'финал верхней сетки' : 'верхняя · ' + koName(k - r)) : r === 3 * k - 3 ? 'финал нижней сетки' : 'нижняя · круг ' + (r - k + 1); }
   if (t.format === 'pl') return 'круг ' + (r + 1);
   return koName(bRounds(t) - r);
 }
@@ -1995,7 +1997,9 @@ const blankRow = id => ({ id, p: 0, w: 0, l: 0, lf: 0, la: 0, pts: 0, darts: 0 }
 function standings(t) {
   const s = {};
   t.players.forEach(id => s[id] = blankRow(id));
-  t.games.forEach(g => { if (g.res) tally(s, g.a, g.b, g.res); });
+  t.games.forEach(g => { if (g.res && g.b !== BYE) tally(s, g.a, g.b, g.res); });
+  // швейцарка: очки с баями, затем Бухгольц
+  if (t.format === 'sw') return Bracket.swissTable(t.players, t.games).map(x => Object.assign(s[x.id], { w: x.w, bh: x.bh }));
   return Object.values(s).sort((x, y) => y.w - x.w || (y.lf - y.la) - (x.lf - x.la) || y.lf - x.lf);
 }
 function bracketStandings(t) {
@@ -2009,12 +2013,12 @@ function bracketStandings(t) {
 }
 function champion(t) {
   if (tStatus(t) !== 'done') return null;
-  if (isBracket(t)) { const w = resolver(t).outcome(bRounds(t) - 1, 0).w; return isReal(w) ? w : null; }
+  if (isBracket(t)) { const fg = Bracket.finalGame(t), w = resolver(t).outcome(fg.r, fg.i).w; return isReal(w) ? w : null; }
   return standings(t)[0].id;
 }
 const lastGameTime = t => Math.max(t.start || 0, ...t.games.filter(g => g.res && MBY[g.res.mid]).map(g => MBY[g.res.mid].t));
 function placeOf(t, pid) {
-  if (t.format === 'rr') { const i = standings(t).findIndex(x => x.id === pid); return (tStatus(t) === 'done' ? '' : 'идёт · ') + (i + 1) + ' место'; }
+  if (t.format === 'rr' || t.format === 'sw') { const i = standings(t).findIndex(x => x.id === pid); return (tStatus(t) === 'done' ? '' : 'идёт · ') + (i + 1) + ' место'; }
   const rg = placeRange(t, pid);
   if (!rg) return '—';
   if (t.format === 'ko' && rg[0] === rg[1]) return rg[0] === 1 ? 'Победитель' : 'Финалист';
@@ -2138,7 +2142,7 @@ const photoOf = id => (P[id] && P[id].photo) || null;
 const avatar = (id, cls) => photoOf(id)
   ? '<img class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" src="' + esc(photoOf(id)) + '" alt="" loading="lazy">'
   : '<span class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(initials(P[id] ? P[id].name : '?')) + '</span>';
-const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая' };
+const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая', de: 'Двойное выбывание', sw: 'Швейцарская система' };
 const venueOf = t => t.venue && t.venue !== 'место уточняется' ? t.venue : '';
 const grpName = t => (t.qual ? 'Квалификация + ' : '') + (t.groups.n === 1 ? 'Лига' : t.groups.n + ' ' + pl(t.groups.n, 'группа', 'группы', 'групп')) + ' + ' + (t.format === 'pl' ? 'сетка за все места' : 'сетка на вылет');
 const fmtName = t => t.groups ? grpName(t) : t.qual ? 'Квалификация + ' + (t.format === 'rr' ? 'круговая' : t.format === 'ko' ? 'сетка на вылет' : t.split && (t.cap || (t.players || []).length) > t.split ? 'сетки по ' + t.split : 'сетка за все места') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
@@ -2571,6 +2575,15 @@ function plGridHTML(t, cx, part) {
 }
 function bracketView(t) {
   const cx = bctx(t), R = bRounds(t), S = bSize(t), N = t.players.length;
+  if (t.format === 'de') {
+    const k = Bracket.deK(t), col = r => ({ label: roundLabel(t, r), games: Array.from({ length: Bracket.roundGames(t, r) }, (_, i) => gameAt(t, r, i)) });
+    const W = [], L = [];
+    for (let r = 0; r < k; r++) W.push(col(r));
+    for (let r = k; r < 3 * k - 2; r++) L.push(col(r));
+    return '<p class="meta">Двойное выбывание: проиграл в верхней сетке — продолжаешь в нижней, проиграл в нижней — выбыл. В суперфинале — победители верхней и нижней.' + (S > N ? ' Свободных мест: ' + (S - N) + '.' : '') + '</p>' + hpPicker(t) +
+      '<div class="part-h"><b>Верхняя сетка</b></div>' + treeHTML(t, cx, W) + '<div class="part-h"><b>Нижняя сетка</b><span class="meta">проиграл — выбыл</span></div>' + treeHTML(t, cx, L) +
+      '<div class="part-h"><b>Суперфинал</b></div><div class="de-gf">' + gameBox(t, gameAt(t, 3 * k - 2, 0), cx) + '</div>';
+  }
   if (t.format === 'ko') {
     const cols = [];
     for (let r = 0; r < R; r++) cols.push({ label: roundLabel(t, r), games: Array.from({ length: S / 2 ** (r + 1) }, (_, i) => gameAt(t, r, i)) });
@@ -2654,8 +2667,9 @@ function gamesList(t) {
   return h;
 }
 function standingsView(t) {
-  let h = '<div class="card scroll" style="padding:4px 14px"><table class="tbl"><thead><tr><th>Место</th><th>Игрок</th><th>В–П</th><th>Леги</th><th>Ср.</th></tr></thead><tbody>';
-  standings(t).forEach((s, i) => { h += '<tr class="' + (s.id === ME ? 'me' : '') + '"><td>' + plcBadge(i + 1, i + 1, true) + '</td><td>' + pid(s.id) + '</td><td>' + s.w + '–' + s.l + '</td><td>' + s.lf + ':' + s.la + '</td><td>' + avg3(s.pts, s.darts) + '</td></tr>'; });
+  const sw = t.format === 'sw';
+  let h = '<div class="card scroll" style="padding:4px 14px"><table class="tbl"><thead><tr><th>Место</th><th>Игрок</th><th>' + (sw ? 'Очки' : 'В–П') + '</th>' + (sw ? '<th title="Бухгольц: сумма очков соперников">Бух.</th>' : '') + '<th>Леги</th><th>Ср.</th></tr></thead><tbody>';
+  standings(t).forEach((s, i) => { h += '<tr class="' + (s.id === ME ? 'me' : '') + '"><td>' + plcBadge(i + 1, i + 1, true) + '</td><td>' + pid(s.id) + '</td><td>' + (sw ? s.w : s.w + '–' + s.l) + '</td>' + (sw ? '<td>' + s.bh + '</td>' : '') + '<td>' + s.lf + ':' + s.la + '</td><td>' + avg3(s.pts, s.darts) + '</td></tr>'; });
   return h + '</tbody></table></div>';
 }
 const plcBadge = (lo, hi, fixed) => '<span class="plc' + (lo === hi && lo <= 3 ? ' p' + lo : '') + (fixed ? '' : ' rng') + '">' + (lo === hi ? lo : lo + '–' + hi) + '</span>';
@@ -2750,7 +2764,7 @@ function tourView(id) {
   else if (tab === 'groups' || (tab === 'table' && t.stage === 'groups')) h += groupsView(t);
   else if (tab === 'table') {
     const pr = tProgress(t), left = pr.total - pr.done;
-    h += '<div class="tstat"><span class="meta">Места по числу побед, затем по разнице легов.</span>' + copyResBtn(t) + '</div>' + standingsView(t);
+    h += '<div class="tstat"><span class="meta">' + (t.format === 'sw' ? 'Швейцарская система, ' + (t.rounds || '') + ' ' + pl(t.rounds || 0, 'тур', 'тура', 'туров') + ': каждый тур — с равным по очкам соперником, без повторов. Места — по очкам (победы и баи), затем по Бухгольцу — сумме очков соперников.' : 'Места по числу побед, затем по разнице легов.') + '</span>' + copyResBtn(t) + '</div>' + standingsView(t);
     if (left) h += '<button class="lnk meta" data-act="ttab" data-v="games">Осталось ' + left + ' ' + pl(left, 'матч', 'матча', 'матчей') + ' → Матчи</button>';
     h += tourDelLink(t);
   } else if (tab === 'games') h += gamesList(t);
@@ -2905,7 +2919,7 @@ function stagesOf(t, rv) {
   const out = [];
   if (t.qual) { const n = t.players.filter(id => qBest(t, id) != null).length; out.push({ l: 'Квалификация', done: n, total: t.players.length }); }
   if (t.groups && t.groups.done && t.groups.games) { const n = t.groups.games.length; out.push({ l: 'Группы', done: n, total: n }); }
-  if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.stage === 'groups' ? 'Группы · тур ' + (x.r + 1) : t.format === 'ko' ? cap1(roundLabel(t, x.r)) : t.format === 'rr' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
+  if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.stage === 'groups' ? 'Группы · тур ' + (x.r + 1) : t.format === 'ko' || t.format === 'de' ? cap1(roundLabel(t, x.r)) : t.format === 'rr' || t.format === 'sw' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
   return out;
 }
 // общий ход турнира: доля сыгранного по всем этапам (квалификация — попытки игроков) и текущий этап
@@ -3153,6 +3167,9 @@ function exRules(ex) {
 const isGrpFmt = v => v === 'std' || v === 'lg';
 function ntSummary(nt) {
   const n = nt.sel.length, br = nt.fmt !== 'rr', max = br ? BR_MAX : RR_MAX;
+  const cnt0 = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
+  if (n >= 3 && nt.fmt === 'sw') { const R = nt.rounds || Math.max(1, Math.ceil(Math.log2(n))); if (R >= n) return { ok: false, txt: 'Туров должно быть меньше, чем участников' }; return { ok: true, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(R, 'тур', 'тура', 'туров'), cnt0(R * Math.floor(n / 2), 'матч', 'матча', 'матчей')].filter(Boolean).join(' · ') }; }
+  if (n >= 3 && nt.fmt === 'de') return { ok: n <= max, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(2 * n - 2, 'матч', 'матча', 'матчей'), 'суперфинал'].filter(Boolean).join(' · ') };
   const cnt = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
   if (n < 3) return { ok: false, txt: 'Выберите минимум 3 участника' };
   if (n > max) return { ok: false, txt: 'Для этого формата максимум ' + max + ' участников' };
@@ -3192,12 +3209,15 @@ function newTourView() {
   const FMTS = [
     ['pl', 'С розыгрышем всех мест', 'Определяются все места: одной сеткой или сразу несколькими.'],
     ['ko', 'Олимпийская система', 'На вылет: проигравший выбывает.'],
-    ['rr', 'Круговая система', 'Каждый с каждым, до ' + RR_MAX + ' участников.']
+    ['rr', 'Круговая система', 'Каждый с каждым, до ' + RR_MAX + ' участников.'],
+    ['de', 'Двойное выбывание', 'Проиграл в верхней сетке — продолжаешь в нижней, проиграл в нижней — выбыл. Суперфинал: победители верхней и нижней.']
   ].concat(SRV ? [
+    ['sw', 'Швейцарская система', 'Несколько туров: каждый раз — соперник с теми же очками, без повторов. Места — по очкам и Бухгольцу.'],
     ['std', 'Стандарт: группы + сетка', 'В группах каждый с каждым, лучшие из каждой группы выходят в сетку.'],
     ['lg', 'Лига: одна группа + сетка', 'Все играют каждый с каждым, лучшие выходят в сетку.']
   ] : []);
   h += '<div class="field"><span class="label">Формат</span><div class="fmts" role="radiogroup">' + FMTS.map(([v, l, d]) => '<button class="fmt' + (nt.fmt === v ? ' on' : '') + '" role="radio" aria-checked="' + (nt.fmt === v) + '" data-act="nt-fmt" data-v="' + v + '"><b>' + l + '</b><span>' + d + '</span></button>').join('') + '</div></div>';
+  if (nt.fmt === 'sw') h += '<div class="field"><span class="label">Туров</span><div class="chips">' + chips([0, 3, 4, 5, 6, 7], nt.rounds || 0, 'nt-rounds', v => v ? String(v) : 'по числу игроков') + '</div><span class="meta">«По числу игроков» — сколько нужно, чтобы выявить победителя: 8 игроков — 3 тура, 16 — 4.</span></div>';
   if (isGrpFmt(nt.fmt)) {
     if (nt.fmt !== 'lg') h += '<div class="field"><span class="label">Групп</span><div class="chips">' + chips([2, 3, 4, 6, 8], nt.gn, 'nt-gn') + '</div></div>';
     h += '<div class="field"><span class="label">Выходят из каждой группы</span><div class="chips">' + chips(nt.fmt === 'lg' ? [2, 4, 8] : [1, 2, 3, 4], nt.gadv, 'nt-gadv') + '</div></div>';
@@ -3266,6 +3286,7 @@ function createTour() {
   if (SRV) {
     const grp = isGrpFmt(nt.fmt), body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: grp ? nt.po : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
     if (grp) body.groups = { n: nt.gn, adv: nt.gadv };
+    if (nt.fmt === 'sw' && nt.rounds) body.rounds = nt.rounds;
     if (qual) body.qual = { ex: exFrom(nt.qk), tries: nt.tries };
     if (nt.fmt === 'pl') body.split = nt.split || null;
     if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) body.ltwBy = nt.ltwBy;
@@ -6998,6 +7019,7 @@ document.addEventListener('click', e => {
     case 'nt-tries': S.nt.tries = +v; render(); break;
     case 'nt-ltw': S.nt.ltw = +v; render(); break;
     case 'nt-gn': S.nt.gn = +v; render(); break;
+    case 'nt-rounds': S.nt.rounds = +v; render(); break;
     case 'nt-qual': S.nt.qualOn = v === '1'; if (S.nt.qualOn && !S.nt.qk) S.nt.qk = 'score'; render(); break;
     case 'nt-splitmode': S.nt.split = v === '1' ? 8 : 0; render(); break;
     case 'nt-split': S.nt.split = +v; render(); break;

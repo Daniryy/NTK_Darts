@@ -6,7 +6,10 @@
    Форматы:
      ko — на вылет;
      pl — розыгрыш всех мест (победители группы → верхняя подгруппа, проигравшие → нижняя);
-     rr — круговая (только список матчей, см. rrGames).
+     rr — круговая (только список матчей, см. rrGames);
+     de — двойное выбывание: верхняя сетка r = 0…k−1 (k = log2 мест), нижняя r = k…3k−3 (её круг l = r − k),
+          суперфинал r = 3k − 2. Проиграл в верхней — в нижнюю, проиграл в нижней — выбыл;
+     sw — швейцарская система: t.rounds туров, пары каждого тура — по итогам предыдущих (см. swissGames).
 
    Объект турнира t:
      t.format   'ko' | 'pl' | 'rr'
@@ -27,7 +30,7 @@
   const BYE = '~';
   const isReal = x => !!x && x !== BYE;
   // пока идёт групповой этап, турнир живёт как круговой: сетка (ko / pl) строится после групп
-  const isBracket = t => (t.format === 'ko' || t.format === 'pl') && t.stage !== 'groups';
+  const isBracket = t => (t.format === 'ko' || t.format === 'pl' || t.format === 'de') && t.stage !== 'groups';
   const slotsOf = t => t.slots || t.players;
   // размер одной части сетки; без частей — вся сетка
   const bSize = t => (t.format === 'pl' && t.block) || slotsOf(t).length;
@@ -40,7 +43,19 @@
   const orderOf = (t, n) => (t.layout === 'ndl' && NDL_ORDER[n]) || seedOrder(n);
   function bracketSize(n) { let s = 2; while (s < n) s *= 2; return s; }
   // size — мест во всей сетке, block — в одной части (pl)
+  // двойное выбывание: сторона круга r — 'w' верхняя, 'l' нижняя, 'f' суперфинал; матчей в круге l нижней
+  const deK = t => Math.round(Math.log2(slotsOf(t).length));
+  const deSide = (t, r) => { const k = deK(t); return r < k ? 'w' : r < 3 * k - 2 ? 'l' : 'f'; };
+  const deLbCount = (B, l) => B / 2 ** (Math.floor(l / 2) + 2);
+  function deGames(size) {
+    const k = Math.round(Math.log2(size)), games = [];
+    for (let r = 0; r < k; r++) for (let i = 0; i < size / 2 ** (r + 1); i++) games.push({ r, i, res: null });
+    for (let l = 0; l < 2 * k - 2; l++) for (let i = 0; i < deLbCount(size, l); i++) games.push({ r: k + l, i, res: null });
+    games.push({ r: 3 * k - 2, i: 0, res: null });
+    return games;
+  }
   function bracketGames(fmt, size, block) {
+    if (fmt === 'de') return deGames(size);
     const rounds = Math.round(Math.log2(fmt === 'pl' && block ? block : size)), games = [];
     for (let r = 0; r < rounds; r++) {
       const cnt = fmt === 'pl' ? size / 2 : size / 2 ** (r + 1);
@@ -61,7 +76,10 @@
     if (parts > 1) t.block = B; else delete t.block;
     t.games = bracketGames(fmt, t.slots.length, t.block);
   }
-  const roundGames = (t, r) => t.format === 'pl' ? slotsOf(t).length / 2 : bSize(t) / 2 ** (r + 1);
+  function roundGames(t, r) {
+    if (t.format === 'de') { const s = deSide(t, r), B = slotsOf(t).length; return s === 'w' ? B / 2 ** (r + 1) : s === 'l' ? deLbCount(B, r - deK(t)) : 1; }
+    return t.format === 'pl' ? slotsOf(t).length / 2 : bSize(t) / 2 ** (r + 1);
+  }
 
   // группа матча в круге r у pl: grp — сквозной номер группы, per — матчей в группе, lo — первое место группы,
   // part — часть сетки, lg — номер группы внутри части
@@ -77,6 +95,7 @@
     if (t.stage === 'groups') return 'groups';
     if (!isBracket(t) || r == null) return null;
     if (t.format === 'pl' && plGroup(t, r, i).lo !== 1) return 'places';
+    if (t.format === 'de') { const k = deK(t); return r === 3 * k - 2 ? 'f' : r === k - 1 || r === 3 * k - 3 ? 'sf' : 'early'; }
     const d = bRounds(t) - 1 - r;
     return d === 0 ? 'f' : d === 1 ? 'sf' : d === 2 ? 'qf' : 'early';
   }
@@ -93,6 +112,21 @@
     return [[2 * i, 'w'], [2 * i + 1, 'w']];
   }
 
+  // откуда игроки матча (r, i) в общем виде: [[r', i', 'w' | 'l'], …]; null — первый круг (места посева)
+  function src(t, r, i) {
+    if (t.format === 'de') {
+      const k = deK(t), s = deSide(t, r);
+      if (s === 'w') return r === 0 ? null : [[r - 1, 2 * i, 'w'], [r - 1, 2 * i + 1, 'w']];
+      if (s === 'f') return [[k - 1, 0, 'w'], [3 * k - 3, 0, 'w']];
+      const l = r - k;
+      if (l === 0) return [[0, 2 * i, 'l'], [0, 2 * i + 1, 'l']];
+      // проигравшие верхней встречают победителей нижней — в обратном порядке, чтобы реже был повтор встречи
+      if (l % 2) return [[r - 1, i, 'w'], [(l + 1) / 2, deLbCount(slotsOf(t).length, l) - 1 - i, 'l']];
+      return [[r - 1, 2 * i, 'w'], [r - 1, 2 * i + 1, 'w']];
+    }
+    return r === 0 ? null : feeders(t, r, i).map(([fi, take]) => [r - 1, fi, take]);
+  }
+
   const GIDX = new WeakMap();
   function gameAt(t, r, i) {
     let m = GIDX.get(t.games);
@@ -105,9 +139,10 @@
     if (!isBracket(t)) return { players: (r, i) => { const g = gameAt(t, r, i); return g ? [g.a, g.b] : [null, null]; } };
     const memo = new Map(), sl = slotsOf(t);
     const players = (r, i) => {
-      if (r === 0) return [sl[2 * i] || BYE, sl[2 * i + 1] || BYE];
+      const s = src(t, r, i);
+      if (!s) return [sl[2 * i] || BYE, sl[2 * i + 1] || BYE];
       const k = r + ':' + i;
-      if (!memo.has(k)) memo.set(k, feeders(t, r, i).map(([fi, take]) => outcome(r - 1, fi)[take]));
+      if (!memo.has(k)) memo.set(k, s.map(([fr, fi, take]) => outcome(fr, fi)[take]));
       return memo.get(k);
     };
     const outcome = (r, i) => {
@@ -145,6 +180,13 @@
 
   // номера стабильны: бай известен заранее и не нумеруется
   function gameNums(t, rv) {
+    if (t.format === 'de') {
+      // по ходу турнира: верхний круг j идёт вместе с нижним 2j − 1, суперфинал последний
+      const k = deK(t), when = g => { const s = deSide(t, g.r); return s === 'w' ? 2 * g.r : s === 'l' ? g.r - k + 1 : 4 * k; };
+      const m = new Map(); let n = 0;
+      t.games.slice().sort((x, y) => when(x) - when(y) || x.r - y.r || x.i - y.i).forEach(g => { const [a, b] = rv.players(g.r, g.i); if (a !== BYE && b !== BYE) m.set(g.r + ':' + g.i, ++n); });
+      return m;
+    }
     const m = new Map(), last = t.format === 'pl' ? bRounds(t) - 1 : -1, half = bSize(t) / 2;
     // в последнем круге pl финал части получает последний номер в её части
     const key = g => g.r === last ? partOf(t, g.i) * half + half - 1 - g.i % half : g.i;
@@ -155,16 +197,17 @@
 
   // подпись источника игрока: «Победитель №3» / «Проигравший №3»; '' если источника нет
   function srcText(t, rv, nums, r, i, side) {
-    let [fi, take] = feeders(t, r, i)[side], fr = r - 1;
-    while (fr >= 0) {
+    const s0 = src(t, r, i);
+    if (!s0) return '';
+    let [fr, fi, take] = s0[side];
+    for (;;) {
       const n = nums.get(fr + ':' + fi);
       if (n) return (take === 'w' ? 'Победитель' : 'Проигравший') + ' №' + n;
-      if (take !== 'w' || fr === 0) return '';
+      const s = src(t, fr, fi);
+      if (take !== 'w' || !s) return '';
       const pp = rv.players(fr, fi);
-      [fi, take] = feeders(t, fr, fi)[pp[0] === BYE ? 1 : 0];
-      fr--;
+      [fr, fi, take] = s[pp[0] === BYE ? 1 : 0];
     }
-    return '';
   }
 
   // подписи как на бумажном листе NDL (t.labels = 'ab'): места второго круга A1, A2…, третьего B1…, сквозные по частям
@@ -172,14 +215,14 @@
   // куда идут победитель и проигравший матча (r, i): { w: [i, сторона] | null, l: [i, сторона] | null } в круге r + 1
   function nextOf(t, r, i) {
     const out = { w: null, l: null };
-    if (!isBracket(t) || r + 1 >= bRounds(t)) return out;
+    if (!isBracket(t) || t.format === 'de' || r + 1 >= bRounds(t)) return out;
     for (let j = 0, n = roundGames(t, r + 1); j < n; j++) feeders(t, r + 1, j).forEach(([fi, take], side) => { if (fi === i) out[take] = [j, side]; });
     return out;
   }
   // название матча при подписях NDL: «A1–A2», «B3–B4»; в первом круге — номера посева «1–8». null — подписи номерами
   function gameTag(t, g) {
     if (t.stage === 'groups' && g.grp != null) return 'группа ' + groupName(g.grp);
-    if (t.labels !== 'ab' || !isBracket(t)) return null;
+    if (t.labels !== 'ab' || !isBracket(t) || t.format === 'de') return null;
     if (g.r > 0) return slotTag(g.r, g.i, 0) + '–' + slotTag(g.r, g.i, 1);
     const B = bSize(t), base = partOf(t, g.i) * B, o = orderOf(t, B), k = (2 * g.i) % B;
     return (base + o[k]) + '–' + (base + o[k + 1]);
@@ -209,6 +252,8 @@
   // можно ли убрать результат матча g: после этого все остальные результаты должны остаться верными.
   // extra(rv) — дополнительная проверка (например, идущая игра), вызывается, пока результат снят.
   function canClear(t, g, extra) {
+    // швейцарка: пока следующий тур не начат (его пары зависят от этого результата)
+    if (t.format === 'sw') return !g.res || !t.games.some(x => x.r > g.r && x.b !== BYE && x.res);
     if (!g.res || !isBracket(t)) return true;
     const saved = g.res;
     g.res = null;
@@ -230,6 +275,61 @@
       a.splice(1, 0, a.pop());
     }
     return games;
+  }
+
+  // швейцарка: туры строятся по одному — следующий, когда сыграны все матчи предыдущего. Первый тур — сильная
+  // половина против слабой (1 — N/2+1 …), дальше — равные по очкам, без повторных встреч. Нечётное число —
+  // бай (победа без игры) последнему в таблице, у кого его ещё не было. res(r, i) — результат матча или null.
+  function swissGames(ids, R, res) {
+    const games = [], met = new Set(), bye = new Set(), key = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+    for (let r = 0; r < R; r++) {
+      let order = r === 0 ? ids.slice() : swissTable(ids, games).map(x => x.id);
+      let byeId = null;
+      if (order.length % 2) { byeId = order.slice().reverse().find(id => !bye.has(id)) || order[order.length - 1]; order = order.filter(id => id !== byeId); }
+      const pairs = [];
+      if (r === 0) { const h = order.length / 2; for (let k = 0; k < h; k++) pairs.push([order[k], order[k + h]]); }
+      else {
+        // сверху вниз, ближайший по таблице без повторной встречи; тупик — шаг назад (перебор с возвратом)
+        let steps = 0;
+        const pick = left => {
+          if (!left.length) return [];
+          if (++steps > 20000) return null;
+          const a = left[0];
+          for (let j = 1; j < left.length; j++) {
+            if (met.has(key(a, left[j]))) continue;
+            const rest = pick(left.slice(1, j).concat(left.slice(j + 1)));
+            if (rest) return [[a, left[j]]].concat(rest);
+          }
+          return null;
+        };
+        const ok = pick(order);
+        if (ok) pairs.push(...ok);
+        else {
+          // не нашлось без повторов за разумное время — ближайший свободный соперник
+          const left = order.slice();
+          while (left.length) { const a = left.shift(); let j = left.findIndex(b => !met.has(key(a, b))); if (j < 0) j = 0; pairs.push([a, left.splice(j, 1)[0]]); }
+        }
+      }
+      let i = 0;
+      for (const [a, b] of pairs) { games.push({ r, i, a, b, res: res(r, i) || null }); i++; met.add(key(a, b)); }
+      if (byeId) { games.push({ r, i: i++, a: byeId, b: BYE, res: null }); bye.add(byeId); }
+      if (games.some(g => g.r === r && g.b !== BYE && !g.res)) break;
+    }
+    return games;
+  }
+  // таблица швейцарки: очки (победы и баи), Бухгольц (сумма очков соперников), разница легов, выигранные леги, посев
+  function swissTable(ids, games) {
+    const s = {};
+    ids.forEach((id, k) => { s[id] = { id, k, n: 0, w: 0, l: 0, lf: 0, la: 0, opp: [], bh: 0 }; });
+    games.forEach(g => {
+      if (g.b === BYE) { if (s[g.a]) { s[g.a].w++; } return; }
+      if (!g.res || !s[g.a] || !s[g.b]) return;
+      const A = s[g.a], Bb = s[g.b];
+      A.n++; Bb.n++; A.lf += g.res.la; A.la += g.res.lb; Bb.lf += g.res.lb; Bb.la += g.res.la; A.opp.push(g.b); Bb.opp.push(g.a);
+      if (g.res.w === g.a) { A.w++; Bb.l++; } else { Bb.w++; A.l++; }
+    });
+    Object.values(s).forEach(x => { x.bh = x.opp.reduce((a, o) => a + s[o].w, 0); });
+    return Object.values(s).sort((x, y) => y.w - x.w || y.bh - x.bh || (y.lf - y.la) - (x.lf - x.la) || y.lf - x.lf || x.k - y.k);
   }
 
   // группы змейкой по посеву: 1-й — в A, 2-й — в B, …, последний в ряду — снова в ту же группу и обратно
@@ -265,7 +365,7 @@
     return out;
   }
   const groupName = k => String.fromCharCode(65 + k);
-  const finalGame = t => isBracket(t) ? gameAt(t, bRounds(t) - 1, 0) : null;
+  const finalGame = t => !isBracket(t) ? null : t.format === 'de' ? gameAt(t, 3 * deK(t) - 2, 0) : gameAt(t, bRounds(t) - 1, 0);
 
   // места игрока [от, до]; пока место не решено, это диапазон. null — игрока нет в сетке.
   // не вышел из группы: место по месту в группе — после всех, кто в сетке
@@ -282,6 +382,7 @@
     if (!isBracket(t)) return null;
     if (t.groups && t.groups.games && isBracket(t) && t.slots && !t.slots.includes(pid)) return groupPlace(t, pid);
     rv = rv || resolver(t);
+    if (t.format === 'de') return dePlace(t, pid, rv);
     const R = bRounds(t), S = bSize(t), N = t.players.length;
     for (let r = R - 1; r >= 0; r--) {
       for (let i = 0, n = roundGames(t, r); i < n; i++) {
@@ -300,6 +401,24 @@
       }
     }
     return null;
+  }
+
+  // двойное выбывание: 1 и 2 — суперфинал, дальше по кругу нижней сетки, в котором выбыл (позже выбыл — выше)
+  function dePlace(t, pid, rv) {
+    const k = deK(t), B = slotsOf(t).length, N = t.players.length, gf = rv.outcome(3 * k - 2, 0);
+    if (gf.w === pid) return [1, 1];
+    if (gf.l === pid) return [2, 2];
+    const real = l => { let c = 0; for (let i = 0; i < deLbCount(B, l); i++) { const [a, b] = rv.players(k + l, i); if (a !== BYE && b !== BYE) c++; } return c; };
+    const loAt = l => { let lo = 3; for (let x = 2 * k - 3; x > l; x--) lo += real(x); return lo; };
+    for (let l = 2 * k - 3; l >= 0; l--) {
+      for (let i = 0; i < deLbCount(B, l); i++) {
+        const pp = rv.players(k + l, i);
+        if (pp[0] !== pid && pp[1] !== pid) continue;
+        const lo = loAt(l), hi = Math.min(N, lo + real(l) - 1);
+        return rv.outcome(k + l, i).l === pid ? [lo, hi] : [1, hi];
+      }
+    }
+    return slotsOf(t).includes(pid) ? [1, N] : null;
   }
 
   // мишени: t.boards = { n, at: { 'r:i': номер } }. Мишень держится за готовой игрой, сыгранная её освобождает;
@@ -361,8 +480,8 @@
 
   return {
     BYE, isReal, isBracket, slotsOf, bSize, bParts, bRounds, seedOrder, bracketSize, bracketGames, setBracket,
-    roundGames, plGroup, partOf, feeders, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
+    roundGames, plGroup, partOf, feeders, src, deK, deSide, gameAt, resolver, gamePlayersIn, gameState, groupReal, gameNums,
     srcText, tProgress, roundProgress, canClear, rrGames, finalGame, placeRange, places, assignBoards,
-    NDL_ORDER, slotTag, nextOf, gameTag, STAGES, stageOf, ltwOf, drawGroups, groupGames, table, groupAdvance, groupName
+    NDL_ORDER, slotTag, nextOf, gameTag, STAGES, stageOf, ltwOf, swissGames, swissTable, drawGroups, groupGames, table, groupAdvance, groupName
   };
 });

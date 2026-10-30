@@ -133,3 +133,46 @@ test('квалификация — к любому формату: ko — одн
   pl = await qualify(pl);
   assert.equal(pl.block, undefined); assert.equal(pl.slots.length, 8);
 });
+
+test('двойное выбывание: 6 игроков — 2N−2 матча, суперфинал, места по нижней сетке', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Двойное', format: 'de', mode: 501, ltw: 1, players: ids, ltwBy: { f: 2 } }), 201).tournament;
+  assert.equal(t.format, 'de');
+  let n = 0;
+  for (let k = 0; k < 40; k++) {
+    const g = t.games.find(x => B.gameState(t, x).st === 'ready');
+    if (!g) break;
+    const ltw = B.ltwOf(t, g.r, g.i);
+    t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/' + g.r + '/' + g.i + '/result', { la: ltw, lb: 0 })).tournament;
+    n++;
+  }
+  assert.equal(n, 10, '2N − 2 матча');
+  assert.equal(t.status, 'done');
+  const pl = (await pool.query('SELECT place_lo, place_hi FROM entries WHERE tournament_id = $1 ORDER BY place_lo, place_hi', [t.id])).rows.map(x => [x.place_lo, x.place_hi]);
+  assert.deepEqual(pl.slice(0, 4), [[1, 1], [2, 2], [3, 3], [4, 4]]);
+  assert.equal(pl.length, 6);
+});
+
+test('швейцарка: 5 игроков, 3 тура — пары по очкам, бай, следующий тур после предыдущего', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Швейцарка', format: 'sw', mode: 501, ltw: 1, rounds: 3, players: ids }), 201).tournament;
+  assert.equal(t.rounds, 3);
+  assert.deepEqual([...new Set(t.games.map(g => g.r))], [0], 'сначала только первый тур');
+  assert.equal(t.games.filter(g => g.b === B.BYE).length, 1);
+  for (let k = 0; k < 20; k++) {
+    const g = t.games.find(x => B.gameState(t, x).st === 'ready');
+    if (!g) break;
+    // снимать результат прошлого тура нельзя, когда следующий уже начат — проверим после второго тура
+    t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/' + g.r + '/' + g.i + '/result', { la: 1, lb: 0 })).tournament;
+  }
+  assert.equal(t.status, 'done');
+  assert.deepEqual([...new Set(t.games.map(g => g.r))], [0, 1, 2]);
+  // никто не играл с одним соперником дважды
+  const pairs = t.games.filter(g => g.b !== B.BYE).map(g => [g.a, g.b].sort().join('|'));
+  assert.equal(new Set(pairs).size, pairs.length);
+  const pl = (await pool.query('SELECT place_lo FROM entries WHERE tournament_id = $1 ORDER BY place_lo', [t.id])).rows.map(x => x.place_lo);
+  assert.deepEqual(pl, [1, 2, 3, 4, 5]);
+  // по умолчанию туров — log2 участников
+  const d = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Швейцарка 2', format: 'sw', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13', 'p14'] }), 201).tournament;
+  assert.equal(d.rounds, 4);
+});
