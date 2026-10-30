@@ -2144,7 +2144,7 @@ const avatar = (id, cls) => photoOf(id)
   : '<span class="av' + (id === ME ? ' me' : '') + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(initials(P[id] ? P[id].name : '?')) + '</span>';
 const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая', de: 'Двойное выбывание', sw: 'Швейцарская система' };
 const venueOf = t => t.venue && t.venue !== 'место уточняется' ? t.venue : '';
-const grpName = t => (t.qual ? 'Квалификация + ' : '') + (t.groups.n === 1 ? 'Лига' : t.groups.n + ' ' + pl(t.groups.n, 'группа', 'группы', 'групп')) + ' + ' + (t.format === 'pl' ? 'сетка за все места' : 'сетка на вылет');
+const grpName = t => (t.qual ? 'Квалификация + ' : '') + (t.groups.n === 1 ? 'Лига' : t.groups.n + ' ' + pl(t.groups.n, 'группа', 'группы', 'групп')) + ' + ' + (t.format === 'pl' ? 'сетка за все места' : 'сетка на вылет') + (t.groups.cups ? ' + Кубок B' : '');
 const fmtName = t => t.groups ? grpName(t) : t.qual ? 'Квалификация + ' + (t.format === 'rr' ? 'круговая' : t.format === 'ko' ? 'сетка на вылет' : t.split && (t.cap || (t.players || []).length) > t.split ? 'сетки по ' + t.split : 'сетка за все места') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
 function fmtLine(t) {
   const n = t.status === 'reg' ? t.cap : t.players.length;
@@ -2728,7 +2728,7 @@ function tourView(id) {
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
   h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация' + (t.regUntil ? ' до ' + fmtDate(t.regUntil) : ' открыта') + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
-  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + (canDo(t, 'org') && t.status !== 'done' ? ' <button class="lnk" data-act="ltw-edit" data-v="' + t.id + '">изменить победы</button>' : '') + '</div>';
+  h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div>' + cupLinks(t) + '<div class="meta">' + fmtLine(t) + (canDo(t, 'org') && t.status !== 'done' ? ' <button class="lnk" data-act="ltw-edit" data-v="' + t.id + '">изменить победы</button>' : '') + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
   if (st === 'live') h += yourMatch(t);
@@ -2877,6 +2877,8 @@ async function addParticipant(tid) {
   render();
   const ne = $('tp-add'); if (ne) { ne.value = ''; ne.focus(); }
 }
+// «Кубок B»: ссылка из основного турнира на кубок и обратно
+const cupLinks = t => t.parent ? '<div class="meta"><button class="lnk" data-act="go" data-v="t.' + esc(t.parent) + '">← Основной турнир (Кубок A)</button></div>' : t.groups && t.groups.cupB ? '<div class="meta"><button class="lnk" data-act="go" data-v="t.' + esc(t.groups.cupB) + '">Кубок B — для не вышедших из групп →</button></div>' : '';
 const cardsBtn = t => SRV && canDo(t, 'org') ? '<div class="row"><button class="mini" data-act="cards-show" data-v="' + t.id + '">QR-карточки игроков</button><span class="meta">вход для тех, у кого нет своего</span></div>' : '';
 function deleteTour(tid) {
   const t = TBY[tid];
@@ -3221,7 +3223,8 @@ function newTourView() {
   if (isGrpFmt(nt.fmt)) {
     if (nt.fmt !== 'lg') h += '<div class="field"><span class="label">Групп</span><div class="chips">' + chips([2, 3, 4, 6, 8], nt.gn, 'nt-gn') + '</div></div>';
     h += '<div class="field"><span class="label">Выходят из каждой группы</span><div class="chips">' + chips(nt.fmt === 'lg' ? [2, 4, 8] : [1, 2, 3, 4], nt.gadv, 'nt-gadv') + '</div></div>';
-    h += '<div class="field"><span class="label">Сетка после групп</span><div class="chips">' + chips(['ko', 'pl'], nt.po, 'nt-po', v => v === 'ko' ? 'На вылет' : 'С розыгрышем всех мест') + '</div><span class="meta">Не вышедшие из групп делят места после сетки — по месту в группе.</span></div>';
+    h += '<div class="field"><span class="label">Сетка после групп</span><div class="chips">' + chips(['ko', 'pl'], nt.po, 'nt-po', v => v === 'ko' ? 'На вылет' : 'С розыгрышем всех мест') + '</div></div>';
+    h += '<div class="field"><span class="label">Кто не вышел из групп</span><div class="chips">' + chips(['0', '1'], nt.cups ? '1' : '0', 'nt-cups', v => v === '1' ? 'Играют «Кубок B»' : 'Заканчивают турнир') + '</div><span class="meta">' + (nt.cups ? 'После групп лучшие играют основную сетку (Кубок A), остальные — свою сетку «Кубок B» отдельным турниром.' : 'Не вышедшие делят места после сетки — по месту в группе.') + '</span></div>';
   }
   if (nt.fmt === 'pl') {
     h += '<div class="field"><span class="label">Как разыгрываются места</span><div class="fmts" role="radiogroup">' + [[0, 'Одна сетка', 'После каждого круга сетка делится: победители играют с победителями, проигравшие — с проигравшими. Одна перерастает в две, потом в четыре — пока не решатся все места.'], [1, 'Сразу несколько сеток', 'Участники сразу делятся на сетки по посеву или итогам квалификации: места 1–8, 9–16, 17–24… У каждой своя сетка.']]
@@ -3285,7 +3288,7 @@ function createTour() {
   const ex = exFrom(nt.exk, nt.lim), qual = !!nt.qualOn;
   if (SRV) {
     const grp = isGrpFmt(nt.fmt), body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: grp ? nt.po : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
-    if (grp) body.groups = { n: nt.gn, adv: nt.gadv };
+    if (grp) body.groups = Object.assign({ n: nt.gn, adv: nt.gadv }, nt.cups ? { cups: true } : {});
     if (nt.fmt === 'sw' && nt.rounds) body.rounds = nt.rounds;
     if (qual) body.qual = { ex: exFrom(nt.qk), tries: nt.tries };
     if (nt.fmt === 'pl') body.split = nt.split || null;
@@ -7019,6 +7022,7 @@ document.addEventListener('click', e => {
     case 'nt-tries': S.nt.tries = +v; render(); break;
     case 'nt-ltw': S.nt.ltw = +v; render(); break;
     case 'nt-gn': S.nt.gn = +v; render(); break;
+    case 'nt-cups': S.nt.cups = v === '1'; render(); break;
     case 'nt-rounds': S.nt.rounds = +v; render(); break;
     case 'nt-qual': S.nt.qualOn = v === '1'; if (S.nt.qualOn && !S.nt.qk) S.nt.qk = 'score'; render(); break;
     case 'nt-splitmode': S.nt.split = v === '1' ? 8 : 0; render(); break;

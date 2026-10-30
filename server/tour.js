@@ -58,7 +58,8 @@ function build(row, ents, ms, qs) {
   if (row.boards) t.boards = row.boards;
   if (row.refs) t.refs = row.refs;
   if (row.rounds) t.rounds = row.rounds;
-  if (row.groups) t.groups = { n: row.groups.n, adv: row.groups.adv, ids: row.groups.ids || null, done: !!row.groups.done };
+  if (row.groups) t.groups = Object.assign({ n: row.groups.n, adv: row.groups.adv, ids: row.groups.ids || null, done: !!row.groups.done }, row.groups.cups ? { cups: true } : {}, row.groups.cupB ? { cupB: row.groups.cupB } : {});
+  if (row.parent) t.parent = row.parent;
   if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
   if (row.layout) t.layout = row.layout;

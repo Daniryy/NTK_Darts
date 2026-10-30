@@ -52,7 +52,7 @@ async function reseed(c, id, order) {
 function groupsCheck(G, n) {
   if (Math.floor(n / G.n) < Math.max(2, G.adv + 1)) throw E.conflict('bad_state', 'Мало участников для ' + G.n + ' ' + (G.n === 1 ? 'группы' : 'групп') + ': в каждой нужно больше, чем выходит из неё (' + G.adv + ')');
 }
-const groupsRow = (G, ids) => JSON.stringify({ n: G.n, adv: G.adv, ids, done: false });
+const groupsRow = (G, ids) => JSON.stringify(Object.assign({ n: G.n, adv: G.adv, ids, done: false }, G.cups ? { cups: true } : {}));
 
 async function launch(c, id, fmt, order, row) {
   const t = { players: [], games: [], layout: row.layout };
@@ -112,6 +112,8 @@ function tourFields(b, full, me) {
     const g = b.groups;
     if (g !== null && (typeof g !== 'object' || Array.isArray(g))) throw E.bad('groups: { n, adv }', 'groups');
     o.groups = g === null ? null : { n: V.int(g.n, 'groups.n', 1, 16), adv: V.int(g.adv, 'groups.adv', 1, 16) };
+    // cups: не вышедшие из групп играют «Кубок B» — отдельный турнир с той же игрой
+    if (o.groups && g.cups != null) o.groups.cups = V.bool(g.cups, 'groups.cups');
     if (o.groups && o.groups.n * o.groups.adv < 2) throw E.bad('Из групп в сетку должны выйти хотя бы двое', 'groups');
   }
   if (b.qual != null) {
@@ -552,6 +554,19 @@ module.exports = async function (app) {
       B.setBracket(g, t.format, order);
       await c.query('UPDATE matches SET r = r + 64 WHERE tournament_id = $1 AND r IS NOT NULL AND r < 64', [t.id]);
       const G = Object.assign({}, t._row.groups, { done: true });
+      // «Кубок B»: остальные — по месту в группе — играют свою сетку в отдельном турнире
+      if (G.cups) {
+        const tabs = G.ids.map((ids, k) => B.table(ids, t.groups.games.filter(x => x.grp === k))), rest = [];
+        for (let p = G.adv; p < Math.max(...tabs.map(x => x.length)); p++) tabs.forEach(tb => { if (tb[p]) rest.push(tb[p].id); });
+        if (rest.length >= 2) {
+          const r = t._row, cup = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, status, format, mode, dbl, ltw, cap, ex, club_id, layout, labels, created_at, ltw_by, refs, parent, fee)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'reg', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
+          [(r.name + ' · Кубок B').slice(0, 60), r.official, r.owner_id, r.org_name, r.org_ver, r.city, r.venue, Date.now(), t.format, r.mode, r.dbl, r.ltw, rest.length, r.ex ? JSON.stringify(r.ex) : null,
+            r.club_id, r.layout, r.labels, Date.now(), r.ltw_by ? JSON.stringify(r.ltw_by) : null, r.refs ? JSON.stringify({ chief: r.refs.chief || null, pool: r.refs.pool || [], at: {} }) : null, t.id, r.fee]);
+          await launch(c, cup.id, t.format, rest, cup);
+          G.cupB = cup.id;
+        }
+      }
       const refs = t.refs && Object.keys(t.refs.at || {}).length ? Object.assign({}, t.refs, { at: Object.fromEntries(Object.entries(t.refs.at).map(([k, v]) => [/^g/.test(k) ? k : 'g' + k, v])) }) : t.refs || null;
       const boards = t.boards ? Object.assign({}, t.boards, { at: {} }) : null;
       await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = NULL, groups = $3, refs = $4, boards = $5, ready = NULL WHERE id = $1`,

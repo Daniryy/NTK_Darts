@@ -176,3 +176,17 @@ test('швейцарка: 5 игроков, 3 тура — пары по очк�
   const d = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Швейцарка 2', format: 'sw', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13', 'p14'] }), 201).tournament;
   assert.equal(d.rounds, 4);
 });
+
+test('«Кубок B»: не вышедшие из групп играют отдельный турнир, турниры связаны', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'С кубками', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2, cups: true } }), 201).tournament;
+  assert.equal(t.groups.cups, true);
+  t = await playAll(t, HOST);
+  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
+  assert.ok(t.groups.cupB);
+  const cup = ok(await call(HOST, 'GET', '/api/tournaments/' + t.groups.cupB)).tournament;
+  assert.equal(cup.parent, t.id); assert.equal(cup.status, 'live'); assert.equal(cup.format, 'ko');
+  assert.equal(cup.players.length, 4);
+  assert.ok(cup.players.every(id => !t.slots.includes(id)), 'в кубке B — не вышедшие');
+  assert.match(cup.name, /Кубок B$/);
+});
