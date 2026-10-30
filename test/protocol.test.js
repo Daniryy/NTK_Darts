@@ -88,3 +88,23 @@ test('нет сети у игрока: ведущий вносит итог по
   // поверх сыгранного — нельзя
   err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 2, lb: 0, force: true }), 409, 'game_taken');
 });
+
+test('дружеский матч: соперник из базы подтверждает участие по QR — каждый вносит свои подходы, строка засчитана сразу', async () => {
+  const id = 'gjoin' + Date.now().toString(36).padEnd(10, '0');
+  const m = ok(await call(HOST, 'PUT', '/api/matches/' + id, { mode: 301, ltw: 1, dbl: false, players: [{ id: 'p1' }, { id: 'p6' }] }), 201).match;
+  assert.equal(m.duo, false); assert.deepEqual(m.joined, []);
+  // до подтверждения подход соперника вносит тот, кто начал (за обоих)
+  err(await call(ADMIN, 'POST', '/api/matches/' + id + '/join'), 403); // не игрок матча
+  const j = ok(await call(PL, 'POST', '/api/matches/' + id + '/join')).match;
+  assert.equal(j.duo, true); assert.deepEqual(j.joined, ['p6']);
+  // теперь каждый за себя
+  err(await call(HOST, 'POST', '/api/matches/' + id + '/events', { events: [{ seq: 1, type: 'visit', leg: 1, p: 1, s: 301, pts: 60, n: 3, b: 0 }] }), 422);
+  ok(await call(HOST, 'POST', '/api/matches/' + id + '/events', { events: [{ seq: 1, type: 'visit', leg: 1, p: 0, s: 301, pts: 180, n: 3, b: 0 }] }));
+  ok(await call(PL, 'POST', '/api/matches/' + id + '/events', { events: [{ seq: 2, type: 'visit', leg: 1, p: 1, s: 301, pts: 60, n: 3, b: 0 }] }));
+  ok(await call(HOST, 'POST', '/api/matches/' + id + '/events', { events: [{ seq: 3, type: 'visit', leg: 1, p: 0, s: 121, pts: 121, n: 3, b: 0 },
+    { seq: 4, type: 'finish', w: 0, pl: [{ id: 'p1', legs: 1, pts: 301, darts: 6 }, { id: 'p6', legs: 0, pts: 60, darts: 3 }] }] }));
+  const line = (await pool.query('SELECT player_id, confirmed FROM match_lines WHERE match_id = $1 ORDER BY idx', [id])).rows;
+  assert.deepEqual(line.map(x => [x.player_id, x.confirmed]), [['p1', null], ['p6', true]]);
+  assert.ok(!ok(await call(PL, 'GET', '/api/me/confirms')).matches.some(x => x.id === id), 'подтверждать после матча не нужно');
+  err(await call(PL, 'POST', '/api/matches/' + id + '/join'), 409); // сыгран
+});

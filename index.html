@@ -2104,6 +2104,8 @@ function go(r, fromHash) {
 window.addEventListener('hashchange', () => {
   const qa = qrParse(location.hash);
   if (qa) { qrStrip(qa); if (qa.t) go('t.' + qa.t, true); qrIn(qa); return; }
+  const mj = mjoinParse(location.hash);
+  if (mj) { try { history.replaceState(null, '', location.pathname + location.search + '#play'); } catch (e) {} mjoinIn(mj); return; }
   const ma = mresParse(location.hash);
   if (ma) { try { history.replaceState(null, '', location.pathname + location.search + '#t.' + ma.tid); } catch (e) {} mresIn(ma); return; }
   const h = location.hash.slice(1);
@@ -3611,6 +3613,7 @@ function playView() {
     h += S.confirmDrop ? '<button class="ghost dng" data-act="drop-yes">Удалить</button><button class="ghost" data-act="drop-no">Нет</button>' : '<button class="ghost" data-act="drop">Удалить</button><button class="btn sm" data-act="cont">Продолжить</button>';
     h += '</div></div>';
   }
+  if (SRV && !ME) h += '<div class="note-box">Вы не вошли — игра для себя: без статистики и рейтинга. <button class="lnk" data-act="login">Войти</button>, чтобы матчи попадали в профиль.</div>';
   h += '<div class="panel"><span class="h2">Дружеский матч</span>';
   h += '<div class="field"><span class="label">Игроки</span><div class="names">';
   su.names.forEach((n, i) => {
@@ -3707,6 +3710,8 @@ function startFromSetup() {
   if (ex.k === 'x01') ex.dbl = su.dbl;
   // на сервер уходит матч, где есть вошедший игрок или другой игрок из базы
   newGame(list, { legsToWin: su.legsToWin, ex, srv: SRV && !!ME && list.some(x => x.id) }, null, 0);
+  // соперники с аккаунтом подтверждают участие по QR со своего телефона — иначе матч в их статистику не идёт без подтверждения
+  if (G.srv) { const inv = list.filter(x => x.id && x.id !== ME).map(x => x.id); if (inv.length) { G.invite = inv; saveGame(); } syncGame(); }
   // счётчик — с самого верха: «Начать игру» нажимают внизу длинной формы
   render(); toTop();
 }
@@ -4062,6 +4067,7 @@ function gameView() {
   h += '<div class="g-stats-area">' + gStatTable(g.players) + '</div></div>';
 
   if (g.tb && !g.over) h += tbOverlay(g.tb);
+  h += inviteOverlay();
   if (g.over) {
     const w = g.players[g.winner], leg = g.over === 'leg';
     h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (leg ? 'Лег ' + g.legNo + ' выигран' : 'Победитель матча') + '</span>' + (G.duo && !undo.length ? '' : '<button class="ghost sm" data-act="undo">Отменить последний бросок</button>') + '</div>' +
@@ -4137,6 +4143,48 @@ function duoBox() {
     (S.duoAll ? '<span class="meta">Соперник больше не сможет вносить сам — весь счёт будет на этом телефоне.</span><div class="row2"><button class="btn sm" data-act="duo-all">Да, вести за обоих</button><button class="ghost sm" data-act="duo-all-no">Отмена</button></div>'
       : '<button class="ghost sm" data-act="duo-ask">Вести счёт за обоих</button>') + '</div>';
 }
+// дружеский матч с соперником из базы: ждём, пока он подтвердит участие по QR со своего телефона
+const inviting = () => !!(SRV && G && G.srv && G.invite && G.invite.length && !G.duo && !G.over && !G.log.length);
+function inviteOverlay() {
+  if (!inviting()) return '';
+  const names = G.invite.map(id => (G.players.find(p => p.id === id) || {}).name || '—').map(esc).join(', ');
+  const url = location.origin + location.pathname + '#mjoin=' + G.id, two = G.players.length === 2 && G.players.every(p => p.id);
+  return '<div class="over" role="dialog" aria-modal="true" aria-label="Соперник подтверждает участие"><div class="ocard center"><div class="ohead"><span class="label">Соперник с аккаунтом</span></div>' +
+    '<h2>' + names + '</h2><p class="meta">Пусть наведёт камеру своего телефона на QR и подтвердит, что играет. ' + (two ? 'Дальше каждый вносит свои подходы со своего телефона, а матч сразу идёт в статистику обоих.' : 'Тогда матч сразу попадёт в его статистику.') + '</p>' +
+    '<div class="tvqr">' + qrHTML(url) + '</div><p class="meta" role="status"><span class="duo-dot" aria-hidden="true"></span> Ждём подтверждения…</p>' +
+    '<button class="btn alt" data-act="inv-skip">Вести счёт за обоих</button><span class="meta">Тогда соперник подтвердит матч в своём профиле после игры — до этого в его статистику он не идёт.</span></div></div>';
+}
+let invBusy = false;
+async function invitePoll() {
+  if (!inviting() || invBusy || document.hidden) return;
+  const it = Api.ob.get(G.id);
+  if (!it || it.start) return; // старт матча ещё не дошёл до сервера
+  invBusy = true;
+  try {
+    const id = G.id, r = await Api.get('/api/matches/' + encodeURIComponent(id)), m = r.match;
+    if (!G || G.id !== id || !G.invite) return;
+    const came = (m.joined || []).filter(x => G.invite.includes(x));
+    if (!came.length) return;
+    G.invite = G.invite.filter(x => !came.includes(x));
+    if (m.duo) { G.duo = true; G.me = G.players.findIndex(p => p.id === ME); }
+    saveGame();
+    toast(came.map(x => (G.players.find(p => p.id === x) || {}).name).join(', ') + (m.duo ? ' — участие подтверждено: каждый вносит свои подходы.' : ' — участие подтверждено.'));
+    render();
+  } catch (e) { /* нет сети — повторим */ } finally { invBusy = false; }
+}
+setInterval(invitePoll, 1500);
+// соперник открыл ссылку с QR: подтвердить участие и войти в игру
+async function mjoinIn(mid) {
+  if (!SRV) { toast('Это ссылка для сервера Oche.'); return; }
+  if (!ME) { S.mjoinPending = mid; toast('Войдите в свой аккаунт — и участие подтвердится.'); return svLogin(); }
+  S.mjoinPending = null;
+  try {
+    const r = await Api.post('/api/matches/' + encodeURIComponent(mid) + '/join');
+    if (r.match.duo) { if (!await duoJoin(mid)) go('m.' + mid); }
+    else { toast('Участие подтверждено — матч попадёт в вашу статистику.'); go('m.' + mid); }
+  } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message); }
+}
+const mjoinParse = h => { const m = /^#mjoin=(g[a-z0-9]{10,30})$/.exec(h); return m ? m[1] : null; };
 let duoBusy = false;
 async function duoPoll() {
   if (!(SRV && G && G.srv && G.duo) || duoBusy || document.hidden || G.over === 'match') return;
@@ -4836,6 +4884,7 @@ function loggedIn(msg) {
   ME = Api.me.id; svPlayer(Api.me); meInSetup();
   Object.keys(SVC).forEach(k => { SVC[k].at = 0; });
   closeModals(); toast(msg || 'Вы вошли как ' + Api.me.name + '.');
+  if (S.mjoinPending) setTimeout(() => mjoinIn(S.mjoinPending), 300);
 }
 function loginAct(a) {
   const L = S.login;
@@ -6257,6 +6306,7 @@ function exGameView() {
   }
   h += '</div>';
   if (st.need === 'tb' && !g.over) h += tbOverlay(st.tie);
+  h += inviteOverlay();
   if (g.over) {
     const w = g.players[g.winner], leg = g.over === 'leg', L = st.legsLog[st.legsLog.length - 1];
     const solo = n === 1;
@@ -7150,6 +7200,7 @@ document.addEventListener('click', e => {
     case 'cards-show': closeModals(); S.cardsOne = null; S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
     case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.filter(c => !S.cardsOne || c.id === S.cardsOne).map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
     case 'card-print': if (CARDS[v]) printCards([CARDS[v]], ''); break;
+    case 'inv-skip': if (G) { G.invite = null; saveGame(); toast('Ведёте счёт за обоих. Соперник подтвердит матч в своём профиле.'); render(); } break;
     case 'qra-tour': { const a = S.qrAsk; closeModals(); if (a && a.t) go('t.' + a.t); else render(); break; }
     case 'qra-login': {
       const a = S.qrAsk; closeModals();
@@ -7488,7 +7539,8 @@ async function boot() {
       if (!x || !ids.includes(x.a) || !ids.includes(x.b)) G.ctx = null;
     }
   }
-  const qa = qrParse(location.hash), ma = mresParse(location.hash);
+  const qa = qrParse(location.hash), ma = mresParse(location.hash), mj = mjoinParse(location.hash);
+  if (mj) try { history.replaceState(null, '', location.pathname + location.search + '#play'); } catch (e) {}
   if (qa) qrStrip(qa);
   if (ma) try { history.replaceState(null, '', location.pathname + location.search + '#t.' + ma.tid); } catch (e) {}
   const h = location.hash.slice(1);
@@ -7498,6 +7550,7 @@ async function boot() {
   render();
   if (qa) qrIn(qa);
   if (ma) mresIn(ma);
+  if (mj) mjoinIn(mj);
 }
 boot();
 </script>
