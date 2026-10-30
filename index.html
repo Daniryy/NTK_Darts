@@ -474,6 +474,10 @@ a.mini { text-decoration: none; }
 .champ { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .champ .pn { color: var(--fg); }
 .thead { display: grid; gap: 10px; }
+/* строка кнопок по умолчанию: с отступами, переносом и по центру по высоте */
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.act-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.act-row > .btn { flex: 1 1 auto; }
 .thead .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .back { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14px; font-weight: 500; justify-self: start; padding: 4px 0; }
 .back:hover { color: var(--fg); }
@@ -2746,7 +2750,7 @@ function tourView(id) {
       const size = isBracket(t) ? bracketSize(n) : 0;
       h += '<div style="display:grid;gap:8px;width:100%"><span class="meta">Начать: ' + n + ' ' + pl(n, 'участник', 'участника', 'участников') + (size > n ? ', сетка на ' + size + ', ' + (size - n) + ' ' + pl(size - n, 'свободное место', 'свободных места', 'свободных мест') : '') + '. Регистрация закроется.</span><div class="row2"><button class="btn sm" data-act="launch-tour" data-v="' + t.id + '">Начать</button><button class="btn sm alt" data-act="launch-no">Отмена</button></div></div>';
     } else {
-      h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (SRV && !ME ? '<button class="btn sm" data-act="login">Войти, чтобы записаться</button>' : canDo(t, 'join') || inn ? '<button class="btn sm' + (inn ? ' alt' : '') + '" data-act="join" data-v="' + t.id + '">' + (inn ? 'Отменить запись' : 'Записаться') + '</button>' : '<span class="meta">Мест нет</span>');
+      h += '<div class="act-row">' + (SRV && !ME ? '<button class="btn sm" data-act="login">Войти, чтобы записаться</button>' : canDo(t, 'join') || inn ? '<button class="btn sm' + (inn ? ' alt' : '') + '" data-act="join" data-v="' + t.id + '">' + (inn ? 'Отменить запись' : 'Записаться') + '</button>' : '<span class="meta">Мест нет</span>');
       if (canLaunch && canDo(t, 'launch')) h += '<button class="btn sm alt" data-act="launch-ask" data-v="' + t.id + '">Начать турнир</button>';
       h += '<button class="btn sm alt" data-act="ics" data-v="' + t.id + '" title="Событие в календарь телефона или компьютера">В календарь</button>';
       h += '</div>' + boardsCtl(t);
@@ -3089,7 +3093,7 @@ function qualView(t) {
       : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + '</span>' + (canDo(t, 'org') ? '<button class="btn sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить квалификацию</button>' : '') + '</div>';
   }
   const th = Array.from({ length: tries }, (_, k) => '<th>Попытка ' + (k + 1) + '</th>').join('');
-  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr><th>Место</th><th>Игрок</th>' + th + '<th>Лучший</th><th>Ср.</th></tr></thead><tbody>';
+  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr><th>Место</th><th>Игрок</th>' + th + '<th>Лучший</th>' + (tries > 1 ? '<th title="Среднее попыток: сумма, делённая на число сданных попыток">Среднее</th>' : '') + '</tr></thead><tbody>';
   order.forEach((id, k) => {
     const best = qBest(t, id), res = qRes(t, id);
     if (split && k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
@@ -3106,9 +3110,10 @@ function qualView(t) {
       }
       else cells += '<td class="muted">—</td>';
     }
-    const att = res.filter(Boolean), dt = att.length ? qVisits(ex) * 3 : 0;
-    const bestAvg = best != null && dt ? avg3(best, dt) : '—';
-    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td><td>' + bestAvg + '</td></tr>';
+    // среднее попыток: (первая + вторая) / сданных попыток
+    const att = res.filter(Boolean), mean = att.length ? att.reduce((a, x) => a + x.v, 0) / att.length : null;
+    const meanTxt = mean == null ? '—' : Number.isInteger(mean) ? String(mean) : mean.toFixed(1);
+    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td>' + (tries > 1 ? '<td>' + meanTxt + '</td>' : '') + '</tr>';
   });
   return h + '</tbody></table></div>';
 }
@@ -5610,7 +5615,7 @@ function admAccounts() {
 function admRow(p) {
   svPlayer(p);
   const meta = [p.code, p.city, p.club, p.title].filter(Boolean).join(' · ') + (p.phone ? ' · ' + showPhone(p.phone) : '') + (p.vk ? ' · VK' : '') + (p.email ? ' · ' + p.email + (p.emailOk ? ' ✓' : '') : '') + (p.login ? ' · логин ' + p.login : '');
-  return '<div class="adm-row click" role="button" tabindex="0" data-act="adm-open" data-v="' + p.id + '">' + avatar(p.id) + '<div style="min-width:0;display:grid"><span class="ell"><b>' + esc(p.name) + '</b> ' + roleChip(p.role) + (p.ver ? ' <span class="meta">✓</span>' : '') + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + '</span><span class="meta ell">' + esc(meta) + '</span>' + (p.claim ? '<span class="meta">код входа: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><span class="meta">›</span></div>';
+  return '<div class="adm-row click" role="button" tabindex="0" data-act="adm-open" data-v="' + p.id + '">' + avatar(p.id) + '<div style="min-width:0;display:grid"><span class="ell"><b>' + esc(p.name) + '</b> ' + roleChip(p.role) + (p.ver ? ' <span class="meta">✓</span>' : '') + (p.blocked ? ' <span class="rolechip r-blk">заблокирован</span>' : '') + '</span><span class="meta ell">' + esc(meta) + '</span>' + (p.claim ? '<span class="meta">QR / код: <span class="code">' + esc(p.claim) + '</span></span>' : '') + '</div><span class="meta">›</span></div>';
 }
 // карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
 const ACT_NAME = {
