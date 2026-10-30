@@ -283,6 +283,8 @@ async function main() {
   const n = (await pool.query('SELECT count(*) AS n FROM players')).rows[0].n;
   if (n > 0) { console.log('База уже заполнена (' + n + ' игроков). Для пересоздания: npm run seed -- --reset'); return; }
   const r = await tx(seed);
+  // демо-сервер: ещё турниры новых форматов — через маршруты сервера, как ведущий на сайте
+  if (process.env.DEMO === '1') await require('./demo-extra').demoExtra();
   console.log('Демо-данные: ' + r.players + ' игроков, ' + r.tours + ' турниров, ' + r.matches + ' матчей.' + (process.env.NODE_ENV === 'production' ? '' : ' Вход для разработки: ' + ME));
 }
 
