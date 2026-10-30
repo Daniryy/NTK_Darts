@@ -18,7 +18,7 @@ const MATCH_SQL = 'SELECT m.*, lp.name AS lock_name FROM matches m LEFT JOIN pla
 const matchJSON = (m, req, card) => ({
   id: m.id, status: m.status, tid: m.tournament_id, r: m.r, i: m.i, mode: m.mode, ltw: m.ltw, dbl: m.dbl, starter: m.starter,
   ex: m.ex || null, q: m.q_player ? { id: m.q_player, k: m.q_try } : null,
-  players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished, duo: !!m.duo,
+  players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished, duo: !!m.duo, joined: m.joined || [],
   lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || null, until: m.lock_until }, card: card || null
 });
 // повтор события совпадает с записанным: тот же тип, для подхода — тот же игрок, лег и очки
@@ -128,6 +128,8 @@ async function finishMatch(c, m, st, lines, now) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [m.id, l.idx, l.player_id, l.name, l.legs, l.pts, l.darts, l.f9, l.hi, l.hco, l.c180, l.c140, l.c100, l.coh, l.coa, l.bl, l.sc ? JSON.stringify(l.sc) : null]);
   }
+  // подтвердившие участие со своего телефона — матч сразу в их статистике
+  if (m.joined && m.joined.length) await c.query('UPDATE match_lines SET confirmed = true WHERE match_id = $1 AND player_id = ANY($2)', [m.id, m.joined]);
   if (m.q_player) {
     // результат попытки — итог лега; если квалификацию уже закрыли или результат внесли вручную, матч остаётся тренировкой
     const t = await tourOf(c, m.tournament_id, true);
@@ -257,6 +259,23 @@ module.exports = async function (app) {
         forget('m', m.id);
       }
       return { ok: true, seq, version: ver };
+    });
+  });
+
+  // дружеский матч: игрок из базы подтверждает участие со своего телефона (QR на экране того, кто начал матч).
+  // Его строка матча засчитается сразу; если игроков двое и оба из базы — дальше каждый вносит свои подходы
+  app.post('/api/matches/:id/join', async req => {
+    const me = needPlayer(req);
+    return tx(async c => {
+      const m = await lockMatch(c, req.params.id);
+      if (m.tournament_id) throw E.conflict('bad_state', 'В турнирном матче участие подтверждает «Готов»');
+      if (!m.players.some(p => p.id === me.id)) throw E.forbidden('Вас нет среди игроков этого матча');
+      if (m.status !== 'live') throw E.conflict('bad_state', 'Матч уже сыгран — подтвердите его в профиле');
+      const joined = [...new Set((m.joined || []).concat(m.created_by === me.id ? [] : [me.id]))];
+      const duo = m.players.length === 2 && m.players.every(p => p.id) && joined.length > 0;
+      await c.query('UPDATE matches SET joined = $2, duo = $3, version = version + 1 WHERE id = $1', [m.id, JSON.stringify(joined), duo || m.duo]);
+      forget('m', m.id);
+      return { match: matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [m.id]), req) };
     });
   });
 
