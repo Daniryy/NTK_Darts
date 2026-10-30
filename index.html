@@ -2712,7 +2712,7 @@ function tourView(id) {
   }
   const tab = tabs.some(x => x[0] === S.ttab) ? S.ttab : tabs[0][0];
   let h = '<div class="thead"><button class="back" data-act="go" data-v="tours">' + I.back + 'Турниры</button>';
-  h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
+  h += '<div class="row">' + (st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">Регистрация' + (t.regUntil ? ' до ' + fmtDate(t.regUntil) : ' открыта') + '</span>' : '<span class="pill">Завершён</span>') + '</div>';
   h += '<h1 class="h1">' + esc(t.name) + '</h1>';
   h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div><div class="meta">' + fmtLine(t) + (canDo(t, 'org') && t.status !== 'done' ? ' <button class="lnk" data-act="ltw-edit" data-v="' + t.id + '">изменить победы</button>' : '') + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
@@ -2723,7 +2723,12 @@ function tourView(id) {
     const inn = t.players.includes(ME), n = t.players.length, max = isBracket(t) ? BR_MAX : RR_MAX;
     const canLaunch = n >= 3 && n <= max;
     h += '<div><b>Записались ' + n + ' из ' + t.cap + '</b>' + (canLaunch ? '' : '<div class="meta">' + (n < 3 ? 'Для старта нужно минимум 3 участника.' : 'Слишком много участников для этого формата.') + '</div>') + '</div>';
-    if (S.confirmLaunch === t.id) {
+    // взносы как отбор: оплатили (отметили на регистрации в клубе) — пришли и играют, остальные не пришли
+    const paid = SRV && t.fees ? t.fees.paid.filter(id => t.players.includes(id)) : null;
+    if (S.confirmLaunch === t.id && paid && paid.length && paid.length < n) {
+      const m = n - paid.length;
+      h += '<div style="display:grid;gap:8px;width:100%"><span class="meta">Оплатили <b>' + paid.length + '</b> из ' + n + '. Не оплатившие (' + m + ') — значит, не пришли: начните с оплатившими, и они уберутся из турнира.</span><div class="row2"><button class="btn sm" data-act="launch-paid" data-v="' + t.id + '"' + (paid.length < 3 ? ' disabled' : '') + '>Оплатившие (' + paid.length + ')</button><button class="btn sm alt" data-act="launch-tour" data-v="' + t.id + '">Со всеми (' + n + ')</button></div>' + (paid.length < 3 ? '<span class="meta">Для старта нужно хотя бы трое оплативших.</span>' : '') + '<button class="lnk meta" data-act="launch-no">Отмена</button></div>';
+    } else if (S.confirmLaunch === t.id) {
       const size = isBracket(t) ? bracketSize(n) : 0;
       h += '<div style="display:grid;gap:8px;width:100%"><span class="meta">Начать: ' + n + ' ' + pl(n, 'участник', 'участника', 'участников') + (size > n ? ', сетка на ' + size + ', ' + (size - n) + ' ' + pl(size - n, 'свободное место', 'свободных места', 'свободных мест') : '') + '. Регистрация закроется.</span><div class="row2"><button class="btn sm" data-act="launch-tour" data-v="' + t.id + '">Начать</button><button class="btn sm alt" data-act="launch-no">Отмена</button></div></div>';
     } else {
@@ -2859,10 +2864,10 @@ function resultsText(t) {
   return t.name + (tStatus(t) === 'done' ? ' — итоги' : ' — текущее положение') + '\n' + [fmtDate(t.start), t.city, venueOf(t)].filter(Boolean).join(' · ') + '\n' + fmtLine(t) + fin + '\n\n' + rows.join('\n');
 }
 const copyResBtn = t => '<button class="mini" data-act="copy-res" data-v="' + t.id + '">' + (tStatus(t) === 'done' ? 'Скопировать итоги' : 'Скопировать положение') + '</button>';
-function launchRegTour(tid) {
+function launchRegTour(tid, paidOnly) {
   const t = TBY[tid];
   if (!t || t.status !== 'reg') return;
-  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/launch'), r => { svTourSet(r); S.ttab = null; S.tdef = null; toast(r.tournament.stage === 'qual' ? 'Турнир начался: идёт квалификация.' : 'Сетка сформирована! Турнир начался.'); });
+  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/launch', paidOnly ? { paidOnly: true } : undefined), r => { svTourSet(r); S.ttab = null; S.tdef = null; toast(r.tournament.stage === 'qual' ? 'Турнир начался: идёт квалификация.' : 'Сетка сформирована! Турнир начался.'); });
   const n = t.players.length, max = isBracket(t) ? BR_MAX : RR_MAX;
   if (n < 3) { toast('Нужно минимум 3 участника.'); return; }
   if (n > max) { toast('Для этого формата максимум ' + max + ' участников.'); return; }
@@ -5151,6 +5156,7 @@ async function clubBannerImg(cid, file) {
 function feesView(t) {
   const f = t.fees || { fee: null, paid: [] }, fee = f.fee || 0, n = f.paid.length;
   let h = '<div class="card sec"><div class="tstat"><span class="label">Взносы</span><span class="meta">видят организатор и помощники</span></div>';
+  if (t.status === 'reg') h += '<p class="meta">Регистрация в клубе: отмечайте, кто пришёл и оплатил. При старте можно начать только с ними — остальные (не пришли) уберутся из турнира.</p>';
   h += '<div class="nrow"><input class="inp" id="fee-v" inputmode="numeric" value="' + (f.fee != null ? f.fee : '') + '" placeholder="Взнос, ₽" aria-label="Взнос, рублей" style="max-width:160px"' + (canDo(t, 'org') ? '' : ' disabled') + '>' + (canDo(t, 'org') ? '<button class="mini" data-act="fee-save" data-v="' + t.id + '">Сохранить</button>' : '') + '</div>';
   h += '<div class="tiles"><div class="tile"><span class="label">Оплатили</span><span class="v">' + n + ' из ' + t.players.length + '</span></div><div class="tile"><span class="label">Касса</span><span class="v">' + rub(n * fee) + '</span><span class="s">' + (fee ? 'ждём ещё ' + rub((t.players.length - n) * fee) : 'укажите взнос') + '</span></div></div>';
   h += '<div class="list">' + t.players.slice().sort((a, b) => (f.paid.includes(a) - f.paid.includes(b)) || ((P[a] || {}).name || '').localeCompare((P[b] || {}).name || '', 'ru')).map(id => { const on = f.paid.includes(id); return '<div class="trow"><span>' + noBadge(t, id) + pid(id) + '</span><button class="mini' + (on ? ' go' : '') + '" data-act="paid" data-v="' + t.id + '|' + id + '|' + (on ? 0 : 1) + '" aria-pressed="' + on + '">' + (on ? '✓ оплатил' : 'не оплатил') + '</button></div>'; }).join('') + '</div>';
@@ -6587,6 +6593,7 @@ document.addEventListener('click', e => {
     case 'launch-ask': S.confirmLaunch = v; render(); break;
     case 'launch-no': S.confirmLaunch = null; render(); break;
     case 'launch-tour': S.confirmLaunch = null; launchRegTour(v); break;
+    case 'launch-paid': S.confirmLaunch = null; launchRegTour(v, true); break;
     case 'tour-del-ask': S.confirmDelT = v; render(); break;
     case 'tour-del-no': S.confirmDelT = null; render(); break;
     case 'tour-del': deleteTour(v); break;

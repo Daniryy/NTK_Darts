@@ -93,6 +93,18 @@ test('взносы: сумма у турнира, отметки «оплати�
   assert.equal(ok(await call(HOST, 'GET', '/api/clubs/c1')).stats.cash30, 1400, 'касса за 30 дней: двое оплатили по 700');
 });
 
+test('отбор по взносам: на регистрации отметили оплативших — старт только с ними, отметки остаются', async () => {
+  const t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Отбор', format: 'pl', mode: 501, ltw: 1, clubId: 'c1', fee: 500, reg: true, cap: 8, players: ['p6', 'p10', 'p12', 'p13', 'p7'] }), 201).tournament;
+  for (const p of ['p6', 'p10']) ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/paid', { playerId: p, paid: true }));
+  err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { paidOnly: true }), 409, 'bad_state'); // оплатили двое
+  ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/paid', { playerId: 'p12', paid: true }));
+  err(await call(PL, 'POST', '/api/tournaments/' + t.id + '/launch', { paidOnly: true }), 403);
+  const live = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { paidOnly: true })).tournament;
+  assert.equal(live.status, 'live');
+  assert.deepEqual(live.players.slice().sort(), ['p10', 'p12', 'p6']);
+  assert.deepEqual(live.fees.paid.slice().sort(), ['p10', 'p12', 'p6'], 'отметки «оплатил» не сбросились');
+});
+
 test('логотип и спонсоры клуба вместо баннеров Oche; без тарифа — снова баннеры Oche', async () => {
   ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'tv', title: 'Реклама Oche' }), 201);
   ok(await call(HOST, 'POST', '/api/clubs/c1/banners', { place: 'tv', title: 'Пиво «Дротик»' }), 201);
