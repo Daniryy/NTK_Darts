@@ -2058,7 +2058,7 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const closeModals = () => { S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
 const anyModal = () => !!(S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
@@ -2761,9 +2761,9 @@ function tourView(id) {
   else if (tab === 'fees') h += feesView(t);
   else if (tab === 'time') h += timeView(t);
   else if (tab === 'refs') h += refsView(t);
-  else if (st !== 'reg') h += cardsBtn(t) + numsView(t);
+  else if (st !== 'reg') h += addPartBox(t) + cardsBtn(t) + numsView(t);
   else {
-    h += cardsBtn(t) + '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
+    h += addPartBox(t) + cardsBtn(t) + '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (qrOneBtn(t, id) || (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге')) + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
   }
   return h + bannerHTML('tour', t.id);
 }
@@ -2841,6 +2841,27 @@ function protoPrint(w, t, d) {
     '<div class="sign"><span>Главный судья</span><span>_______________ / ' + esc(short(ch && ch.name)) + ' /</span></div>' + (pr.about ? '<div class="about">' + esc(pr.about) + '</div>' : '') +
     '<script>onload=()=>print()<\/script></body></html>');
   w.document.close();
+}
+// организатор вписывает участника: по имени (новый — лайт-профиль, войдёт по QR) или по ID; пока идёт регистрация или квалификация
+const addPartBox = t => SRV && canDo(t, 'org') && (t.status === 'reg' || t.stage === 'qual') ? '<div class="card sec"><span class="label">' + (t.stage === 'qual' ? 'Вписать опоздавшего' : 'Вписать участника') + '</span><div class="nrow"><input class="inp" id="tp-add" maxlength="32" placeholder="Имя и фамилия или ID (OCH-1234)" aria-label="Вписать участника" autocomplete="off"><button class="mini go" data-act="tp-add" data-v="' + t.id + '">Вписать</button></div><span class="meta">Нового игрока сайт заведёт как лайт-профиль: войдёт по QR-карточке — кнопка «QR» рядом с ним.</span></div>' : '';
+// QR входа для лайт-профиля участника — организатору
+const qrOneBtn = (t, id) => SRV && canDo(t, 'org') && P[id] && P[id].lite ? '<button class="mini" data-act="card-one" data-v="' + t.id + '|' + id + '" title="QR для входа игрока">QR</button>' : '';
+async function addParticipant(tid) {
+  const el = $('tp-add'), raw = el ? el.value.trim().replace(/\s+/g, ' ') : '';
+  if (raw.length < 2) { if (el) el.focus(); return; }
+  try {
+    let p;
+    if (/^och-\d+$/i.test(raw)) {
+      p = ((await Api.get('/api/players?q=' + encodeURIComponent(raw) + '&limit=5')).players || []).find(x => x.code.toLowerCase() === raw.toLowerCase());
+      if (!p) { toast('Игрок с ID ' + raw.toUpperCase() + ' не найден.'); return; }
+    } else p = (await Api.post('/api/players', { name: raw })).player;
+    svPlayer(p);
+    const r = await Api.post('/api/tournaments/' + tid + '/entries', { playerId: p.id });
+    svTourSet(r);
+    toast(p.lite ? p.name + ' вписан — лайт-профиль, QR для входа рядом с ним.' : p.name + ' вписан в турнир.');
+  } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.data && e.data.reason === 'already' ? 'Этот игрок уже в турнире.' : e.message); }
+  render();
+  const ne = $('tp-add'); if (ne) { ne.value = ''; ne.focus(); }
 }
 const cardsBtn = t => SRV && canDo(t, 'org') ? '<div class="row"><button class="mini" data-act="cards-show" data-v="' + t.id + '">QR-карточки игроков</button><span class="meta">вход для тех, у кого нет своего</span></div>' : '';
 function deleteTour(tid) {
@@ -3012,7 +3033,7 @@ function numsView(t) {
   let h = '<div class="tstat"><span class="meta">Номер игрока виден в сетке и списках — по нему удобно искать и вызывать к мишени.</span>' + (canDo(t, 'org') ? '<button class="mini" data-act="nums-reset" data-v="' + t.id + '">' + (t.stage === 'qual' || !t.games.length ? 'По порядку записи' : 'По посеву') + '</button>' : '') + '</div>';
   if (dup.size) h += '<div class="note-box warn">Повторяются номера: ' + [...dup].join(', ') + '.</div>';
   const ro = canDo(t, 'org') ? '' : ' disabled';
-  h += '<div class="card nums" style="padding:4px 14px">' + ids.map(id => '<div class="nrow2"><input class="inp" id="num-' + id + '" type="number" inputmode="numeric" min="1" max="999" value="' + numOf(t, id) + '" data-num="' + t.id + '|' + id + '" aria-label="Номер: ' + esc(P[id].name) + '"' + ro + '><div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге') + '</span></div>').join('') + '</div>';
+  h += '<div class="card nums" style="padding:4px 14px">' + ids.map(id => '<div class="nrow2"><input class="inp" id="num-' + id + '" type="number" inputmode="numeric" min="1" max="999" value="' + numOf(t, id) + '" data-num="' + t.id + '|' + id + '" aria-label="Номер: ' + esc(P[id].name) + '"' + ro + '><div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (qrOneBtn(t, id) || (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге')) + '</span></div>').join('') + '</div>';
   return h;
 }
 function setNum(tid, id, n) {
@@ -4577,10 +4598,11 @@ function cardsModal() {
   let h = '<div class="over" role="dialog" aria-modal="true" aria-label="QR-карточки игроков"><div class="ocard acard"><div class="ohead"><span class="label">QR-карточки игроков</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   const st = svState(e, 'карточек');
   if (st) return h + st + '</div></div>';
-  const { cards, others } = e.data;
+  const one = S.cardsOne, all = e.data.cards, cards = one ? all.filter(c => c.id === one) : all, others = one ? 0 : e.data.others;
+  if (one && !cards.length) return h + '<div class="note-box">Этого игрока заводили не вы — QR у того, кто его завёл.</div></div></div>';
   h += '<p class="meta">Для участников без своего входа (лайт-профиль). Игрок наводит камеру на свою карточку — входит и сразу видит турнир: свои матчи, мишень, счёт. Карточка многоразовая — подойдёт и для следующих турниров.</p>';
   if (!cards.length) return h + '<div class="note-box">' + (others ? 'Лайт-профили в этом турнире заводили другие ведущие — карточки у них.' : 'Все участники входят сами — карточки не нужны. Игроку без телефона и почты заведите аккаунт: «Управление» → «+ Новый аккаунт», и добавьте его в турнир.') + '</div></div></div>';
-  h += '<button class="btn" data-act="cards-print" data-v="' + esc(tid) + '">Печать всех (' + cards.length + ')</button><div class="qrc-list">' + cards.map(c => '<div class="qrc"><div class="qrc-q">' + qrHTML(qrLoginUrl(c.claim, tid)) + '</div><div class="qrc-t"><b>' + esc(c.name) + '</b><span class="meta">код <span class="code">' + esc(c.claim) + '</span></span></div></div>').join('') + '</div>';
+  h += '<button class="btn" data-act="cards-print" data-v="' + esc(tid) + '">' + (one ? 'Печать карточки' : 'Печать всех (' + cards.length + ')') + '</button><div class="qrc-list">' + cards.map(c => '<div class="qrc"><div class="qrc-q">' + qrHTML(qrLoginUrl(c.claim, tid)) + '</div><div class="qrc-t"><b>' + esc(c.name) + '</b><span class="meta">код <span class="code">' + esc(c.claim) + '</span></span></div></div>').join('') + '</div>';
   return h + (others ? '<p class="meta">Ещё ' + others + ' — у ведущих, которые их заводили.</p>' : '') + '</div></div>';
 }
 // свой лайт-профиль: привязать вход — станет полным
@@ -6268,7 +6290,7 @@ function svPlayer(p) {
 }
 // турнир сервера — тот же объект, что у страницы (docs/api.md, Tour)
 function svTour(tj) {
-  Object.keys(tj.roster || {}).forEach(id => { const x = tj.roster[id]; svPlayer({ id, name: x.name, city: x.city, club: x.club, r: x.r, photo: x.photo || null, title: x.title || '', walkon: x.walkon || '', pro: !!x.pro }); });
+  Object.keys(tj.roster || {}).forEach(id => { const x = tj.roster[id]; svPlayer({ id, name: x.name, city: x.city, club: x.club, r: x.r, photo: x.photo || null, title: x.title || '', walkon: x.walkon || '', pro: !!x.pro, lite: !!x.lite }); });
   TBY[tj.id] = tj;
   return tj;
 }
@@ -7092,8 +7114,10 @@ document.addEventListener('click', e => {
     case 'grp-close': svDo(Api.post('/api/tournaments/' + v + '/groups/close'), r => { svTourSet(r); S.ttab = 'grid'; toast('Сетка построена: вышли ' + r.tournament.slots.filter(Boolean).length + ' ' + pl(r.tournament.slots.filter(Boolean).length, 'игрок', 'игрока', 'игроков') + '.'); }); break;
     case 'proto-pdf': { const e = SVC['proto:' + v]; if (e && e.data && TBY[v]) protoPrint(window.open('', '_blank'), TBY[v], e.data); break; }
     case 'ttab-refs': closeModals(); go('t.' + v); S.ttab = 'refs'; render(); break;
-    case 'cards-show': closeModals(); S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
-    case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
+    case 'tp-add': addParticipant(v); break;
+    case 'card-one': { const [tid, id] = v.split('|'); closeModals(); S.cardsT = tid; S.cardsOne = id; if (SVC['cards:' + tid]) SVC['cards:' + tid].at = 0; loadQr(); render(); break; }
+    case 'cards-show': closeModals(); S.cardsOne = null; S.cardsT = v; if (SVC['cards:' + v]) SVC['cards:' + v].at = 0; loadQr(); render(); break;
+    case 'cards-print': { const e = SVC['cards:' + v]; if (e && e.data) printCards(e.data.cards.filter(c => !S.cardsOne || c.id === S.cardsOne).map(c => Object.assign({ t: v }, c)), TBY[v] ? TBY[v].name : ''); break; }
     case 'card-print': if (CARDS[v]) printCards([CARDS[v]], ''); break;
     case 'qra-tour': { const a = S.qrAsk; closeModals(); if (a && a.t) go('t.' + a.t); else render(); break; }
     case 'qra-login': {
@@ -7254,6 +7278,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
   if (e.key === 'Enter' && t && /^mail-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
+  if (e.key === 'Enter' && t && t.id === 'tp-add') { e.preventDefault(); const b = document.querySelector('[data-act="tp-add"]'); if (b) addParticipant(b.dataset.v); return; }
   if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
   if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && t && t.id === 'tfa-code') { e.preventDefault(); tfaGo(); return; }

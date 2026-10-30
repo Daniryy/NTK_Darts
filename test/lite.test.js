@@ -94,3 +94,19 @@ test('QR-карточки турнира: только организатору,
   assert.equal(ok(await call(anon(), 'POST', '/api/auth/code', { code: r.cards[1].claim })).player.id, g.id);
   clearCache();
 });
+
+test('вписанный по имени игрок — лайт-профиль; опоздавшего можно вписать, пока идёт квалификация', async () => {
+  const SCORE = { k: 'score', lim: 3 };
+  const t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Опоздавший', format: 'ko', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, players: ['p6', 'p7', 'p8'] }), 201).tournament;
+  assert.equal(t.stage, 'qual');
+  const g = ok(await call(HOST, 'POST', '/api/players', { name: 'Опоздавший Игрок' })).player;
+  assert.equal(g.lite, true);
+  err(await call(PL, 'POST', '/api/tournaments/' + t.id + '/entries', { playerId: g.id }), 403);
+  const t2 = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/entries', { playerId: g.id })).tournament;
+  assert.ok(t2.players.includes(g.id));
+  assert.equal(t2.roster[g.id].lite, true);
+  assert.equal(t2.cap, 4);
+  // QR-карточка для него — у организатора
+  const cards = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/cards')).cards;
+  assert.ok(cards.some(x => x.id === g.id && x.claim));
+});

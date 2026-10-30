@@ -326,11 +326,14 @@ module.exports = async function (app) {
       const t = await getTour(c, req.params.id, true);
       const pid = b.playerId == null ? me.id : V.id(b.playerId, 'playerId');
       if (pid !== me.id) needOwner(t, me);
-      if (t.status !== 'reg') throw E.conflict('bad_state', 'Регистрация закрыта');
+      // опоздавший: пока идёт квалификация, организатор ещё может вписать игрока — он сдаёт её вместе со всеми
+      const late = t.stage === 'qual' && pid !== me.id;
+      if (t.status !== 'reg' && !late) throw E.conflict('bad_state', 'Регистрация закрыта');
       if (!await one(c, 'SELECT 1 FROM players WHERE id = $1', [pid])) throw E.notFound('Игрок не найден');
       if (t.players.includes(pid)) throw E.conflict('conflict', 'Игрок уже записан', { reason: 'already' });
-      if (t.players.length >= t.cap) throw E.conflict('conflict', 'Мест нет', { reason: 'full' });
+      if (t.players.length >= (late ? T.maxPlayers(t.format) : t.cap)) throw E.conflict('conflict', 'Мест нет', { reason: 'full' });
       await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) VALUES ($1, $2, $3)', [t.id, pid, t.players.length + 1]);
+      if (late) await c.query('UPDATE tournaments SET cap = greatest(cap, $2) WHERE id = $1', [t.id, t.players.length + 1]);
       await bump(c, t.id);
       return tourResp(c, t.id, me);
     });
