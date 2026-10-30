@@ -58,9 +58,11 @@ async function launch(c, id, fmt, order, row) {
   const t = { players: [], games: [], layout: row.layout };
   let slots = null, groups = row.groups || null;
   if (row.groups) groupsCheck(row.groups, order.length);
+  if (fmt === 'sw' && row.rounds && row.rounds >= order.length) throw E.conflict('bad_state', 'Туров должно быть меньше, чем участников (' + order.length + ')');
   if (row.qual) t.players = order;
   else if (row.groups) groups = groupsRow(row.groups, B.drawGroups(order, row.groups.n));
-  else if (fmt === 'rr') t.players = order;
+  else if (fmt === 'rr' || fmt === 'sw') t.players = order;
+  if (fmt === 'sw' && !row.rounds) await c.query('UPDATE tournaments SET rounds = $2 WHERE id = $1', [id, Math.min(15, Math.max(1, Math.ceil(Math.log2(order.length))))]);
   else { B.setBracket(t, fmt, order, row.split); slots = t.slots; }
   await reseed(c, id, order);
   await c.query(`UPDATE tournaments SET status = 'live', slots = $2, block = $3, stage = $4, start = $5, groups = $6 WHERE id = $1`,
@@ -93,7 +95,9 @@ function tourFields(b, full, me) {
   if (full || b.name !== undefined) o.name = V.str(b.name, 'name', 1, 60);
   if (full || b.city !== undefined) o.city = V.optStr(b.city, 'city', 40);
   if (full || b.venue !== undefined) o.venue = V.optStr(b.venue, 'venue', 60);
-  if (full || b.format !== undefined) o.format = V.oneOf(b.format, 'format', ['pl', 'ko', 'rr']);
+  if (full || b.format !== undefined) o.format = V.oneOf(b.format, 'format', ['pl', 'ko', 'rr', 'de', 'sw']);
+  // швейцарка: сколько туров; не задано — по числу участников (log2, округлённо вверх)
+  if (b.rounds !== undefined) o.rounds = b.rounds == null ? null : V.int(b.rounds, 'rounds', 1, 15);
   if ((full && b.ex == null) || b.mode !== undefined) o.mode = V.oneOf(b.mode, 'mode', [301, 501, 701]);
   if (full || b.ltw !== undefined) o.ltw = V.int(b.ltw, 'ltw', 1, LTW_MAX);
   // до скольких побед по стадиям сетки: { f, sf, qf, early, places }; пустое — как общее
@@ -192,7 +196,7 @@ module.exports = async function (app) {
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
     if (f.split && f.format !== 'pl') throw E.bad('Сетки частями — только в формате pl', 'format');
-    if (f.groups && f.format === 'rr') throw E.bad('После групп — сетка: format ko или pl', 'format');
+    if (f.groups && !['ko', 'pl'].includes(f.format)) throw E.bad('После групп — сетка: format ko или pl', 'format');
     if (f.groups && f.split) throw E.bad('С группами сетка частями не делится', 'split');
     const max = T.maxPlayers(f.format);
     const ids = b.players == null && reg ? [] : b.players;
@@ -211,10 +215,10 @@ module.exports = async function (app) {
       if (b.clubId != null) Object.assign(f, await clubFields(c, b.clubId, me));
       // по умолчанию: порядок как на листе NDL; подписи A/B — у турниров с квалификацией, остальным номера
       const layout = f.layout || 'ndl', labels = f.labels || (f.qual ? 'ab' : 'num');
-      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, layout, labels, created_at, ltw_by, groups)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+      const row = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, reg_until, status, format, mode, dbl, ltw, cap, ex, qual, split, club_id, layout, labels, created_at, ltw_by, groups, rounds)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reg', $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
       [f.name, !!f.official, me.id, f.org_name || null, !!f.org_ver, f.city || me.city || '', f.venue, f.start || Date.now(), reg ? f.reg_until || null : null, f.format, f.mode || 501, f.dbl !== false, f.ltw, cap,
-        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now(), f.ltw_by ? JSON.stringify(f.ltw_by) : null, f.groups ? JSON.stringify(f.groups) : null]);
+        f.ex ? JSON.stringify(f.ex) : null, f.qual ? JSON.stringify(f.qual) : null, f.split || null, f.club_id || null, layout, labels, Date.now(), f.ltw_by ? JSON.stringify(f.ltw_by) : null, f.groups ? JSON.stringify(f.groups) : null, f.rounds || null]);
       if (f.fee != null) await c.query('UPDATE tournaments SET fee = $2 WHERE id = $1', [row.id, f.fee]);
       // мишени в зале: сразу при создании — после старта игры и квалификация распределяются по ним сами
       if (b.boards != null) {
@@ -245,7 +249,7 @@ module.exports = async function (app) {
       const qual = 'qual' in f ? f.qual : t._row.qual, split = 'split' in f ? f.split : t._row.split;
       const groups = 'groups' in f ? f.groups : t._row.groups, fmt = f.format || t.format;
       if (split && fmt !== 'pl' && !groups) throw E.bad('Сетки частями — только в формате pl', 'format');
-      if (groups && fmt === 'rr') throw E.bad('После групп — сетка: format ko или pl', 'format');
+      if (groups && !['ko', 'pl'].includes(fmt)) throw E.bad('После групп — сетка: format ko или pl', 'format');
       // с группами сетка частями не делится
       if (groups && split) f.split = null;
       ['ex', 'qual', 'ltw_by', 'groups'].forEach(k => { if (f[k]) f[k] = JSON.stringify(f[k]); });
@@ -521,7 +525,7 @@ module.exports = async function (app) {
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
       const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout }, G = t._row.groups;
       // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
-      if (G) groupsCheck(G, order.length); else if (t.format !== 'rr') B.setBracket(g, t.format, order, t.format === 'pl' ? t.split : undefined);
+      if (G) groupsCheck(G, order.length); else if (t.format !== 'rr' && t.format !== 'sw') B.setBracket(g, t.format, order, t.format === 'pl' ? t.split : undefined);
       await reseed(c, t.id, order);
       const nums = JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])));
       if (G) await c.query(`UPDATE tournaments SET stage = 'groups', groups = $2, nums = $3 WHERE id = $1`, [t.id, groupsRow(G, B.drawGroups(order, G.n)), nums]);

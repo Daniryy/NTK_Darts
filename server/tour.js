@@ -57,6 +57,7 @@ function build(row, ents, ms, qs) {
   if (row.stage) t.stage = row.stage;
   if (row.boards) t.boards = row.boards;
   if (row.refs) t.refs = row.refs;
+  if (row.rounds) t.rounds = row.rounds;
   if (row.groups) t.groups = { n: row.groups.n, adv: row.groups.adv, ids: row.groups.ids || null, done: !!row.groups.done };
   if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
@@ -79,12 +80,17 @@ function build(row, ents, ms, qs) {
   ms.forEach(m => { if (m.q_player != null && m.status === 'live') t.live['q:' + m.q_player + ':' + m.q_try] = m.id; });
   if (t.stage === 'qual') return t;
   if (t.groups && t.groups.ids) t.groups.games = B.groupGames(t.groups.ids);
+  const resOf = m => ({ la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id, avg: m.ln ? [avgOf(m.ln[0]), avgOf(m.ln[1])] : [null, null] });
   if (B.isBracket(t)) {
     t.slots = row.slots;
     if (row.block) t.block = row.block;
     t.games = B.bracketGames(t.format, t.slots.length, t.block);
-  } else t.games = t.stage === 'groups' ? t.groups.games : B.rrGames(t.players);
-  const resOf = m => ({ la: m.legs[0], lb: m.legs[1], w: m.players[m.w].id, mid: m.id, avg: m.ln ? [avgOf(m.ln[0]), avgOf(m.ln[1])] : [null, null] });
+  } else if (t.stage === 'groups') t.games = t.groups.games;
+  else if (t.format === 'sw') {
+    // швейцарка: пары каждого тура — по сыгранным турам
+    const done = new Map(ms.filter(m => m.r != null && m.r < 64 && m.status === 'done').map(m => [m.r + ':' + m.i, m]));
+    t.games = B.swissGames(t.players, t.rounds || 3, (r, i) => { const m = done.get(r + ':' + i); return m ? resOf(m) : null; });
+  } else t.games = B.rrGames(t.players);
   ms.forEach(m => {
     // матчи закрытого группового этапа
     if (m.r != null && m.r >= 64) {
@@ -101,6 +107,7 @@ function build(row, ents, ms, qs) {
 }
 
 function standings(t) {
+  if (t.format === 'sw') return B.swissTable(t.players, t.games);
   const s = {};
   t.players.forEach(id => { s[id] = { id, w: 0, lf: 0, la: 0 }; });
   t.games.forEach(g => {
@@ -121,7 +128,7 @@ function tStatus(t) {
 
 function champion(t) {
   if (tStatus(t) !== 'done') return null;
-  if (B.isBracket(t)) { const w = B.resolver(t).outcome(B.bRounds(t) - 1, 0).w; return B.isReal(w) ? w : null; }
+  if (B.isBracket(t)) { const fg = B.finalGame(t), w = B.resolver(t).outcome(fg.r, fg.i).w; return B.isReal(w) ? w : null; }
   return standings(t)[0].id;
 }
 
@@ -174,7 +181,8 @@ async function refreshTour(c, t) {
 // подписи как на странице (gameLabel)
 const koName = k => k === 1 ? 'финал' : k === 2 ? '1/2 финала' : k === 3 ? '1/4 финала' : '1/' + 2 ** (k - 1) + ' финала';
 function roundLabel(t, r) {
-  if (t.format === 'rr' || t.stage === 'groups') return 'тур ' + (r + 1);
+  if (t.format === 'rr' || t.format === 'sw' || t.stage === 'groups') return 'тур ' + (r + 1);
+  if (t.format === 'de') { const k = B.deK(t), s = B.deSide(t, r); return s === 'f' ? 'суперфинал' : s === 'w' ? (r === k - 1 ? 'финал верхней сетки' : 'верхняя · ' + koName(k - r)) : r === 3 * k - 3 ? 'финал нижней сетки' : 'нижняя · круг ' + (r - k + 1); }
   if (t.format === 'pl') return 'круг ' + (r + 1);
   return koName(B.bRounds(t) - r);
 }
@@ -210,6 +218,8 @@ const canScoreGame = (t, me, a, b) => !!me && (isStaff(t, me) || me.id === a || 
 
 // можно ли снять результат игры g: дальше нет зависящих сыгранных матчей, идущие матчи остаются готовыми
 function canClear(t, g, liveMatches) {
+  // швейцарка: и идущих матчей следующих туров быть не должно — их пары зависят от этого результата
+  if (t.format === 'sw') return B.canClear(t, g) && liveMatches.every(m => m.r <= g.r);
   return B.canClear(t, g, rv => liveMatches.every(m => {
     const lg = B.gameAt(t, m.r, m.i), s = lg && B.gameState(t, lg, rv);
     return s && s.st === 'ready' && s.a === m.players[0].id && s.b === m.players[1].id;
