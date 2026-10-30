@@ -116,3 +116,20 @@ test('«Комплексный»: квалификация → группы → 
   t = await playAll(t, HOST);
   assert.equal(t.status, 'done');
 });
+
+test('квалификация — к любому формату: ko — одна сетка по итогам, rr — таблица, pl — одна сетка без частей', async () => {
+  const SCORE = { k: 'score', lim: 3 }, ids = ['p6', 'p7', 'p8', 'p9', 'p10'];
+  const qualify = async t => { for (const [k, id] of ids.entries()) t = ok(await call(HOST, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 100 + k })).tournament; return ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/qual/close')).tournament; };
+  let ko = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'КО с квалификацией', format: 'ko', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, players: ids }), 201).tournament;
+  assert.equal(ko.stage, 'qual');
+  ko = await qualify(ko);
+  assert.equal(ko.stage, undefined); assert.equal(ko.format, 'ko');
+  assert.equal(ko.slots.length, 8); assert.equal(ko.slots[0], 'p10', 'лучший по квалификации — первый посев');
+  let rr = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Круг с квалификацией', format: 'rr', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, players: ids }), 201).tournament;
+  rr = await qualify(rr);
+  assert.equal(rr.games.length, 10); assert.deepEqual(rr.players, ['p10', 'p9', 'p8', 'p7', 'p6']);
+  let pl = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Все места, одна сетка', format: 'pl', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, split: null, players: ids }), 201).tournament;
+  assert.equal(pl.split, undefined);
+  pl = await qualify(pl);
+  assert.equal(pl.block, undefined); assert.equal(pl.slots.length, 8);
+});

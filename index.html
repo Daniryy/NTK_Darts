@@ -2141,7 +2141,7 @@ const avatar = (id, cls) => photoOf(id)
 const FMT_SHORT = { pl: 'Все места', ko: 'На вылет', rr: 'Круговая' };
 const venueOf = t => t.venue && t.venue !== 'место уточняется' ? t.venue : '';
 const grpName = t => (t.qual ? 'Квалификация + ' : '') + (t.groups.n === 1 ? 'Лига' : t.groups.n + ' ' + pl(t.groups.n, 'группа', 'группы', 'групп')) + ' + ' + (t.format === 'pl' ? 'сетка за все места' : 'сетка на вылет');
-const fmtName = t => t.groups ? grpName(t) : t.qual ? 'Квалификация + ' + ((t.cap || (t.players || []).length) > (t.split || 8) ? 'сетки по ' + (t.split || 8) : 'сетка') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
+const fmtName = t => t.groups ? grpName(t) : t.qual ? 'Квалификация + ' + (t.format === 'rr' ? 'круговая' : t.format === 'ko' ? 'сетка на вылет' : t.split && (t.cap || (t.players || []).length) > t.split ? 'сетки по ' + t.split : 'сетка за все места') : t.format === 'pl' && (t.block || t.split) ? 'Сетки по ' + (t.block || t.split) : FMT_SHORT[t.format];
 function fmtLine(t) {
   const n = t.status === 'reg' ? t.cap : t.players.length;
   return fmtName(t) + ' · ' + (t.status === 'reg' ? 'до ' : '') + n + ' ' + pl(n, 'игрок', 'игрока', 'игроков') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwInfo(t) + (t.qual ? ' · квалификация: ' + Games.label(t.qual.ex) : '');
@@ -3036,20 +3036,21 @@ function exMax(ex) {
 }
 const qVisits = ex => Games.perLeg(Games.norm(ex)) || 10;
 function qualView(t) {
-  const q = t.qual, ex = Games.norm(q.ex), tries = q.tries || 2, open = t.stage === 'qual', split = t.split || 8;
+  const q = t.qual, ex = Games.norm(q.ex), tries = q.tries || 2, open = t.stage === 'qual', split = t.format === 'pl' && t.split ? t.split : 0;
   const order = qualOrder(t), done = order.filter(id => qBest(t, id) != null).length;
-  let h = '<p class="meta">' + esc(Games.label(ex)) + ': ' + (tries > 1 ? 'каждый может сдать ' + tries + ' попытки, идёт лучший результат' : 'одна попытка') + '. Места 1–' + split + ' играют верхнюю сетку, ' + (split + 1) + '–' + 2 * split + ' — следующую и т. д.</p>';
+  let h = '<p class="meta">' + esc(Games.label(ex)) + ': ' + (tries > 1 ? 'каждый может сдать ' + tries + ' попытки, идёт лучший результат' : 'одна попытка') + '. ' + (split ? 'Места 1–' + split + ' играют верхнюю сетку, ' + (split + 1) + '–' + 2 * split + ' — следующую и т. д.' : t.groups ? 'По итогам игроки расходятся по группам змейкой.' : t.format === 'rr' ? 'По итогам — порядок в таблице.' : 'По итогам — посев в сетке: лучший с последним.') + '</p>';
   if (open) {
-    const n = t.players.length, parts = Math.ceil(n / Math.min(split, bracketSize(n)));
+    const n = t.players.length, parts = split ? Math.ceil(n / Math.min(split, bracketSize(n))) : 1;
+    const next = split ? 'Будет ' + parts + ' ' + pl(parts, 'сетка', 'сетки', 'сеток') + ' по ' + split + ' мест' : t.groups ? 'Игроки разойдутся по ' + t.groups.n + ' ' + pl(t.groups.n, 'группе', 'группам', 'группам') : t.format === 'rr' ? 'Начнётся круговая' : 'Построится сетка';
     h += S.confirmQual === t.id
-      ? '<div class="card tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? '; без результата ' + (n - done) + ' — встанут в конец по рейтингу' : '') + '. Будет ' + parts + ' ' + pl(parts, 'сетка', 'сетки', 'сеток') + ' по ' + split + ' мест, квалификация закроется.</span><div class="row2" style="width:100%"><button class="btn sm" data-act="qual-close" data-v="' + t.id + '">Построить сетки</button><button class="btn sm alt" data-act="qual-close-no">Отмена</button></div></div>'
+      ? '<div class="card tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? '; без результата ' + (n - done) + ' — встанут в конец по рейтингу' : '') + '. ' + next + ', квалификация закроется.</span><div class="row2" style="width:100%"><button class="btn sm" data-act="qual-close" data-v="' + t.id + '">' + (t.groups ? 'Разложить по группам' : t.format === 'rr' ? 'Начать круговую' : split ? 'Построить сетки' : 'Построить сетку') + '</button><button class="btn sm alt" data-act="qual-close-no">Отмена</button></div></div>'
       : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + '</span>' + (canDo(t, 'org') ? '<button class="btn sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить квалификацию</button>' : '') + '</div>';
   }
   const th = Array.from({ length: tries }, (_, k) => '<th>Попытка ' + (k + 1) + '</th>').join('');
   h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr><th>Место</th><th>Игрок</th>' + th + '<th>Лучший</th><th>Ср.</th></tr></thead><tbody>';
   order.forEach((id, k) => {
     const best = qBest(t, id), res = qRes(t, id);
-    if (k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
+    if (split && k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
     if (k === done) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">' + (open ? 'Ещё не сдали — без результата встанут в конец по рейтингу' : 'Без результата') + '</td></tr>';
     let cells = '';
     for (let j = 0; j < tries; j++) {
@@ -3083,7 +3084,8 @@ function closeQual(tid) {
   if (!t || t.stage !== 'qual') return;
   if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/qual/close'), r => { svTourSet(r); S.confirmQual = null; S.ttab = 'grid'; S.tdef = null; toast('Сетки построены по итогам квалификации.'); });
   const order = qualOrder(t);
-  setBracket(t, 'pl', order, t.split || 8);
+  if (t.format === 'rr') { t.players = order; t.games = rrGames(order); }
+  else setBracket(t, t.format || 'pl', order, (t.format || 'pl') === 'pl' ? t.split : undefined);
   t.stage = null;
   t.nums = Object.fromEntries(order.map((id, k) => [id, k + 1]));
   if (t.boards) Bracket.assignBoards(t);
@@ -3122,7 +3124,7 @@ function exRules(ex) {
   if (ex.k === 'sector') return ex.lim + ' подходов в сектор ' + ex.sec + '. Считаются попадания: одиночный — 1, дубль — 2, трипл — 3.';
   return 'Закрыть 15–20 и булл (по 3 метки), очки — по закрытым у себя и открытым у соперника.' + (ex.lim ? ' За ' + ex.lim + ' подходов не закрыли — побеждают очки, затем метки.' : '');
 }
-const isGrpFmt = v => v === 'std' || v === 'lg' || v === 'cx';
+const isGrpFmt = v => v === 'std' || v === 'lg';
 function ntSummary(nt) {
   const n = nt.sel.length, br = nt.fmt !== 'rr', max = br ? BR_MAX : RR_MAX;
   const cnt = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
@@ -3132,16 +3134,16 @@ function ntSummary(nt) {
     const gs = Bracket.drawGroups(nt.sel, nt.gn), per = Math.floor(n / nt.gn);
     if (per < Math.max(2, nt.gadv + 1)) return { ok: false, txt: 'Мало участников: в каждой группе нужно больше ' + nt.gadv + ' — выберите хотя бы ' + nt.gn * (nt.gadv + 1) };
     const gm = gs.reduce((a, g) => a + g.length * (g.length - 1) / 2, 0);
-    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), nt.fmt === 'cx' ? 'квалификация' : '', nt.gn === 1 ? 'одна группа' : cnt(nt.gn, 'группа', 'группы', 'групп') + ' по ' + per + (n % nt.gn ? '–' + (per + 1) : ''), cnt(gm, 'матч', 'матча', 'матчей') + ' в группах', 'в сетку ' + nt.gn * nt.gadv].filter(Boolean).join(' · ') };
+    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', nt.gn === 1 ? 'одна группа' : cnt(nt.gn, 'группа', 'группы', 'групп') + ' по ' + per + (n % nt.gn ? '–' + (per + 1) : ''), cnt(gm, 'матч', 'матча', 'матчей') + ' в группах', 'в сетку ' + nt.gn * nt.gadv].filter(Boolean).join(' · ') };
   }
-  if (nt.fmt === 'ndl') {
-    const parts = Math.ceil(n / Math.min(8, bracketSize(n)));
-    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), 'квалификация', cnt(parts, 'сетка', 'сетки', 'сеток') + ' по 8 мест'].join(' · ') };
+  if (nt.fmt === 'pl' && nt.split) {
+    const parts = Math.ceil(n / Math.min(nt.split, bracketSize(n)));
+    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt(parts, 'сетка', 'сетки', 'сеток') + ' по ' + nt.split + ' мест'].filter(Boolean).join(' · ') };
   }
-  if (!br) { const rounds = n % 2 ? n : n - 1; return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), cnt(rounds, 'тур', 'тура', 'туров'), cnt(n * (n - 1) / 2, 'матч', 'матча', 'матчей')].join(' · ') }; }
+  if (!br) { const rounds = n % 2 ? n : n - 1; return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников')].concat(nt.qualOn ? ['квалификация'] : [], [cnt(rounds, 'тур', 'тура', 'туров'), cnt(n * (n - 1) / 2, 'матч', 'матча', 'матчей')]).join(' · ') }; }
   const tmp = {};
   setBracket(tmp, nt.fmt, nt.sel);
-  const size = bSize(tmp), parts = [cnt(n, 'участник', 'участника', 'участников'), cnt(bRounds(tmp), 'круг', 'круга', 'кругов'), cnt(tProgress(tmp).total, 'матч', 'матча', 'матчей')];
+  const size = bSize(tmp), parts = [cnt(n, 'участник', 'участника', 'участников')].concat(nt.qualOn ? ['квалификация'] : [], [cnt(bRounds(tmp), 'круг', 'круга', 'кругов'), cnt(tProgress(tmp).total, 'матч', 'матча', 'матчей')]);
   if (size > n) parts.push(cnt(size - n, 'свободное место', 'свободных места', 'свободных мест'));
   return { ok: true, txt: parts.join(' · ') };
 }
@@ -3162,14 +3164,12 @@ function newTourView() {
   h += '<div class="field"><label class="label" for="nt-name">Название</label><input class="inp" id="nt-name" data-nt="name" maxlength="60" value="' + esc(nt.name) + '"></div>';
   h += '<div class="field"><label class="label" for="nt-venue">Место проведения</label><input class="inp" id="nt-venue" data-nt="venue" maxlength="60" value="' + esc(nt.venue) + '" placeholder="Клуб или бар"></div>';
   const FMTS = [
-    ['ndl', 'Квалификация + сетки по 8 (NDL)', 'Все сдают упражнение (лучшая из попыток), по итогам места 1–8, 9–16, 17–24… играют свои сетки.'],
-    ['pl', 'С розыгрышем всех мест', 'Проигравшие играют с проигравшими — определяются все места.'],
+    ['pl', 'С розыгрышем всех мест', 'Определяются все места: одной сеткой или сразу несколькими.'],
     ['ko', 'Олимпийская система', 'На вылет: проигравший выбывает.'],
     ['rr', 'Круговая система', 'Каждый с каждым, до ' + RR_MAX + ' участников.']
   ].concat(SRV ? [
     ['std', 'Стандарт: группы + сетка', 'В группах каждый с каждым, лучшие из каждой группы выходят в сетку.'],
-    ['lg', 'Лига: одна группа + сетка', 'Все играют каждый с каждым, лучшие выходят в сетку.'],
-    ['cx', 'Комплексный: упражнение + группы + сетка', 'Квалификация раскладывает по группам змейкой, дальше группы и сетка.']
+    ['lg', 'Лига: одна группа + сетка', 'Все играют каждый с каждым, лучшие выходят в сетку.']
   ] : []);
   h += '<div class="field"><span class="label">Формат</span><div class="fmts" role="radiogroup">' + FMTS.map(([v, l, d]) => '<button class="fmt' + (nt.fmt === v ? ' on' : '') + '" role="radio" aria-checked="' + (nt.fmt === v) + '" data-act="nt-fmt" data-v="' + v + '"><b>' + l + '</b><span>' + d + '</span></button>').join('') + '</div></div>';
   if (isGrpFmt(nt.fmt)) {
@@ -3177,16 +3177,23 @@ function newTourView() {
     h += '<div class="field"><span class="label">Выходят из каждой группы</span><div class="chips">' + chips(nt.fmt === 'lg' ? [2, 4, 8] : [1, 2, 3, 4], nt.gadv, 'nt-gadv') + '</div></div>';
     h += '<div class="field"><span class="label">Сетка после групп</span><div class="chips">' + chips(['ko', 'pl'], nt.po, 'nt-po', v => v === 'ko' ? 'На вылет' : 'С розыгрышем всех мест') + '</div><span class="meta">Не вышедшие из групп делят места после сетки — по месту в группе.</span></div>';
   }
-  if (nt.fmt === 'ndl' || nt.fmt === 'cx') {
-    h += '<div class="field"><span class="label">Квалификация</span><div class="chips">' + QUAL_CHOICES.map(([v, l]) => '<button class="chip txt' + (nt.qk === v ? ' on' : '') + '" data-act="nt-qk" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">' + esc(exRules(exFrom(nt.qk))) + '</span></div>';
+  if (nt.fmt === 'pl') {
+    h += '<div class="field"><span class="label">Как разыгрываются места</span><div class="fmts" role="radiogroup">' + [[0, 'Одна сетка', 'После каждого круга сетка делится: победители играют с победителями, проигравшие — с проигравшими. Одна перерастает в две, потом в четыре — пока не решатся все места.'], [1, 'Сразу несколько сеток', 'Участники сразу делятся на сетки по посеву или итогам квалификации: места 1–8, 9–16, 17–24… У каждой своя сетка.']]
+      .map(([v, l, d]) => '<button class="fmt' + (!!nt.split === !!v ? ' on' : '') + '" role="radio" aria-checked="' + (!!nt.split === !!v) + '" data-act="nt-splitmode" data-v="' + v + '"><b>' + l + '</b><span>' + d + '</span></button>').join('') + '</div>' +
+      (nt.split ? '<div class="chips">' + chips([4, 8, 16], nt.split, 'nt-split', v => 'по ' + v + ' мест') + '</div>' : '') + '</div>';
+  }
+  h += '<div class="field"><span class="label">Квалификация</span><div class="chips">' + chips(['0', '1'], nt.qualOn ? '1' : '0', 'nt-qual', v => v === '1' ? 'С квалификацией' : 'Без квалификации') + '</div><span class="meta">' +
+    (nt.qualOn ? 'Все сдают упражнение (идёт лучшая попытка), по итогам — ' + (isGrpFmt(nt.fmt) ? 'группы змейкой (это «Комплексный» турнир)' : nt.fmt === 'rr' ? 'порядок в таблице' : nt.fmt === 'pl' && nt.split ? 'сетки: 1–' + nt.split + ', ' + (nt.split + 1) + '–' + 2 * nt.split + '…' : 'посев в сетке') + '.' : 'Посев — по рейтингу или жеребьёвкой.') + '</span></div>';
+  if (nt.qualOn) {
+    h += '<div class="field"><span class="label">Упражнение квалификации</span><div class="chips">' + QUAL_CHOICES.map(([v, l]) => '<button class="chip txt' + (nt.qk === v ? ' on' : '') + '" data-act="nt-qk" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">' + esc(exRules(exFrom(nt.qk))) + '</span></div>';
     h += '<div class="field"><span class="label">Попыток квалификации</span><div class="chips">' + chips([1, 2], nt.tries, 'nt-tries', v => v === 1 ? 'Одна' : 'Две, идёт лучшая') + '</div></div>';
   }
-  h += '<div class="field"><span class="label">' + (nt.fmt === 'ndl' ? 'Игра в сетках' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
+  h += '<div class="field"><span class="label">' + (nt.qualOn ? 'Игра после квалификации' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips(LTW_LIST, nt.ltw, 'nt-ltw') + '</div></div>';
   if (nt.fmt !== 'rr') {
     const by = nt.ltwBy || {}, n = Object.keys(by).length;
     h += '<div class="field ltw-stg"><button class="lnk stg-tg" data-act="nt-stg-tg" aria-expanded="' + !!nt.stgOpen + '">' + (nt.stgOpen ? '▾' : '▸') + ' По стадиям сетки' + (n ? ': ' + STAGES.filter(k => by[k]).map(k => STAGE_SHORT[k] + ' до ' + by[k]).join(', ') : '') + '</button>' +
-      (nt.stgOpen ? '<p class="meta">Например: финал до 5, полуфинал до 3, ранние круги до 2. «Как все» — общее число выше.</p>' + stageLtwHTML(by, isGrpFmt(nt.fmt) ? nt.po : nt.fmt === 'ndl' ? 'pl' : nt.fmt, 'nt-stg', isGrpFmt(nt.fmt)) : '') + '</div>';
+      (nt.stgOpen ? '<p class="meta">Например: финал до 5, полуфинал до 3, ранние круги до 2. «Как все» — общее число выше.</p>' + stageLtwHTML(by, isGrpFmt(nt.fmt) ? nt.po : nt.fmt, 'nt-stg', isGrpFmt(nt.fmt)) : '') + '</div>';
   }
   if (nt.fmt !== 'rr') {
     // вид сетки: порядок матчей сверху вниз и подписи; по умолчанию — классический порядок и подписи A/B
@@ -3194,13 +3201,13 @@ function newTourView() {
     h += '<div class="field"><span class="label">Порядок матчей в сетке</span><div class="chips">' + [['std', 'Классический: 1–8, 4–5, 2–7, 3–6'], ['ndl', '1-й и 2-й по краям: 1–8, 5–4, 3–6, 7–2']].map(([v, l]) => '<button class="chip txt' + ((nt.layout || 'std') === v ? ' on' : '') + '" data-act="nt-layout" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">Пары и кто с кем играет дальше одинаковые — меняется только порядок сверху вниз.</span></div>';
     h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'Буквы: A1–A2, B1–B2'], ['num', 'Номера: №1, №2']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
   }
-  if (nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.fmt !== 'cx') h += '<div class="field"><span class="label">Посев</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
+  if (!nt.qualOn) h += '<div class="field"><span class="label">' + (nt.fmt === 'rr' ? 'Порядок в таблице' : isGrpFmt(nt.fmt) ? 'Посев по группам' : 'Посев') + '</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
     (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
   h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — с тарифом «Ведущий».</span><button class="lnk meta" data-act="go" data-v="plans" style="justify-self:start">Тарифы →</button></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
-  const sel = nt.fmt !== 'rr' && nt.fmt !== 'ndl' && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
+  const sel = !nt.qualOn && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
   h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
   if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
@@ -3229,17 +3236,17 @@ function createTour() {
   if (!sm.ok) { nt.err = sm.txt; return render(); }
   const boards = boardsFrom(nt.bcount, nt.bnames);
   if (typeof boards === 'string') { nt.err = boards; return render(); }
-  const ex = exFrom(nt.exk, nt.lim), ndl = nt.fmt === 'ndl';
+  const ex = exFrom(nt.exk, nt.lim), qual = !!nt.qualOn;
   if (SRV) {
-    const grp = isGrpFmt(nt.fmt), body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: grp ? nt.po : ndl ? 'pl' : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
+    const grp = isGrpFmt(nt.fmt), body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: grp ? nt.po : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
     if (grp) body.groups = { n: nt.gn, adv: nt.gadv };
-    if (nt.fmt === 'cx') body.qual = { ex: exFrom(nt.qk), tries: nt.tries };
+    if (qual) body.qual = { ex: exFrom(nt.qk), tries: nt.tries };
+    if (nt.fmt === 'pl') body.split = nt.split || null;
     if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) body.ltwBy = nt.ltwBy;
     if (nt.fmt !== 'rr') { body.layout = nt.layout || 'std'; body.labels = nt.labels || 'ab'; }
     if (nt.club && Api.clubs.some(c => c.id === nt.club)) body.clubId = nt.club;
     const fee = ntFee(nt);
     if (fee) body.fee = fee;
-    if (ndl) { body.qual = { ex: exFrom(nt.qk), tries: nt.tries }; body.split = 8; }
     if (boards.length) body.boards = boards;
     nt.err = '';
     return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(r.tournament.stage === 'qual' ? 'Турнир создан: начинается квалификация.' : r.tournament.stage === 'groups' ? 'Турнир создан: начинается групповой этап.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
@@ -3250,12 +3257,12 @@ function createTour() {
   if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) t.ltwBy = Object.assign({}, nt.ltwBy);
   if (nt.fmt !== 'rr') { t.layout = nt.layout || 'std'; t.labels = nt.labels || 'ab'; }
   const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
-  if (ndl) { t.players = ids.slice(); t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; t.split = 8; t.stage = 'qual'; }
+  if (qual) { t.format = nt.fmt; t.players = ids.slice(); t.games = []; t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; if (nt.fmt === 'pl' && nt.split) t.split = nt.split; t.stage = 'qual'; }
   else if (nt.fmt === 'rr') { t.players = order; t.games = rrGames(order); }
-  else setBracket(t, nt.fmt, order);
+  else setBracket(t, nt.fmt, order, nt.fmt === 'pl' ? nt.split || undefined : undefined);
   if (boards.length) t.boards = Object.assign({ n: boards.length, at: {} }, boards.every((x, k) => x === k + 1) ? {} : { names: boards });
   db.tournaments.push(t); saveDb(); recalc(); S.nt = null;
-  toast(ndl ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.');
+  toast(qual ? 'Турнир создан: начинается квалификация.' : 'Турнир создан. Можно начинать матчи.');
   go('t.' + t.id);
 }
 
@@ -6954,9 +6961,7 @@ document.addEventListener('click', e => {
     }
     case 'tplay': startTourGame(v); break;
     case 'nt-fmt':
-      if (v === 'ndl' && S.nt.fmt !== 'ndl') { S.nt.exk = 'score'; S.nt.lim = false; S.nt.ltw = 2; }
       if (isGrpFmt(v)) Object.assign(S.nt, { gn: v === 'lg' ? 1 : S.nt.gn > 1 ? S.nt.gn : 2, gadv: v === 'lg' ? 4 : S.nt.gadv && S.nt.gadv <= 4 ? S.nt.gadv : 2, po: S.nt.po || 'ko' });
-      if (v === 'cx' && !S.nt.qk) S.nt.qk = 'score';
       S.nt.fmt = v; S.nt.err = ''; render(); break;
     case 'nt-ex': S.nt.exk = v; S.nt.lim = v === 'cricket'; render(); break;
     case 'nt-lim': S.nt.lim = v === '1'; render(); break;
@@ -6964,6 +6969,9 @@ document.addEventListener('click', e => {
     case 'nt-tries': S.nt.tries = +v; render(); break;
     case 'nt-ltw': S.nt.ltw = +v; render(); break;
     case 'nt-gn': S.nt.gn = +v; render(); break;
+    case 'nt-qual': S.nt.qualOn = v === '1'; if (S.nt.qualOn && !S.nt.qk) S.nt.qk = 'score'; render(); break;
+    case 'nt-splitmode': S.nt.split = v === '1' ? 8 : 0; render(); break;
+    case 'nt-split': S.nt.split = +v; render(); break;
     case 'nt-gadv': S.nt.gadv = +v; render(); break;
     case 'nt-po': S.nt.po = v; render(); break;
     case 'nt-stg-tg': S.nt.stgOpen = !S.nt.stgOpen; render(); break;

@@ -111,7 +111,8 @@ function tourFields(b, full, me) {
     const ex = exField(q.ex, 'qual.ex');
     if (!QUAL_KINDS.includes(ex.k)) throw E.bad('Квалификация: Набор очков, Большой раунд или Сектор', 'qual.ex');
     o.qual = { ex, tries: q.tries == null ? 2 : V.int(q.tries, 'qual.tries', 1, 2) };
-    if (b.split === undefined && !o.groups) o.split = 8;
+    // по умолчанию, как в NDL, — сетки по 8 (только у розыгрыша всех мест)
+    if (b.split === undefined && !o.groups && (o.format || 'pl') === 'pl') o.split = 8;
   } else if (b.qual === null) o.qual = null;
   if (b.split != null) o.split = V.oneOf(b.split, 'split', [4, 8, 16, 32]);
   else if (b.split === null) o.split = null;
@@ -185,7 +186,7 @@ module.exports = async function (app) {
     const f = tourFields(b, true, me);
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
-    if ((f.qual || f.split) && f.format !== 'pl' && !f.groups) throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
+    if (f.split && f.format !== 'pl') throw E.bad('Сетки частями — только в формате pl', 'format');
     if (f.groups && f.format === 'rr') throw E.bad('После групп — сетка: format ko или pl', 'format');
     if (f.groups && f.split) throw E.bad('С группами сетка частями не делится', 'split');
     const max = T.maxPlayers(f.format);
@@ -238,7 +239,7 @@ module.exports = async function (app) {
       // с учётом того, что уже стоит у турнира: смена формата не должна оставить квалификацию у ko или rr
       const qual = 'qual' in f ? f.qual : t._row.qual, split = 'split' in f ? f.split : t._row.split;
       const groups = 'groups' in f ? f.groups : t._row.groups, fmt = f.format || t.format;
-      if ((qual || split) && fmt !== 'pl' && !groups) throw E.bad('Квалификация и сетки частями — только в формате pl', 'format');
+      if (split && fmt !== 'pl' && !groups) throw E.bad('Сетки частями — только в формате pl', 'format');
       if (groups && fmt === 'rr') throw E.bad('После групп — сетка: format ko или pl', 'format');
       // с группами сетка частями не делится
       if (groups && split) f.split = null;
@@ -502,13 +503,13 @@ module.exports = async function (app) {
       if (T.qualDone(t) < 2) throw E.conflict('bad_state', 'Нужны результаты хотя бы двух игроков');
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
       const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout }, G = t._row.groups;
-      // «Комплексный»: после квалификации — группы змейкой по её итогам, иначе сетки частями
-      if (G) groupsCheck(G, order.length); else B.setBracket(g, 'pl', order, t.split || 8);
+      // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
+      if (G) groupsCheck(G, order.length); else if (t.format !== 'rr') B.setBracket(g, t.format, order, t.format === 'pl' ? t.split : undefined);
       await c.query('DELETE FROM entries WHERE tournament_id = $1', [t.id]);
       await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [t.id, order]);
       const nums = JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])));
       if (G) await c.query(`UPDATE tournaments SET stage = 'groups', groups = $2, nums = $3 WHERE id = $1`, [t.id, groupsRow(G, B.drawGroups(order, G.n)), nums]);
-      else await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = $3, nums = $4 WHERE id = $1`, [t.id, JSON.stringify(g.slots), g.block || null, nums]);
+      else await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = $3, nums = $4 WHERE id = $1`, [t.id, g.slots ? JSON.stringify(g.slots) : null, g.block || null, nums]);
       await T.refreshTour(c, await getTour(c, t.id, false));
       forget('t', t.id);
       return tourResp(c, t.id, me);

@@ -82,7 +82,7 @@ let A, X, tid, tour;
 test('создание NDL: квалификация, ввод результата организатором, права', async () => {
   A = await login(ME); X = await login('p9');
   const ids = [ME, 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'];
-  err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'ko', ltw: 2, ex: SCORE, qual: { ex: SCORE }, players: ids }), 400);
+  err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'ko', ltw: 2, ex: SCORE, split: 8, players: ids }), 400); // сетки частями — только pl
   err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'pl', ltw: 2, ex: SCORE, qual: { ex: { k: 'cricket' } }, players: ids }), 400);
   err(await call(A, 'POST', '/api/tournaments', { name: 'x', format: 'pl', ltw: 2, ex: { k: 'golf' }, players: ids }), 400);
   tour = ok(await call(A, 'POST', '/api/tournaments', { name: 'NDL тест', city: 'Новоуральск', format: 'pl', ltw: 2, ex: SCORE, qual: { ex: SCORE, tries: 2 }, players: ids }), 201).tournament;
