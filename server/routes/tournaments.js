@@ -423,9 +423,13 @@ module.exports = async function (app) {
     const r = +req.params.r, i = +req.params.i;
     if (!Number.isInteger(r) || !Number.isInteger(i)) throw E.bad('r и i: целые числа');
     return tx(async c => {
+      // сначала матч, потом турнир — тот же порядок блокировок, что у счётчика
+      if (b.force === true) await c.query('SELECT id FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3 FOR UPDATE', [String(req.params.id), r, i]);
       const t = await getTour(c, req.params.id, true);
-      const busy = await one(c, 'SELECT id FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3', [t.id, r, i]);
-      if (busy) throw E.conflict('game_taken', 'Этот матч уже ведётся или сыгран', { matchId: busy.id });
+      const busy = await one(c, 'SELECT id, status FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3', [t.id, r, i]);
+      // force: результат с телефона игрока без сети («покажите ведущему») — идущий матч этой игры заменяется итогом
+      if (busy && !(b.force === true && busy.status === 'live' && T.isStaff(t, me))) throw E.conflict('game_taken', 'Этот матч уже ведётся или сыгран', { matchId: busy.id });
+      if (busy) { await c.query('DELETE FROM matches WHERE id = $1', [busy.id]); delete t.live[r + ':' + i]; }
       const x = T.readyPair(t, r, i);
       if (!x) throw E.conflict('bad_state', 'Счёт этого матча сейчас внести нельзя');
       // итог без бросков меняет рейтинг — вносит только команда турнира; игроки пары играют матч в счётчике

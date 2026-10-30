@@ -71,3 +71,20 @@ test('протокол: места и данные игроков организ
   p = ok(await call(HOST, 'GET', '/api/tournaments/' + t.id + '/protocol'));
   assert.equal(p.proto.done.p6, 'КМС');
 });
+
+test('нет сети у игрока: ведущий вносит итог поверх идущего матча (force), телефон игрока потом получает отказ', async () => {
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Без сети', format: 'ko', mode: 501, ltw: 2, players: ['p6', 'p7', 'p8', 'p9'] }), 201).tournament;
+  const m = ok(await call(HOST, 'PUT', '/api/matches/goffline000000000001', { tournamentId: t.id, r: 0, i: 0 }), 201);
+  assert.ok(m);
+  err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 2, lb: 1 }), 409, 'game_taken');
+  // force — только команде турнира
+  err(await call(PL, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 2, lb: 1, force: true }), 409, 'game_taken');
+  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 2, lb: 1, force: true })).tournament;
+  assert.equal(t.games.find(x => x.r === 0 && x.i === 0).res.la, 2);
+  assert.equal(t.live['0:0'], undefined);
+  // события с телефона, который вёл матч, больше не принимаются
+  const r = await call(HOST, 'POST', '/api/matches/goffline000000000001/events', { events: [{ seq: 1, type: 'visit', leg: 1, p: 0, s: 501, pts: 60, n: 3, b: 0 }] });
+  assert.equal(r.s, 404);
+  // поверх сыгранного — нельзя
+  err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 2, lb: 0, force: true }), 409, 'game_taken');
+});
