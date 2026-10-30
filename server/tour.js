@@ -13,7 +13,7 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon, p.lite
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
   const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished, m.started, m.quick,
@@ -231,7 +231,7 @@ const orgOf = (row, t) => ({ id: row.owner_id, name: row.org_name || row.owner_n
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me), staff = isStaff(t, me), fees = feesOn(t, me);
   const roster = {};
-  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', pro: isPro(e) }; });
+  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', lite: !!e.lite, pro: isPro(e) }; });
   const out = Object.assign({}, t, {
     org: orgOf(row, t), roster,
     can: {
