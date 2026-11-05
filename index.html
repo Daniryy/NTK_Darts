@@ -2275,8 +2275,11 @@ function renderModals() {
     h += '<div class="ohead"><span class="label">Квалификация · попытка ' + (k + 1) + '</span>' + closeBtn + '</div>';
     h += '<div class="qm-names">' + noBadge(t, id) + esc(P[id].name) + '</div><div class="meta">' + esc(Games.label(ex)) + ' · ' + Games.unit(ex).tot + ' за ' + qVisits(ex) + ' ' + pl(qVisits(ex), 'подход', 'подхода', 'подходов') + ', от 0 до ' + exMax(ex) + '</div>';
     h += '<input class="inp num" id="q-val" type="number" inputmode="numeric" min="0" max="' + exMax(ex) + '" value="' + esc(val) + '" placeholder="Результат" style="font-size:28px;text-align:center" aria-label="Результат">';
+    const lq = SRV && t.live && t.live['q:' + id + ':' + k];
+    if (had && had.mid && SRV) h += '<div class="note-box">Попытка сыграна в счётчике: <b>' + had.v + '</b>. Новый результат заменит её. <button class="lnk" data-act="minfo" data-v="' + had.mid + '">Подходы попытки</button></div>';
+    else if (lq) h += '<div class="note-box">Попытка сейчас идёт в счётчике. Сохранение остановит её и запишет этот результат. <button class="lnk" data-act="mview" data-v="' + lq + '">Открыть попытку</button></div>';
     if (err) h += '<div class="err">' + esc(err) + '</div>';
-    h += '<button class="btn" data-act="q-save">Сохранить</button>';
+    h += '<button class="btn" data-act="q-save">' + (had && had.mid && SRV || lq ? 'Заменить результат' : 'Сохранить') + '</button>';
     if (had) h += '<button class="ghost dng sm" data-act="q-del">Удалить результат' + (k + 1 < (t.qual.tries || 2) && qRes(t, id)[k + 1] ? ' и следующие попытки' : '') + '</button>';
     h += '</div></div>';
     return h;
@@ -3131,11 +3134,12 @@ function qualView(t) {
     let cells = '';
     for (let j = 0; j < tries; j++) {
       const r = res[j], ref = t.id + '|' + id + '|' + j;
-      if (r) cells += '<td><button class="qv lnk' + (r.v === best ? ' best' : ' lo') + '" data-act="' + (protoOk(r.mid) ? 'minfo' : open && canDo(t, 'org') ? 'qenter' : '') + '" data-v="' + (protoOk(r.mid) ? r.mid : ref) + '">' + r.v + '</button></td>';
+      const fix = open && canDo(t, 'org') && (SRV || !protoOk(r && r.mid));
+      if (r) cells += '<td><button class="qv lnk' + (r.v === best ? ' best' : ' lo') + '" data-act="' + (fix ? 'qenter' : protoOk(r.mid) ? 'minfo' : '') + '" data-v="' + (fix ? ref : protoOk(r.mid) ? r.mid : ref) + '"' + (fix ? ' title="Исправить результат"' : '') + '>' + r.v + '</button></td>';
       else if (open && (j === 0 || res[j - 1])) {
         const lq = SRV && t.live && t.live['q:' + id + ':' + j];
         const play = lq ? '<button class="mini go" data-act="mview" data-v="' + lq + '">' + I.clock + 'Идёт</button>' : canDo(t, 'score') && (id === ME || canDo(t, 'org')) ? '<button class="mini go" data-act="qplay" data-v="' + ref + '">Играть</button>' : '';
-        const enter = (canDo(t, 'org') || canDo(t, 'staff')) && !lq ? '<button class="mini" data-act="qenter" data-v="' + ref + '">Ввести</button>' : '';
+        const enter = (canDo(t, 'org') || canDo(t, 'staff')) && (!lq || canDo(t, 'org')) ? '<button class="mini" data-act="qenter" data-v="' + ref + '">Ввести</button>' : '';
         cells += '<td>' + (play || enter ? '<div class="gacts" style="justify-content:flex-end">' + play + enter + '</div>' : '<span class="muted">—</span>') + '</td>';
       }
       else cells += '<td class="muted">—</td>';
@@ -6238,7 +6242,8 @@ function matchView(mid) {
   if (s.tie) h += '<div class="note-box">Ничья в леге — разыгрывают булл.</div>';
   if (m.status === 'live') {
     h += '<p class="meta">Счёт ведёт: ' + esc(m.lock && m.lock.by || '—') + (m.lock && m.lock.mine ? ' (это устройство)' : '') + '. Обновляется сам.</p>';
-    if (ME && !(m.lock && m.lock.mine)) h += S.confirmTake === mid
+    if (m.lock && m.lock.mine) h += '<button class="btn" data-act="' + (G && G.id === mid ? 'go" data-v="play' : 'takeover" data-v="' + mid) + '">Продолжить вести счёт</button>';
+    else if (ME) h += S.confirmTake === mid
       ? '<div class="row2"><button class="btn" data-act="takeover" data-v="' + mid + '">Да, вести счёт здесь</button><button class="btn alt" data-act="take-no">Отмена</button></div><p class="meta">Другой телефон перестанет отправлять подходы.</p>'
       : '<button class="btn alt" data-act="take-ask" data-v="' + mid + '">Забрать ведение счёта</button>';
   } else if (m.card) h += matchCard(svMatch(m.card));
@@ -7471,7 +7476,8 @@ function saveQualEntry() {
   if (!q) return;
   const t = TBY[q.tid], max = t ? exMax(t.qual.ex) : 0, v = +String(q.val).trim();
   if (String(q.val).trim() === '' || !Number.isInteger(v) || v < 0 || v > max) { q.err = 'Введите целое число от 0 до ' + max + '.'; return render(); }
-  if (SRV) return svDo(Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/' + q.k, { v }), r => { svTourSet(r); S.qualModal = null; toast('Результат сохранён: ' + v + '.'); }).then(() => { if (S.qualModal) { S.qualModal.err = 'Не сохранилось — проверьте связь и повторите.'; render(); } });
+  const was = qRes(t, q.id)[q.k], replace = !!(SRV && ((was && was.mid) || (t.live && t.live['q:' + q.id + ':' + q.k])));
+  if (SRV) return svDo(Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/' + q.k, replace ? { v, replace } : { v }), r => { svTourSet(r); S.qualModal = null; toast('Результат сохранён: ' + v + '.'); }).then(() => { if (S.qualModal) { S.qualModal.err = 'Не сохранилось — проверьте связь и повторите.'; render(); } });
   const old = qRes(t, q.id)[q.k];
   if (old && protoOk(old.mid)) { q.err = 'Эта попытка сыграна в счётчике — её результат не меняется вручную.'; return render(); }
   if (!setQual(q.tid, q.id, q.k, { v })) { q.err = 'Квалификация уже закрыта.'; return render(); }
