@@ -165,6 +165,25 @@ test('организатор исправляет попытку из счётч
   ok(await call(A, 'DELETE', '/api/tournaments/' + tid + '/qual/p9/0'));
 });
 
+test('равенство в квалификации: без перестрелки не закрыть, перестрелка решает порядок', async () => {
+  // p5 и p7 — по одной попытке на 640: ничем не развести
+  ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p7/0', { v: 640 }));
+  const e = err(await call(A, 'POST', '/api/tournaments/' + tid + '/qual/close'), 409, 'ties');
+  assert.deepEqual(e.ties.map(g => g.slice().sort()), [['p5', 'p7']]);
+  err(await call(X, 'PUT', '/api/tournaments/' + tid + '/qual/p7/tb', { v: 3 }), 403, 'forbidden');
+  err(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p7/tb', { v: -1 }), 400);
+  ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p5/tb', { v: 1 }));
+  const t = ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p7/tb', { v: 3 })).tournament;
+  assert.deepEqual(t.qual.tb, { p5: 1, p7: 3 });
+  // равная перестрелка — снова равенство
+  ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p7/tb', { v: 1 }));
+  err(await call(A, 'POST', '/api/tournaments/' + tid + '/qual/close'), 409, 'ties');
+  // вернуть как было: p7 — 580, перестрелки сняты
+  ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p7/0', { v: 580 }));
+  for (const id of ['p5', 'p7']) ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/' + id + '/tb', { v: null }));
+  assert.equal(ok(await call(null, 'GET', '/api/tournaments/' + tid)).tournament.qual.tb, undefined);
+});
+
 test('закрытие квалификации: посев по лучшему результату, сетки по 8, номера', async () => {
   err(await call(X, 'POST', '/api/tournaments/' + tid + '/qual/close'), 403, 'forbidden');
   // идущая попытка мешает закрыть

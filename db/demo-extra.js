@@ -54,6 +54,8 @@ async function demoExtra() {
     // квалификация + сетка на вылет: идёт квалификация
     t = (await call('POST', '/api/tournaments', Object.assign({ name: 'Квалификация + олимпийская', format: 'ko', qual: { ex: { k: 'score', lim: 10 }, tries: 2 }, players: PLAYERS.slice(0, 8) }, base))).tournament;
     for (const [j, id] of PLAYERS.slice(0, 5).entries()) await call('PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 420 + j * 37 });
+    // равенство: обе попытки одинаковые — нужна перестрелка
+    for (const [id, vs] of [[PLAYERS[5], [500, 480]], [PLAYERS[6], [480, 500]]]) for (const [k, v] of vs.entries()) await call('PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/' + k, { v });
     // лайт-профиль от ведущего с QR-карточкой
     await call('POST', '/api/admin/players', { name: 'Нина Петровна', city: 'Москва' });
   } finally { await app.close(); config.rateMax = rate; }

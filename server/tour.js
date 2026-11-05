@@ -13,7 +13,7 @@ const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
 async function loadTours(c, rows) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
-  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon, p.lite
+  const ents = await all(c, `SELECT e.tournament_id, e.player_id, e.place_lo, e.place_hi, e.paid, e.qual_tb, p.name, p.city, p.club, p.rating, p.photo, p.title, p.role, p.walkon, p.lite
     FROM entries e JOIN players p ON p.id = e.player_id WHERE e.tournament_id = ANY($1) ORDER BY e.seed_no, e.player_id`, [ids]);
   // ln — [очки, дротики] строк сыгранного матча: средний набор в сетке
   const ms = await all(c, `SELECT m.id, m.tournament_id, m.r, m.i, m.q_player, m.q_try, m.status, m.players, m.legs, m.w, m.finished, m.started, m.quick,
@@ -67,6 +67,9 @@ function build(row, ents, ms, qs) {
   if (row.qual) {
     t.qual = { ex: row.qual.ex, tries: row.qual.tries, res: {} };
     qs.forEach(q => { (t.qual.res[q.player_id] = t.qual.res[q.player_id] || [])[q.try] = { v: q.v, mid: q.match_id, t: q.t }; });
+    // перестрелки при равенстве: { игрок: результат }
+    const tb = ents.filter(e => e.qual_tb != null);
+    if (tb.length) t.qual.tb = Object.fromEntries(tb.map(e => [e.player_id, e.qual_tb]));
   }
   // темп: средняя длительность матча и попытки квалификации в счётчике (мс) — для «осталось примерно»
   const dur = q => { const d = ms.filter(m => m.status === 'done' && !m.quick && (m.q_player != null) === q && m.started && m.finished).map(m => m.finished - m.started).filter(x => x > 30e3 && x < 90 * 6e4); return d.length ? Math.round(d.reduce((a, x) => a + x, 0) / d.length) : null; };
@@ -230,10 +233,26 @@ function canClear(t, g, liveMatches) {
 // сколько игроков сдали квалификацию
 const qualDone = t => t.qual ? t.players.filter(id => (t.qual.res[id] || []).some(Boolean)).length : 0;
 // порядок по квалификации: лучший результат, затем вторая попытка, затем рейтинг (как на странице)
+// ключ места в квалификации: лучший результат, вторая попытка, перестрелка (−1 — нет)
+function qualKey(t, id) {
+  const v = (t.qual.res[id] || []).filter(Boolean).map(x => x.v).sort((a, b) => b - a), tb = t.qual.tb && t.qual.tb[id];
+  return [v.length ? v[0] : -1, v.length > 1 ? v[1] : -1, tb == null ? -1 : tb];
+}
 function qualOrder(t) {
   const r = Object.fromEntries(t._ents.map(e => [e.player_id, e.rating]));
-  const key = id => { const v = (t.qual.res[id] || []).filter(Boolean).map(x => x.v).sort((a, b) => b - a); return [v.length ? v[0] : -1, v.length > 1 ? v[1] : -1]; };
-  return t.players.slice().sort((a, b) => { const ka = key(a), kb = key(b); return kb[0] - ka[0] || kb[1] - ka[1] || r[b] - r[a] || (a < b ? -1 : 1); });
+  return t.players.slice().sort((a, b) => { const ka = qualKey(t, a), kb = qualKey(t, b); return kb[0] - ka[0] || kb[1] - ka[1] || kb[2] - ka[2] || r[b] - r[a] || (a < b ? -1 : 1); });
+}
+// равенства: игроки с одинаковым лучшим результатом и второй попыткой. Решено, когда перестрелка внесена
+// всем в группе и результаты разные. Пока квалификация идёт — только среди сдавших все попытки; final — среди всех с результатом
+function qualTies(t, final) {
+  const by = {}, tb = t.qual.tb || {};
+  t.players.forEach(id => {
+    const res = (t.qual.res[id] || []).filter(Boolean);
+    if (!res.length || (!final && res.length < t.qual.tries)) return;
+    const k = qualKey(t, id).slice(0, 2).join(':');
+    (by[k] = by[k] || []).push(id);
+  });
+  return Object.values(by).filter(g => g.length > 1 && (g.some(id => tb[id] == null) || new Set(g.map(id => tb[id])).size < g.length));
 }
 
 // logo — у клуба с тарифом «Ведущий»
@@ -277,6 +296,6 @@ function tourCard(t, me) {
 }
 
 module.exports = {
-  RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour,
+  RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour, qualTies,
   roundLabel, gameLabel, isOwner, isStaff, feesOn, tourBest, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
 };
