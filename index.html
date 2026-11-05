@@ -649,6 +649,8 @@ a.mini { text-decoration: none; }
 .qtbl .qv { font-family: var(--display); font-size: 17px; font-weight: 600; }
 .qtbl .qv.best { color: var(--green); }
 .qtbl .qv.lo { color: var(--muted); font-weight: 500; }
+.qtbl .tie { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--red); border: 1px solid currentColor; white-space: nowrap; }
+.qtbl .tie.ok { color: var(--green); }
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
 .boards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .boards .num { min-width: 1.6em; text-align: center; font-size: 18px; }
@@ -2073,8 +2075,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2266,6 +2268,18 @@ function renderModals() {
     h += '<button class="ghost sm" data-act="tplay" data-v="' + tid + '|' + r + '|' + i + '">Вести счёт по броскам</button>';
     h += '</div></div>';
     return h;
+  }
+  if (S.tbModal) {
+    const { tid, id, val, err } = S.tbModal, t = TBY[tid];
+    if (!t || !t.qual || !P[id]) { S.tbModal = null; return ''; }
+    const had = t.qual.tb && t.qual.tb[id];
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Перестрелка"><div class="ocard"><div class="ohead"><span class="label">Перестрелка</span>' + closeBtn + '</div>';
+    h += '<div class="qm-names">' + noBadge(t, id) + esc(P[id].name) + '</div><div class="meta">Результат перестрелки у судьи — больше значит выше в посеве. Например, очки за подход или место в перестрелке, перевёрнутое: 1-е место — наибольшее число.</div>';
+    h += '<input class="inp num" id="tb-val" type="number" inputmode="numeric" min="0" max="9999" value="' + esc(val) + '" placeholder="Результат" style="font-size:28px;text-align:center" aria-label="Результат перестрелки">';
+    if (err) h += '<div class="err">' + esc(err) + '</div>';
+    h += '<button class="btn" data-act="tb-save">Сохранить</button>';
+    if (had != null) h += '<button class="ghost dng sm" data-act="tb-del">Убрать результат перестрелки</button>';
+    return h + '</div></div>';
   }
   if (S.qualModal) {
     const { tid, id, k, val, err } = S.qualModal, t = TBY[tid];
@@ -3101,9 +3115,25 @@ function setNum(tid, id, n) {
 const qRes = (t, id) => (t.qual && t.qual.res && t.qual.res[id]) || [];
 function qBest(t, id) { const r = qRes(t, id).filter(Boolean); return r.length ? Math.max(...r.map(x => x.v)) : null; }
 // порядок по квалификации: лучший результат, затем вторая попытка, затем рейтинг
+// ключ места: лучший результат, вторая попытка, перестрелка (−1 — нет), как на сервере
+function qKey(t, id) {
+  const r = qRes(t, id).filter(Boolean).map(x => x.v).sort((a, b) => b - a), tb = t.qual.tb && t.qual.tb[id];
+  return [r.length ? r[0] : -1, r.length > 1 ? r[1] : -1, tb == null ? -1 : tb];
+}
 function qualOrder(t) {
-  const key = id => { const r = qRes(t, id).filter(Boolean).map(x => x.v).sort((a, b) => b - a); return [r.length ? r[0] : -1, r.length > 1 ? r[1] : -1]; };
-  return t.players.filter(x => P[x]).sort((a, b) => { const ka = key(a), kb = key(b); return kb[0] - ka[0] || kb[1] - ka[1] || rt(b) - rt(a); });
+  return t.players.filter(x => P[x]).sort((a, b) => { const ka = qKey(t, a), kb = qKey(t, b); return kb[0] - ka[0] || kb[1] - ka[1] || kb[2] - ka[2] || rt(b) - rt(a); });
+}
+// равенства: одинаковые лучший результат и вторая попытка; решено, когда перестрелка у всех в группе и разная.
+// Пока идёт — только среди сдавших все попытки (как на сервере)
+function qTies(t, final) {
+  const by = {}, tries = t.qual.tries || 2, tb = t.qual.tb || {};
+  t.players.forEach(id => {
+    const n = qRes(t, id).filter(Boolean).length;
+    if (!n || (!final && n < tries)) return;
+    const k = qKey(t, id).slice(0, 2).join(':');
+    (by[k] = by[k] || []).push(id);
+  });
+  return Object.values(by).filter(g => g.length > 1 && (g.some(id => tb[id] == null) || new Set(g.map(id => tb[id])).size < g.length));
 }
 // максимум упражнения квалификации: для проверки ручного ввода
 function exMax(ex) {
@@ -3121,12 +3151,15 @@ function qualView(t) {
   if (open) {
     const n = t.players.length, parts = split ? Math.ceil(n / Math.min(split, bracketSize(n))) : 1;
     const next = split ? 'Будет ' + parts + ' ' + pl(parts, 'сетка', 'сетки', 'сеток') + ' по ' + split + ' мест' : t.groups ? 'Игроки разойдутся по ' + t.groups.n + ' ' + pl(t.groups.n, 'группе', 'группам', 'группам') : t.format === 'rr' ? 'Начнётся круговая' : 'Построится сетка';
+    const ties = qTies(t, S.confirmQual === t.id), tieNames = g => g.map(id => esc(P[id] ? P[id].name : id)).join(', ') + ' — ' + qBest(t, g[0]);
+    if (ties.length && canDo(t, 'staff')) h += '<div class="note-box"><b>Равенство в квалификации.</b> ' + ties.map(tieNames).join('; ') + '. Проведите перестрелку у судьи и внесите её результат кнопкой «Перестрелка» в строке игрока — больше значит выше.' + (S.confirmQual === t.id ? ' Закроете как есть — порядок решит рейтинг.' : '') + '</div>';
     h += S.confirmQual === t.id
       ? '<div class="card tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? '; без результата ' + (n - done) + ' — встанут в конец по рейтингу' : '') + '. ' + next + ', квалификация закроется.</span><div class="row2" style="width:100%"><button class="btn sm" data-act="qual-close" data-v="' + t.id + '">' + (t.groups ? 'Разложить по группам' : t.format === 'rr' ? 'Начать круговую' : split ? 'Построить сетки' : 'Построить сетку') + '</button><button class="btn sm alt" data-act="qual-close-no">Отмена</button></div></div>'
       : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + '</span>' + (canDo(t, 'org') ? '<button class="btn sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить квалификацию</button>' : '') + '</div>';
   }
   const th = Array.from({ length: tries }, (_, k) => '<th>Попытка ' + (k + 1) + '</th>').join('');
   h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr><th>Место</th><th>Игрок</th>' + th + '<th>Лучший</th>' + (tries > 1 ? '<th title="Среднее попыток: сумма, делённая на число сданных попыток">Среднее</th>' : '') + '</tr></thead><tbody>';
+  const tiedIds = new Set(qTies(t, !open).flat());
   order.forEach((id, k) => {
     const best = qBest(t, id), res = qRes(t, id);
     if (split && k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
@@ -3147,7 +3180,10 @@ function qualView(t) {
     // среднее попыток: (первая + вторая) / сданных попыток
     const att = res.filter(Boolean), mean = att.length ? att.reduce((a, x) => a + x.v, 0) / att.length : null;
     const meanTxt = mean == null ? '—' : Number.isInteger(mean) ? String(mean) : mean.toFixed(1);
-    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td>' + (tries > 1 ? '<td>' + meanTxt + '</td>' : '') + '</tr>';
+    const tbv = t.qual.tb && t.qual.tb[id], tied = tiedIds.has(id);
+    const tieTag = tied ? '<span class="tie" title="Равенство: нужна перестрелка">⚑ равенство</span>' : tbv != null ? '<span class="tie ok" title="Результат перестрелки">перестр. ' + tbv + '</span>' : '';
+    const tbBtn = open && canDo(t, 'staff') && (tied || tbv != null) ? ' <button class="mini" data-act="qtb" data-v="' + t.id + '|' + id + '">Перестрелка</button>' : '';
+    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + tieTag + tbBtn + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td>' + (tries > 1 ? '<td>' + meanTxt + '</td>' : '') + '</tr>';
   });
   return h + '</tbody></table></div>';
 }
@@ -3163,7 +3199,7 @@ function setQual(tid, id, k, v) {
 function closeQual(tid) {
   const t = TBY[tid];
   if (!t || t.stage !== 'qual') return;
-  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/qual/close'), r => { svTourSet(r); S.confirmQual = null; S.ttab = 'grid'; S.tdef = null; toast('Сетки построены по итогам квалификации.'); });
+  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/qual/close', qTies(t, true).length ? { force: true } : {}), r => { svTourSet(r); S.confirmQual = null; S.ttab = 'grid'; S.tdef = null; toast('Сетки построены по итогам квалификации.'); });
   const order = qualOrder(t);
   if (t.format === 'rr') { t.players = order; t.games = rrGames(order); }
   else setBracket(t, t.format || 'pl', order, (t.format || 'pl') === 'pl' ? t.split : undefined);
@@ -6736,6 +6772,13 @@ document.addEventListener('click', e => {
       break;
     }
     case 'q-save': saveQualEntry(); break;
+    case 'qtb': {
+      const [tid, id] = v.split('|'), t = TBY[tid], had = t && t.qual && t.qual.tb && t.qual.tb[id];
+      closeModals(); S.tbModal = { tid, id, val: had != null ? String(had) : '', err: '' }; render();
+      const el = $('tb-val'); if (el) el.focus();
+      break;
+    }
+    case 'tb-save': case 'tb-del': saveTb(a === 'tb-del'); break;
     case 'q-del': {
       const q = S.qualModal;
       if (q && SRV) { svDo(Api.del('/api/tournaments/' + q.tid + '/qual/' + q.id + '/' + q.k), r => { svTourSet(r); S.qualModal = null; toast('Результат удалён.'); }); break; }
@@ -7357,6 +7400,7 @@ document.addEventListener('input', e => {
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
+  if (t.id === 'tb-val' && S.tbModal) { S.tbModal.val = t.value; S.tbModal.err = ''; }
   if (t.id === 'mail-consent' && S.login) { S.login.consent = t.checked; if (S.login.err) { S.login.err = ''; render(); } return; }
   if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
   if (t.dataset && t.dataset.bnr && S.bnr) { S.bnr[t.dataset.bnr] = t.value; return; }
@@ -7471,6 +7515,18 @@ function hoverPath(id, on) {
 document.addEventListener('mouseover', e => { const el = e.target.closest && e.target.closest('[data-pid]'); if (el && el.closest('.pg, .bk, .glist')) hoverPath(el.dataset.pid, true); });
 document.addEventListener('mouseout', e => { const el = e.target.closest && e.target.closest('[data-pid]'); if (el && !el.contains(e.relatedTarget)) hoverPath(el.dataset.pid, false); });
 
+// результат перестрелки: del — снять
+function saveTb(del) {
+  const q = S.tbModal;
+  if (!q) return;
+  const t = TBY[q.tid], v = del ? null : +String(q.val).trim();
+  if (!del && (String(q.val).trim() === '' || !Number.isInteger(v) || v < 0 || v > 9999)) { q.err = 'Введите целое число от 0 до 9999.'; return render(); }
+  if (SRV) return svDo(Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/tb', { v }), r => { svTourSet(r); S.tbModal = null; toast(del ? 'Перестрелка снята.' : 'Перестрелка: ' + v + '.'); });
+  if (!t || t.stage !== 'qual') return;
+  t.qual.tb = Object.assign({}, t.qual.tb);
+  if (del) delete t.qual.tb[q.id]; else t.qual.tb[q.id] = v;
+  S.tbModal = null; saveDb(); toast(del ? 'Перестрелка снята.' : 'Перестрелка: ' + v + '.'); render();
+}
 function saveQualEntry() {
   const q = S.qualModal;
   if (!q) return;

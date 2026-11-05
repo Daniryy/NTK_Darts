@@ -502,6 +502,22 @@ module.exports = async function (app) {
     });
   });
 
+  // перестрелка при равенстве (организатор или помощник): { v } — результат, больше выше; null — снять
+  app.put('/api/tournaments/:id/qual/:pid/tb', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      const t = await getTour(c, req.params.id, true);
+      needStaff(t, me);
+      if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация закрыта');
+      if (!t.players.includes(req.params.pid)) throw E.notFound('Игрок не участвует');
+      const v = b.v === null ? null : V.int(b.v, 'v', 0, 9999);
+      await c.query('UPDATE entries SET qual_tb = $3 WHERE tournament_id = $1 AND player_id = $2', [t.id, req.params.pid, v]);
+      await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [t.id]);
+      forget('t', t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
   // удалить результат попытки и следующих (организатор); сыгранные в счётчике попытки удаляются вместе с матчем
   app.delete('/api/tournaments/:id/qual/:pid/:try', async req => {
     const me = needPlayer(req);
@@ -526,6 +542,9 @@ module.exports = async function (app) {
       needOwner(t, me);
       if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация уже закрыта');
       if (T.qualDone(t) < 2) throw E.conflict('bad_state', 'Нужны результаты хотя бы двух игроков');
+      // равенство без перестрелки: закрыть можно, только подтвердив (force) — тогда решит рейтинг
+      const ties = T.qualTies(t, true);
+      if (ties.length && !(req.body && req.body.force === true)) throw E.conflict('ties', 'Есть равенство в квалификации: проведите перестрелку или закройте как есть', { ties });
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
       const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout }, G = t._row.groups;
       // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
