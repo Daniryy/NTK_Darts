@@ -144,6 +144,27 @@ test('попытка квалификации в счётчике: 10 подхо
   assert.equal(ok(await call(null, 'GET', '/api/tournaments/' + tid)).tournament.qual.res[ME][0].v, 845);
 });
 
+test('организатор исправляет попытку из счётчика и снимает зависшую; игрок — нет', async () => {
+  const played = ok(await call(null, 'GET', '/api/tournaments/' + tid)).tournament.qual.res[ME][0].mid;
+  err(await call(X, 'PUT', '/api/tournaments/' + tid + '/qual/' + ME + '/0', { v: 900, replace: true }), 403, 'forbidden');
+  let t = ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/' + ME + '/0', { v: 900, replace: true })).tournament;
+  assert.equal(t.qual.res[ME][0].v, 900);
+  assert.ok(!t.qual.res[ME][0].mid);
+  err(await call(null, 'GET', '/api/matches/' + played), 404);
+  // теперь это обычный ручной результат — правится без replace
+  t = ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/' + ME + '/0', { v: 845 })).tournament;
+  assert.equal(t.qual.res[ME][0].v, 845);
+  // зависшая попытка в счётчике: без replace — занято, с replace — матч удалён, результат внесён
+  const id = mid();
+  ok(await call(A, 'PUT', '/api/matches/' + id, { tournamentId: tid, qual: { playerId: 'p9', try: 0 } }), 201);
+  err(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p9/0', { v: 300 }), 409, 'game_taken');
+  t = ok(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p9/0', { v: 300, replace: true })).tournament;
+  assert.equal(t.qual.res.p9[0].v, 300);
+  assert.equal(t.live['q:p9:0'], undefined);
+  err(await call(null, 'GET', '/api/matches/' + id), 404);
+  ok(await call(A, 'DELETE', '/api/tournaments/' + tid + '/qual/p9/0'));
+});
+
 test('закрытие квалификации: посев по лучшему результату, сетки по 8, номера', async () => {
   err(await call(X, 'POST', '/api/tournaments/' + tid + '/qual/close'), 403, 'forbidden');
   // идущая попытка мешает закрыть

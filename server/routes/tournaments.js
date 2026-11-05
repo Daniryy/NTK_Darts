@@ -478,21 +478,23 @@ module.exports = async function (app) {
     });
   });
 
-  // результат попытки квалификации вручную (организатор); тело { v }
+  // результат попытки квалификации вручную (организатор); тело { v, replace }
+  // replace: true — исправить попытку, сыгранную или идущую в счётчике: её матч удаляется, остаётся введённое число
   app.put('/api/tournaments/:id/qual/:pid/:try', async req => {
     const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needStaff(t, me);
       const { pid, k } = qualSlot(t, req.params);
-      const max = qualMax(t.qual.ex), v = V.int(b.v, 'v', 0, max);
+      const max = qualMax(t.qual.ex), v = V.int(b.v, 'v', 0, max), replace = b.replace === undefined ? false : V.bool(b.replace, 'replace');
       const old = await one(c, 'SELECT match_id FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k]);
-      if (old && old.match_id) throw E.conflict('game_taken', 'Эта попытка сыграна в счётчике', { matchId: old.match_id });
+      if (old && old.match_id && !replace) throw E.conflict('game_taken', 'Эта попытка сыграна в счётчике', { matchId: old.match_id });
       const live = await one(c, `SELECT id FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try = $3`, [t.id, pid, k]);
-      if (live) throw E.conflict('game_taken', 'Эта попытка идёт в счётчике', { matchId: live.id });
+      if (live && !replace) throw E.conflict('game_taken', 'Эта попытка идёт в счётчике', { matchId: live.id });
+      if (replace) await c.query('DELETE FROM matches WHERE tournament_id = $1 AND q_player = $2 AND q_try = $3', [t.id, pid, k]);
       if (k > 0 && !await one(c, 'SELECT 1 FROM qual_results WHERE tournament_id = $1 AND player_id = $2 AND try = $3', [t.id, pid, k - 1])) throw E.conflict('bad_state', 'Сначала нужна попытка ' + k);
       await c.query(`INSERT INTO qual_results (tournament_id, player_id, try, v, t) VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (tournament_id, player_id, try) DO UPDATE SET v = EXCLUDED.v, t = EXCLUDED.t`, [t.id, pid, k, v, Date.now()]);
+        ON CONFLICT (tournament_id, player_id, try) DO UPDATE SET v = EXCLUDED.v, t = EXCLUDED.t, match_id = NULL`, [t.id, pid, k, v, Date.now()]);
       // сдавшие все попытки освобождают мишень — её получает следующий
       await T.refreshTour(c, await getTour(c, t.id, false));
       forget('t', t.id);
