@@ -930,7 +930,14 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .qrbox svg { width: 100%; height: 100%; display: block; }
 .tvbox .qrbox { width: clamp(140px, 13vw, 300px); }
 .de-gf { max-width: var(--bk-w, 240px); }
-.grp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.grp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 12px; }
+/* таблица «каждый с каждым», как на бумажном листе группы: строки и столбцы — игроки по номеру, на пересечении счёт по легам */
+.tbl.xt th.xc, .tbl.xt td.xc { text-align: center; padding: 8px 4px; min-width: 40px; border-left: 1px solid var(--line); }
+.tbl.xt td.xx { background: var(--line); }
+.tbl.xt td.xw { color: var(--green); font-weight: 700; }
+.tbl.xt td.xl { color: var(--muted); }
+.tbl.xt th.xs, .tbl.xt td.xs { border-left: 1px solid var(--line-bright); }
+.tbl.xt tr.adv td.xp { color: var(--green); font-weight: 700; }
 .card.grp { padding: 10px 14px; display: grid; gap: 6px; }
 .tbl tr.adv td:first-child { color: var(--green); font-weight: 700; }
 .stg-row { display: grid; gap: 4px; margin-top: 10px; }
@@ -2186,7 +2193,7 @@ function tourEvent(t, c) {
 }
 function tourCard(t) {
   const st = tStatus(t), n = st === 'reg' ? t.players.length : t.players.length;
-  const pill = st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">до ' + fmtDate(t.regUntil) + '</span>' : '<span class="pill">' + fmtDate(lastGameTime(t)) + '</span>';
+  const pill = st === 'live' ? '<span class="pill live"><i></i>Идёт</span>' : st === 'reg' ? '<span class="pill">' + (t.regUntil ? 'до ' + fmtDate(t.regUntil) : 'запись открыта') + '</span>' : '<span class="pill">' + fmtDate(lastGameTime(t)) + '</span>';
   let h = '<div class="card tc" role="button" tabindex="0" data-act="go" data-v="t.' + t.id + '"><div class="tc-h"><h3>' + esc(t.name) + '</h3>' + pill + '</div><div class="meta">' + esc(t.city) + ' · ' + fmtDate(t.start) + ' · ' + fmtName(t).toLowerCase() + '</div>';
   const bar = (a, b, txt) => '<div class="tc-p"><div class="bar"><i style="width:' + Math.round(a / Math.max(1, b) * 100) + '%"></i></div><span class="meta">' + txt + '</span></div>';
   if (st === 'live' && t.stage === 'qual') { const d = t.players.filter(id => qBest(t, id) != null).length; h += bar(d, t.players.length, 'квалификация ' + d + '/' + t.players.length); }
@@ -2674,6 +2681,7 @@ function gamesList(t) {
 }
 function standingsView(t) {
   const sw = t.format === 'sw';
+  if (t.format === 'rr') { const pr = tProgress(t); return '<div class="card" style="padding:4px 14px">' + crossTable(t.players, t.games, standings(t), 0, pr.done === pr.total) + '</div>'; }
   let h = '<div class="card scroll" style="padding:4px 14px"><table class="tbl"><thead><tr><th>Место</th><th>Игрок</th><th>' + (sw ? 'Очки' : 'В–П') + '</th>' + (sw ? '<th title="Бухгольц: сумма очков соперников">Бух.</th>' : '') + '<th>Леги</th><th>Ср.</th></tr></thead><tbody>';
   standings(t).forEach((s, i) => { h += '<tr class="' + (s.id === ME ? 'me' : '') + '"><td>' + plcBadge(i + 1, i + 1, true) + '</td><td>' + pid(s.id) + '</td><td>' + (sw ? s.w : s.w + '–' + s.l) + '</td>' + (sw ? '<td>' + s.bh + '</td>' : '') + '<td>' + s.lf + ':' + s.la + '</td><td>' + avg3(s.pts, s.darts) + '</td></tr>'; });
   return h + '</tbody></table></div>';
@@ -2810,6 +2818,27 @@ function refsView(t) {
   return h + (staff && pool.length ? '<p class="meta">«По очереди» — матчам без судьи, кто судил меньше; игрок свой матч не судит.</p>' : '') + '</div>';
 }
 // групповой этап: таблицы групп (вышедшие в сетку отмечены), пока идёт — закрыть и построить сетку
+// rows — строки мест (id, w, l, lf, la; у круговой ещё pts и darts для среднего) в порядке мест;
+// ids — порядок строк и столбцов, как на листе; adv — сколько выходит дальше (подсветка); done — места окончательные
+function crossTable(ids, games, rows, adv, done) {
+  const by = {}, R = {}, avg = rows.length && rows[0].darts !== undefined;
+  games.forEach(g => { if (g.a && g.b) by[g.a + '|' + g.b] = g; });
+  rows.forEach((x, k) => { R[x.id] = Object.assign({ rank: k + 1 }, x); });
+  let h = '<div class="scroll"><table class="tbl xt"><thead><tr><th>№</th><th>Игрок</th>' + ids.map((_, j) => '<th class="xc">' + (j + 1) + '</th>').join('') +
+    '<th class="xs">В–П</th><th>Леги</th>' + (avg ? '<th>Ср.</th>' : '') + '<th>Место</th></tr></thead><tbody>';
+  ids.forEach((x, i) => {
+    const s = R[x];
+    h += '<tr class="' + (x === ME ? 'me' : '') + (s.rank <= adv ? ' adv' : '') + '"><td>' + (i + 1) + '</td><td>' + pid(x) + '</td>' + ids.map((y, j) => {
+      if (i === j) return '<td class="xc xx" aria-hidden="true"></td>';
+      const g = by[x + '|' + y] || by[y + '|' + x];
+      if (!g || !g.res) return '<td class="xc"></td>';
+      const [a, b] = g.a === x ? [g.res.la, g.res.lb] : [g.res.lb, g.res.la];
+      return '<td class="xc ' + (g.res.w === x ? 'xw' : 'xl') + '">' + a + ':' + b + '</td>';
+    }).join('') + '<td class="xs">' + s.w + '–' + s.l + '</td><td>' + s.lf + ':' + s.la + '</td>' + (avg ? '<td>' + avg3(s.pts, s.darts) + '</td>' : '') +
+      '<td class="xp">' + (done ? plcBadge(s.rank, s.rank, true) : '<span class="muted">' + s.rank + '</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
 function groupsView(t) {
   const G = t.groups, games = G.games || [], open = t.stage === 'groups';
   let h = '<div class="tstat"><span class="meta">Места в группе — по победам, затем по разнице легов. В сетку ' + (open ? 'выходят' : 'вышли') + ' ' + G.adv + ' из каждой группы' + (G.n > 1 ? '' : '') + '.</span></div>';
@@ -2820,8 +2849,7 @@ function groupsView(t) {
   }
   h += '<div class="grp-grid">' + G.ids.map((ids, k) => {
     const gg = games.filter(g => g.grp === k), tb = Bracket.table(ids, gg), left = gg.filter(g => !g.res).length;
-    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + (left ? '<span class="meta">осталось ' + left + '</span>' : '<span class="meta">сыграна</span>') + '</div><div class="scroll"><table class="tbl"><thead><tr><th>#</th><th>Игрок</th><th>И</th><th>В–П</th><th>Леги</th></tr></thead><tbody>' +
-      tb.map((s, i) => '<tr class="' + (s.id === ME ? 'me' : '') + (i < G.adv ? ' adv' : '') + '"><td>' + (i + 1) + '</td><td>' + pid(s.id) + '</td><td>' + s.n + '</td><td>' + s.w + '–' + s.l + '</td><td>' + s.lf + ':' + s.la + '</td></tr>').join('') + '</tbody></table></div></div>';
+    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + (left ? '<span class="meta">осталось ' + left + '</span>' : '<span class="meta">сыграна</span>') + '</div>' + crossTable(ids, gg, tb, G.adv, !left) + '</div>';
   }).join('') + '</div>';
   return h;
 }
@@ -3177,9 +3205,16 @@ const isGrpFmt = v => v === 'std' || v === 'lg';
 function ntSummary(nt) {
   const n = nt.sel.length, br = nt.fmt !== 'rr', max = br ? BR_MAX : RR_MAX;
   const cnt0 = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
-  if (n >= 3 && nt.fmt === 'sw') { const R = nt.rounds || Math.max(1, Math.ceil(Math.log2(n))); if (R >= n) return { ok: false, txt: 'Туров должно быть меньше, чем участников' }; return { ok: true, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(R, 'тур', 'тура', 'туров'), cnt0(R * Math.floor(n / 2), 'матч', 'матча', 'матчей')].filter(Boolean).join(' · ') }; }
-  if (n >= 3 && nt.fmt === 'de') return { ok: n <= max, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(2 * n - 2, 'матч', 'матча', 'матчей'), 'суперфинал'].filter(Boolean).join(' · ') };
+  if (n >= 3 && nt.fmt === 'sw' && !nt.reg) { const R = nt.rounds || Math.max(1, Math.ceil(Math.log2(n))); if (R >= n) return { ok: false, txt: 'Туров должно быть меньше, чем участников' }; return { ok: true, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(R, 'тур', 'тура', 'туров'), cnt0(R * Math.floor(n / 2), 'матч', 'матча', 'матчей')].filter(Boolean).join(' · ') }; }
+  if (n >= 3 && nt.fmt === 'de' && !nt.reg) return { ok: n <= max, txt: [cnt0(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', cnt0(2 * n - 2, 'матч', 'матча', 'матчей'), 'суперфинал'].filter(Boolean).join(' · ') };
   const cnt = (k, a, b, c) => k + ' ' + pl(k, a, b, c);
+  // открытая регистрация: участники запишутся сами, вписать сразу можно не всех (или никого)
+  if (nt.reg) {
+    const cap = +nt.cap;
+    if (!Number.isInteger(cap) || cap < 3 || cap > max) return { ok: false, txt: 'Мест — от 3 до ' + max };
+    if (n > cap) return { ok: false, txt: 'Вписано больше, чем мест: ' + n + ' из ' + cap };
+    return { ok: true, txt: ['Открытая регистрация', 'до ' + cnt(cap, 'места', 'мест', 'мест'), n ? 'вписано ' + n : 'игроки запишутся сами', nt.qualOn ? 'квалификация' : ''].filter(Boolean).join(' · ') };
+  }
   if (n < 3) return { ok: false, txt: 'Выберите минимум 3 участника' };
   if (n > max) return { ok: false, txt: 'Для этого формата максимум ' + max + ' участников' };
   if (isGrpFmt(nt.fmt)) {
@@ -3263,8 +3298,20 @@ function newTourView() {
   h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — с тарифом «Ведущий».</span><button class="lnk meta" data-act="go" data-v="plans" style="justify-self:start">Тарифы →</button></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
+  if (SRV) {
+    const capMax = nt.fmt === 'rr' ? RR_MAX : BR_MAX;
+    h += '<div class="field"><span class="label">Участники</span><div class="chips">' + [['sel', 'Выбрать сейчас'], ['reg', 'Открытая регистрация']].map(([v, l]) => '<button class="chip txt' + ((nt.reg ? 'reg' : 'sel') === v ? ' on' : '') + '" data-act="nt-regmode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+    if (nt.reg) {
+      h += '<span class="meta">Турнир появится во вкладке «Регистрация», игроки запишутся сами. Когда соберутся — «Начать» на странице турнира' + (nt.feeOn ? '; можно начать только с оплатившими' : '') + '.</span>';
+      h += '<div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Мест</span><input class="inp" id="nt-cap" data-nt="cap" inputmode="numeric" maxlength="2" value="' + esc(nt.cap || '') + '" placeholder="16"></label>' +
+        '<label class="nt-bl"><span class="meta">Начало</span><input class="inp" id="nt-start" data-nt="startAt" type="datetime-local" value="' + esc(nt.startAt || '') + '"></label></div>' +
+        '<label style="display:grid;gap:4px"><span class="meta">Запись до (необязательно)</span><input class="inp" id="nt-regu" data-nt="regUntil" type="datetime-local" value="' + esc(nt.regUntil || '') + '" style="max-width:260px"></label>' +
+        '<span class="meta">Мест — от 3 до ' + capMax + '.</span>';
+    }
+    h += '</div>';
+  }
   const sel = !nt.qualOn && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
-  h += '<div class="field"><div class="tstat"><span class="label">Участники · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
+  h += '<div class="field"><div class="tstat"><span class="label">' + (SRV && nt.reg ? 'Вписать сразу (необязательно)' : 'Участники') + ' · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
   if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
   if (SRV && Api.perm('host_nums')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
@@ -3305,8 +3352,14 @@ function createTour() {
     const fee = ntFee(nt);
     if (fee) body.fee = fee;
     if (boards.length) body.boards = boards;
+    if (nt.reg) {
+      const at = v => { const x = v ? new Date(v).getTime() : NaN; return Number.isFinite(x) ? x : null; };
+      body.reg = true; body.cap = +nt.cap;
+      if (at(nt.startAt)) body.start = at(nt.startAt);
+      if (at(nt.regUntil)) body.regUntil = at(nt.regUntil);
+    }
     nt.err = '';
-    return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(r.tournament.stage === 'qual' ? 'Турнир создан: начинается квалификация.' : r.tournament.stage === 'groups' ? 'Турнир создан: начинается групповой этап.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
+    return svDo(Api.post('/api/tournaments', body), r => { svTourSet(r); S.nt = null; toast(r.tournament.status === 'reg' ? 'Турнир создан: открыта регистрация.' : r.tournament.stage === 'qual' ? 'Турнир создан: начинается квалификация.' : r.tournament.stage === 'groups' ? 'Турнир создан: начинается групповой этап.' : 'Турнир создан. Можно начинать матчи.'); go('t.' + r.tournament.id); });
   }
   const t = { id: 'u' + uid(), name: nt.name.trim(), official: false, org: { name: meP().name, ver: false }, city: (nt.city || meP().city || '').trim() || '—', venue: (nt.venue || '').trim(), start: Date.now(), dbl: true, mode: ex.k === 'x01' ? ex.mode : 501, ltw: nt.ltw, status: null, cap: ids.length, format: ndl ? 'pl' : nt.fmt, players: [], games: [] };
   if (!(ex.k === 'x01' && !ex.lim)) t.ex = ex;
@@ -3600,7 +3653,7 @@ function roomCard() {
   if (!t) return '';
   const st = tStatus(t);
   if (st === 'done') { roomSet(null); return ''; }
-  return '<div class="card room"><div class="tstat"><div style="display:grid;gap:2px;min-width:0"><span class="label">Ваш турнир</span><b>' + esc(t.name) + '</b><span class="meta">' + (st === 'live' ? 'Идёт' : 'Регистрация до ' + fmtDate(t.regUntil)) + '</span></div>' +
+  return '<div class="card room"><div class="tstat"><div style="display:grid;gap:2px;min-width:0"><span class="label">Ваш турнир</span><b>' + esc(t.name) + '</b><span class="meta">' + (st === 'live' ? 'Идёт' : t.regUntil ? 'Регистрация до ' + fmtDate(t.regUntil) : 'Регистрация открыта') + '</span></div>' +
     '<div class="row"><button class="btn sm" data-act="go" data-v="t.' + esc(id) + '">Вернуться в турнир</button><button class="ghost sm" data-act="room-off" title="Вкладка «Турниры» снова ведёт в общий список">Забыть</button></div></div>' + tourBar(t) + '</div>' + (st === 'live' && !(myGame(t) && liveCtxIs(t.id, myGame(t).g.r, myGame(t).g.i)) ? yourMatch(t) : '');
 }
 function playView() {
@@ -7027,6 +7080,7 @@ document.addEventListener('click', e => {
     }
     case 'nt-club': if (S.nt) { S.nt.club = v; render(); } break;
     case 'nt-feeon': if (S.nt) { S.nt.feeOn = v === '1'; render(); } break;
+    case 'nt-regmode': if (S.nt) { S.nt.reg = v === 'reg'; if (S.nt.reg && !S.nt.cap) S.nt.cap = String(S.nt.fmt === 'rr' ? RR_MAX : 16); render(); } break;
     case 't-labels': {
       const [tid, lab] = v.split('|'), t = TBY[tid];
       if (!t) break;
@@ -7270,7 +7324,13 @@ document.addEventListener('input', e => {
       pill.className = 'p-resolve ' + pr.cls; pill.innerHTML = pr.txt; pill.hidden = !pr.txt;
     }
   }
-  if (t.dataset && t.dataset.nt && S.nt) S.nt[t.dataset.nt] = t.value;
+  if (t.dataset && t.dataset.nt && S.nt) {
+    S.nt[t.dataset.nt] = t.value;
+    if (t.dataset.nt === 'cap') {
+      const sm = ntSummary(S.nt), foot = document.querySelector('.nt-foot');
+      if (foot) { const m = foot.querySelector('.meta'), b = foot.querySelector('[data-act="nt-create"]'); if (m) { m.textContent = sm.txt; m.style.color = sm.ok ? '' : 'var(--red)'; } if (b) b.disabled = !sm.ok; }
+    }
+  }
   if (t.dataset && t.dataset.ntq && S.nt && SRV) {
     // на сервере — поиск после паузы в наборе
     S.nt.q = t.value;
