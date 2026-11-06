@@ -190,3 +190,15 @@ test('«Кубок B»: не вышедшие из групп играют от�
   assert.ok(cup.players.every(id => !t.slots.includes(id)), 'в кубке B — не вышедшие');
   assert.match(cup.name, /Кубок B$/);
 });
+
+test('ручной посев: при создании — в порядке списка; при старте регистрации — порядок организатора', async () => {
+  const ids = ['p9', 'p6', 'p8', 'p7'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Ручной посев', format: 'ko', mode: 501, ltw: 1, seed: 'm', players: ids }), 201).tournament;
+  assert.deepEqual(t.players, ids);
+  // регистрация: записались четверо, организатор расставил троих — четвёртый в конец по рейтингу
+  t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Посев после записи', format: 'pl', mode: 501, ltw: 1, reg: true, cap: 8, players: ['p6', 'p7', 'p8', 'p9'] }), 201).tournament;
+  err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { seed: 'm', order: 'p9' }), 400);
+  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { seed: 'm', order: ['p8', 'p9', 'p6', 'x404'] })).tournament;
+  assert.deepEqual(t.players, ['p8', 'p9', 'p6', 'p7']);
+  assert.deepEqual(B.resolver(t).players(0, 0), ['p8', 'p7'], 'первый против последнего');
+});

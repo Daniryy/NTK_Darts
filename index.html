@@ -1349,6 +1349,14 @@ img.av { object-fit: cover; padding: 0; }
 .fmt span { color: var(--muted); font-size: 13px; }
 .pick[hidden] { display: none; }
 .selchips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* ручной посев: список с номерами и стрелками */
+.seedl { display: grid; gap: 4px; }
+.seedl .sr { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 10px; background: var(--surface2); }
+.seedl .sr b { font-family: var(--display); text-align: center; color: var(--muted); }
+.seedl .sr span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seedl .sr .gacts { display: flex; flex-direction: row; gap: 4px; }
+.qtbl th .sortb { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.qtbl th .sortb.on { color: var(--text); }
 .selchip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px 5px 5px; border-radius: 999px; border: 1.5px solid var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface2)); font-size: 13.5px; font-weight: 500; max-width: 100%; }
 .selchip b { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 999px; background: var(--surface); font-family: var(--display); font-size: 12px; font-weight: 600; }
 .selchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1679,7 +1687,7 @@ const ltwTxt = n => 'до ' + n + ' ' + pl(n, 'победы', 'побед', 'п�
 // стадии сетки для «до скольких побед»: от ранних кругов к финалу, матчи за места — у формата с розыгрышем всех мест
 const STAGE_NAME = { groups: 'Групповой этап', early: 'Ранние круги', qf: 'Четвертьфинал', sf: 'Полуфинал', f: 'Финал', places: 'Матчи за места' };
 const STAGE_SHORT = { groups: 'группы', early: 'ранние', qf: '¼', sf: '½', f: 'финал', places: 'за места' };
-const LTW_LIST = [1, 2, 3, 4, 5, 6, 7, 9, 11];
+const LTW_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 const ltwStages = (fmt, grp) => (grp ? ['groups'] : []).concat(fmt === 'rr' || fmt === 'sw' ? [] : STAGES.filter(k => k !== 'groups' && (k !== 'places' || fmt === 'pl') && (k !== 'qf' || fmt !== 'de')));
 const ltwInfo = t => ltwTxt(t.ltw) + (t.ltwBy && Object.keys(t.ltwBy).length ? ' (' + STAGES.filter(k => t.ltwBy[k]).map(k => STAGE_SHORT[k] + ' — до ' + t.ltwBy[k]).join(', ') + ')' : '');
 // выбор «до скольких побед» по стадиям: act|стадия|число ('' — как общее)
@@ -2770,11 +2778,20 @@ function tourView(id) {
     h += '<div><b>Записались ' + n + ' из ' + t.cap + '</b>' + (canLaunch ? '' : '<div class="meta">' + (n < 3 ? 'Для старта нужно минимум 3 участника.' : 'Слишком много участников для этого формата.') + '</div>') + '</div>';
     // взносы как отбор: оплатили (отметили на регистрации в клубе) — пришли и играют, остальные не пришли
     const paid = SRV && t.fees ? t.fees.paid.filter(id => t.players.includes(id)) : null;
+    // посев при старте (без квалификации — с ней посев по её итогам)
+    const lsBox = () => {
+      if (t.qual) return '';
+      const L = S.lseed && S.lseed.tid === t.id ? S.lseed : (S.lseed = { tid: t.id, mode: 'r', order: t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)) });
+      return '<div class="field" style="width:100%"><span class="label">' + (t.format === 'rr' ? 'Порядок в таблице' : 'Посев') + '</span><div class="chips">' + [['r', 'По рейтингу'], ['x', 'Жеребьёвка'], ['m', 'Вручную']].map(([v, l]) => '<button class="chip txt' + (L.mode === v ? ' on' : '') + '" data-act="ls-mode" data-v="' + t.id + '|' + v + '">' + l + '</button>').join('') + '</div>' +
+        (L.mode === 'm' ? '<span class="meta">Первый — сильнейший. Меняйте места стрелками.</span>' + seedListHTML(L.order, t.id, false) : '') + '</div>';
+    };
     if (S.confirmLaunch === t.id && paid && paid.length && paid.length < n) {
+      h += lsBox();
       const m = n - paid.length;
       h += '<div style="display:grid;gap:8px;width:100%"><span class="meta">Оплатили <b>' + paid.length + '</b> из ' + n + '. Не оплатившие (' + m + ') — значит, не пришли: начните с оплатившими, и они уберутся из турнира.</span><div class="row2"><button class="btn sm" data-act="launch-paid" data-v="' + t.id + '"' + (paid.length < 3 ? ' disabled' : '') + '>Оплатившие (' + paid.length + ')</button><button class="btn sm alt" data-act="launch-tour" data-v="' + t.id + '">Со всеми (' + n + ')</button></div>' + (paid.length < 3 ? '<span class="meta">Для старта нужно хотя бы трое оплативших.</span>' : '') + '<button class="lnk meta" data-act="launch-no">Отмена</button></div>';
     } else if (S.confirmLaunch === t.id) {
       const size = isBracket(t) ? bracketSize(n) : 0;
+      h += lsBox();
       h += '<div style="display:grid;gap:8px;width:100%"><span class="meta">Начать: ' + n + ' ' + pl(n, 'участник', 'участника', 'участников') + (size > n ? ', сетка на ' + size + ', ' + (size - n) + ' ' + pl(size - n, 'свободное место', 'свободных места', 'свободных мест') : '') + '. Регистрация закроется.</span><div class="row2"><button class="btn sm" data-act="launch-tour" data-v="' + t.id + '">Начать</button><button class="btn sm alt" data-act="launch-no">Отмена</button></div></div>';
     } else {
       h += '<div class="act-row">' + (SRV && !ME ? '<button class="btn sm" data-act="login">Войти, чтобы записаться</button>' : canDo(t, 'join') || inn ? '<button class="btn sm' + (inn ? ' alt' : '') + '" data-act="join" data-v="' + t.id + '">' + (inn ? 'Отменить запись' : 'Записаться') + '</button>' : '<span class="meta">Мест нет</span>');
@@ -2955,11 +2972,17 @@ const copyResBtn = t => '<button class="mini" data-act="copy-res" data-v="' + t.
 function launchRegTour(tid, paidOnly) {
   const t = TBY[tid];
   if (!t || t.status !== 'reg') return;
-  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/launch', paidOnly ? { paidOnly: true } : undefined), r => { svTourSet(r); S.ttab = null; S.tdef = null; toast(r.tournament.stage === 'qual' ? 'Турнир начался: идёт квалификация.' : 'Сетка сформирована! Турнир начался.'); });
+  const L = S.lseed && S.lseed.tid === tid && !t.qual ? S.lseed : null, body = {};
+  if (paidOnly) body.paidOnly = true;
+  if (L && L.mode !== 'r') { body.seed = L.mode; if (L.mode === 'm') body.order = L.order; }
+  S.lseed = null;
+  if (SRV) return svDo(Api.post('/api/tournaments/' + tid + '/launch', body), r => { svTourSet(r); S.ttab = null; S.tdef = null; toast(r.tournament.stage === 'qual' ? 'Турнир начался: идёт квалификация.' : 'Сетка сформирована! Турнир начался.'); });
   const n = t.players.length, max = isBracket(t) ? BR_MAX : RR_MAX;
   if (n < 3) { toast('Нужно минимум 3 участника.'); return; }
   if (n > max) { toast('Для этого формата максимум ' + max + ' участников.'); return; }
-  const ids = t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a));
+  let ids = t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a));
+  if (body.seed === 'x') ids = shuffle(ids);
+  else if (body.seed === 'm') ids = body.order.filter(x => ids.includes(x)).concat(ids.filter(x => !body.order.includes(x)));
   if (t.qual) { t.players = t.players.filter(x => P[x]); t.stage = 'qual'; t.games = []; t.qual.res = t.qual.res || {}; }
   else if (isBracket(t)) setBracket(t, t.format, ids, t.split);
   else { t.players = ids; t.games = rrGames(ids); }
@@ -3157,13 +3180,26 @@ function qualView(t) {
       ? '<div class="card tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? '; без результата ' + (n - done) + ' — встанут в конец по рейтингу' : '') + '. ' + next + ', квалификация закроется.</span><div class="row2" style="width:100%"><button class="btn sm" data-act="qual-close" data-v="' + t.id + '">' + (t.groups ? 'Разложить по группам' : t.format === 'rr' ? 'Начать круговую' : split ? 'Построить сетки' : 'Построить сетку') + '</button><button class="btn sm alt" data-act="qual-close-no">Отмена</button></div></div>'
       : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + '</span>' + (canDo(t, 'org') ? '<button class="btn sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить квалификацию</button>' : '') + '</div>';
   }
-  const th = Array.from({ length: tries }, (_, k) => '<th>Попытка ' + (k + 1) + '</th>').join('');
-  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr><th>Место</th><th>Игрок</th>' + th + '<th>Лучший</th>' + (tries > 1 ? '<th title="Среднее попыток: сумма, делённая на число сданных попыток">Среднее</th>' : '') + '</tr></thead><tbody>';
+  // сортировка по столбцам: место (как есть), фамилия, попытки, лучший, среднее; повторный щелчок — обратный порядок
+  const QS = S.qsort && S.qsort.tid === t.id && S.qsort.k !== 'place' ? S.qsort : null;
+  const sb = (key, l, title) => '<th' + (title ? ' title="' + title + '"' : '') + '><button class="lnk sortb' + ((QS ? QS.k : 'place') === key ? ' on' : '') + '" data-act="qsort" data-v="' + t.id + '|' + key + '">' + l + ((QS ? QS.k : 'place') === key ? (QS && QS.dir < 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
+  const th = Array.from({ length: tries }, (_, k) => sb('t' + k, 'Попытка ' + (k + 1))).join('');
+  h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr>' + sb('place', 'Место') + sb('name', 'Игрок') + th + sb('best', 'Лучший') + (tries > 1 ? sb('mean', 'Среднее', 'Среднее попыток: сумма, делённая на число сданных попыток') : '') + '</tr></thead><tbody>';
+  const placeOf = new Map(order.map((id, k) => [id, k]));
+  const surname = id => { const n = (P[id] ? P[id].name : id).trim().split(/\s+/); return (n[n.length - 1] + ' ' + n.join(' ')).toLowerCase(); };
+  const meanOf = id => { const a = qRes(t, id).filter(Boolean); return a.length ? a.reduce((x, r) => x + r.v, 0) / a.length : null; };
+  const valOf = (id, key) => key === 'best' ? qBest(t, id) : key === 'mean' ? meanOf(id) : (qRes(t, id)[+key.slice(1)] || {}).v;
+  const rows = !QS ? order : order.slice().sort((a, b) => {
+    if (QS.k === 'name') return QS.dir * surname(a).localeCompare(surname(b), 'ru');
+    const x = valOf(a, QS.k), y = valOf(b, QS.k);
+    if (x == null || y == null) return (x == null) - (y == null) || placeOf.get(a) - placeOf.get(b);
+    return QS.dir * (y - x) || placeOf.get(a) - placeOf.get(b);
+  });
   const tiedIds = new Set(qTies(t, !open).flat());
-  order.forEach((id, k) => {
-    const best = qBest(t, id), res = qRes(t, id);
-    if (split && k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
-    if (k === done) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">' + (open ? 'Ещё не сдали — без результата встанут в конец по рейтингу' : 'Без результата') + '</td></tr>';
+  rows.forEach(id => {
+    const k = placeOf.get(id), best = qBest(t, id), res = qRes(t, id);
+    if (!QS && split && k < done && k % split === 0) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">Сетка ' + (k + 1) + '–' + Math.min(order.length, k + split) + '</td></tr>';
+    if (!QS && k === done) h += '<tr class="qgrp"><td colspan="' + (4 + tries) + '">' + (open ? 'Ещё не сдали — без результата встанут в конец по рейтингу' : 'Без результата') + '</td></tr>';
     let cells = '';
     for (let j = 0; j < tries; j++) {
       const r = res[j], ref = t.id + '|' + id + '|' + j;
@@ -3210,6 +3246,13 @@ function closeQual(tid) {
   saveDb(); recalc(); toast('Сетки построены по итогам квалификации.'); render();
 }
 
+// ручной посев: порядок игроков, ↑↓ меняют места; в форме — ещё × (убрать)
+function seedListHTML(ids, ctx, removable) {
+  return '<div class="seedl">' + ids.map((id, k) => '<div class="sr"><b>' + (k + 1) + '</b><span>' + esc(P[id] ? P[id].name : id) + '</span><div class="gacts">' +
+    '<button class="mini" data-act="sq-mv" data-v="' + esc(ctx) + '|' + k + '|-1"' + (k ? '' : ' disabled') + ' aria-label="Выше">↑</button>' +
+    '<button class="mini" data-act="sq-mv" data-v="' + esc(ctx) + '|' + k + '|1"' + (k < ids.length - 1 ? '' : ' disabled') + ' aria-label="Ниже">↓</button>' +
+    (removable ? '<button class="mini" data-act="nt-p" data-v="' + id + '" aria-label="Убрать">×</button>' : '') + '</div></div>').join('') + '</div>';
+}
 function shuffle(a) {
   const x = a.slice();
   for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; }
@@ -3332,7 +3375,7 @@ function newTourView() {
     h += '<div class="field"><span class="label">Порядок матчей в сетке</span><div class="chips">' + [['std', 'Классический: 1–8, 4–5, 2–7, 3–6'], ['ndl', '1-й и 2-й по краям: 1–8, 5–4, 3–6, 7–2']].map(([v, l]) => '<button class="chip txt' + ((nt.layout || 'std') === v ? ' on' : '') + '" data-act="nt-layout" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">Пары и кто с кем играет дальше одинаковые — меняется только порядок сверху вниз.</span></div>';
     h += '<div class="field"><span class="label">Подписи матчей</span><div class="chips">' + [['ab', 'Буквы: A1–A2, B1–B2'], ['num', 'Номера: №1, №2']].map(([v, l]) => '<button class="chip txt' + (lab === v ? ' on' : '') + '" data-act="nt-labels" data-v="' + v + '">' + l + '</button>').join('') + '</div></div>';
   }
-  if (!nt.qualOn) h += '<div class="field"><span class="label">' + (nt.fmt === 'rr' ? 'Порядок в таблице' : isGrpFmt(nt.fmt) ? 'Посев по группам' : 'Посев') + '</span><div class="chips">' + chips(['r', 'x'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : 'Жеребьёвка') + '</div></div>';
+  if (!nt.qualOn) h += '<div class="field"><span class="label">' + (nt.fmt === 'rr' ? 'Порядок в таблице' : isGrpFmt(nt.fmt) ? 'Посев по группам' : 'Посев') + '</span><div class="chips">' + chips(['r', 'x', 'm'], nt.seed, 'nt-seed', v => v === 'r' ? 'По рейтингу' : v === 'x' ? 'Жеребьёвка' : 'Вручную') + '</div>' + (nt.seed === 'm' ? '<span class="meta">Посев — в порядке списка участников ниже: первый — сильнейший. Меняйте места стрелками.</span>' : '') + '</div>';
   h += '<div class="field"><span class="label">Взнос за участие</span><div class="chips">' + [['0', 'Без взноса'], ['1', 'Со взносом']].map(([v, l]) => '<button class="chip txt' + ((nt.feeOn ? '1' : '0') === v ? ' on' : '') + '" data-act="nt-feeon" data-v="' + v + '">' + l + '</button>').join('') + '</div>' +
     (nt.feeOn ? '<input class="inp" id="nt-fee" data-nt="fee" inputmode="numeric" maxlength="6" value="' + esc(nt.fee || '') + '" placeholder="Сумма, ₽" aria-label="Взнос, рублей" style="max-width:200px"><span class="meta">Сумму увидят все при записи.' + (SRV && Api.perm('club_tools') ? ' Отметки «оплатил» и касса — во вкладке «Взносы».' : '') + '</span>' : '') + '</div>';
   h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
@@ -3352,7 +3395,8 @@ function newTourView() {
   }
   const sel = !nt.qualOn && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
   h += '<div class="field"><div class="tstat"><span class="label">' + (SRV && nt.reg ? 'Вписать сразу (необязательно)' : 'Участники') + ' · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
-  if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
+  if (sel.length && !nt.qualOn && nt.seed === 'm') h += seedListHTML(sel, 'nt', true);
+  else if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
   if (SRV && Api.perm('host_nums')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
   h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока: имя или ID" aria-label="Найти или добавить игрока" autocomplete="off">';
@@ -3406,7 +3450,7 @@ function createTour() {
   if (ntFee(nt)) t.fee = ntFee(nt);
   if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) t.ltwBy = Object.assign({}, nt.ltwBy);
   if (nt.fmt !== 'rr') { t.layout = nt.layout || 'std'; t.labels = nt.labels || 'ab'; }
-  const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : ids.slice().sort((a, b) => rt(b) - rt(a));
+  const order = nt.fmt !== 'rr' && nt.seed === 'x' ? shuffle(ids) : nt.seed === 'm' ? ids.slice() : ids.slice().sort((a, b) => rt(b) - rt(a));
   if (qual) { t.format = nt.fmt; t.players = ids.slice(); t.games = []; t.qual = { ex: exFrom(nt.qk), tries: nt.tries, res: {} }; if (nt.fmt === 'pl' && nt.split) t.split = nt.split; t.stage = 'qual'; }
   else if (nt.fmt === 'rr') { t.players = order; t.games = rrGames(order); }
   else setBracket(t, nt.fmt, order, nt.fmt === 'pl' ? nt.split || undefined : undefined);
@@ -6792,7 +6836,7 @@ document.addEventListener('click', e => {
       S.quickModal.la = x; S.quickModal.lb = y; S.quickModal.err = '';
       render(); break;
     }
-    case 'launch-ask': S.confirmLaunch = v; render(); break;
+    case 'launch-ask': S.confirmLaunch = v; S.lseed = null; render(); break;
     case 'launch-no': S.confirmLaunch = null; render(); break;
     case 'launch-tour': S.confirmLaunch = null; launchRegTour(v); break;
     case 'launch-paid': S.confirmLaunch = null; launchRegTour(v, true); break;
@@ -7202,6 +7246,13 @@ document.addEventListener('click', e => {
       saveDb(); closeModals(); toast('Сохранено.'); render(); break;
     }
     case 'nt-seed': S.nt.seed = v; render(); break;
+    case 'ls-mode': { const [tid, m] = v.split('|'); if (S.lseed && S.lseed.tid === tid) { S.lseed.mode = m; render(); } break; }
+    case 'sq-mv': {
+      const [ctx, k, d] = v.split('|'), i = +k, j = i + +d, arr = ctx === 'nt' ? S.nt && S.nt.sel : S.lseed && S.lseed.tid === ctx ? S.lseed.order : null;
+      if (arr && j >= 0 && j < arr.length) { [arr[i], arr[j]] = [arr[j], arr[i]]; render(); }
+      break;
+    }
+    case 'qsort': { const [tid, key] = v.split('|'), q = S.qsort && S.qsort.tid === tid ? S.qsort : null; S.qsort = { tid, k: key, dir: q && q.k === key ? -q.dir : 1 }; render(); break; }
     case 'nt-p': {
       const k = S.nt.sel.indexOf(v);
       if (k >= 0) S.nt.sel.splice(k, 1);
