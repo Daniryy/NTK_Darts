@@ -70,20 +70,12 @@ test('смена формата не оставляет квалификацию
   ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id, { format: 'ko', qual: null, split: null }));
 });
 
-test('роль, выданная вручную, возвращается после тарифа', async () => {
-  const plans = ok(await call(null, 'GET', '/api/plans')).plans, plus = plans.find(p => p.role === 'plus');
+test('роль, выданная вручную, остаётся при назначении и снятии ведущим клуба', async () => {
   ok(await call(ADMIN, 'PATCH', '/api/admin/players/p9', { role: 'host' }));
-  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p9', planId: plus.id }));
-  assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'host', 'ведущий с «Игрок+» остаётся ведущим');
-  const sub = ok(await call(ADMIN, 'GET', '/api/admin/players/p9/plans')).subs.find(s => s.status === 'active');
-  ok(await call(ADMIN, 'POST', '/api/admin/plans/subs/' + sub.id + '/end'));
-  assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'host', 'после тарифа — роль, выданная вручную');
-  // игроку без ручной роли тариф даёт и снимает свою роль
-  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p10', planId: plus.id }));
-  assert.equal(ok(await call(null, 'GET', '/api/players/p10')).player.role, 'plus');
-  await pool.query(`UPDATE player_plans SET ends = $1 WHERE player_id = 'p10' AND status = 'active'`, [Date.now() - 1]);
-  await tx(require('../server/plans').sweepPlans);
-  assert.equal(ok(await call(null, 'GET', '/api/players/p10')).player.role, 'player');
+  assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'host');
+  ok(await call(ADMIN, 'POST', '/api/admin/clubs/c1/hosts', { playerId: 'p9' }));
+  ok(await call(ADMIN, 'DELETE', '/api/admin/clubs/c1/hosts/p9'));
+  assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'host', 'после снятия с клуба — роль, выданная вручную');
   // снять ручную роль — снова игрок
   ok(await call(ADMIN, 'PATCH', '/api/admin/players/p9', { role: 'player' }));
   assert.equal(ok(await call(null, 'GET', '/api/players/p9')).player.role, 'player');

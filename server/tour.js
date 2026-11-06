@@ -1,7 +1,7 @@
 // Турнир из базы в том виде, в каком его хранит страница, и всё, что из него вычисляется.
 const B = require('../shared/bracket.js');
 const { all } = require('./db');
-const { can, RANK } = require('./roles');
+const { can } = require('./roles');
 const config = require('./config');
 
 const RR_MAX = 10, BR_MAX = 64;
@@ -202,14 +202,12 @@ function gameLabel(t, g, rv) {
   return 'круг ' + (g.r + 1) + ' · за ' + placesTxt(lo, lo + c - 1);
 }
 
-// значок PRO: тариф Pro или выше, кроме администраторов
-const isPro = e => can({ role: e.role }, 'pro') && (RANK[e.role] || 0) < RANK.admin;
 // организатор: создатель, ведущие клуба турнира, администратор с правом any_tour
 const isOwner = (t, me) => !!me && (can(me, 'any_tour') || t._row.owner_id === me.id || !!(t._club && t._club.hosts.has(me.id)));
 // команда турнира: организатор и помощники клуба — ведут счёт, ставят мишени, отмечают взносы
 const isStaff = (t, me) => isOwner(t, me) || !!(me && t._club && t._club.helpers.has(me.id));
-// взносы — в тарифе «Ведущий»: у клуба, где ведущий с этим правом, или у организатора с ним
-const feesOn = (t, me) => isStaff(t, me) && (can(me, 'club_tools') || !!(t._club && t._club.branded));
+// взносы и отметки «оплатил» — у команды турнира
+const feesOn = (t, me) => isStaff(t, me);
 
 // игроки игры сетки, если её можно начать: { a, b } или null
 function readyPair(t, r, i) {
@@ -255,13 +253,13 @@ function qualTies(t, final) {
   return Object.values(by).filter(g => g.length > 1 && (g.some(id => tb[id] == null) || new Set(g.map(id => tb[id])).size < g.length));
 }
 
-// logo — у клуба с тарифом «Ведущий»
+// logo — логотип клуба на странице турнира и табло
 const orgOf = (row, t) => ({ id: row.owner_id, name: row.org_name || row.owner_name || '—', ver: row.org_ver, club: row.club_id || null, logo: t && t._club && t._club.branded ? t._club.logo : null });
 
 function tourJSON(t, me) {
   const row = t._row, joined = !!me && t.players.includes(me.id), owner = isOwner(t, me), staff = isStaff(t, me), fees = feesOn(t, me);
   const roster = {};
-  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', lite: !!e.lite, pro: isPro(e) }; });
+  t._ents.forEach(e => { roster[e.player_id] = { name: e.name, city: e.city, club: e.club, r: Math.round(e.rating), photo: e.photo || null, title: e.title || '', walkon: e.walkon || '', lite: !!e.lite }; });
   const out = Object.assign({}, t, {
     org: orgOf(row, t), roster,
     can: {

@@ -59,7 +59,8 @@ test('вход по логину и паролю: верный, неверный
   const r = await full(u, '/api/auth/password', { login: ' DANIL ', password: 'Darts-Secret-1' });
   assert.equal(r.player.id, ME);
   assert.equal(r.role, 'tech');
-  assert.ok(r.perms.includes('banners') && r.perms.includes('audit'));
+  assert.ok(r.perms.includes('cleanup') && r.perms.includes('audit'));
+  assert.ok(!r.perms.some(k => ['banners', 'plans', 'plans_edit', 'pro'].includes(k)), 'тарифов и баннеров больше нет');
   assert.equal(r.player.login, 'danil');
   assert.equal(ok(await call(u, 'GET', '/api/me')).player.id, ME);
   // 5 неверных с одного адреса — с него вход закрыт даже с верным паролем; владелец с другого адреса входит
@@ -125,15 +126,14 @@ test('логин администратору выдаёт только тех. 
 
 test('права ролей: тех. администратор настраивает, остальные получают по настройке', async () => {
   const t = ok(await call(PL, 'GET', '/api/admin/perms'));
-  assert.deepEqual(t.roles.map(r => r.key), ['player', 'host', 'plus', 'admin']);
+  assert.deepEqual(t.roles.map(r => r.key), ['player', 'host', 'admin']);
   assert.deepEqual(t.perms.find(x => x.key === 'streams').roles, ['host', 'admin']);
   err(await call(ADMIN, 'PUT', '/api/admin/perms', { perms: { streams: ['player'] } }), 403);
   err(await call(TECH, 'PUT', '/api/admin/perms', { perms: { nope: [] } }), 400);
   err(await call(TECH, 'PUT', '/api/admin/perms', { perms: { streams: ['tech'] } }), 400);
-  // админу — баннеры; ведущему — без своих номеров; игроку — камеры
-  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { banners: ['admin'], host_nums: ['admin'], streams: ['player', 'host', 'admin'] } }));
-  assert.ok(ok(await call(ADMIN, 'GET', '/api/me')).perms.includes('banners'));
-  ok(await call(ADMIN, 'GET', '/api/admin/banners'));
+  // админу — очистка; ведущему — без своих номеров; игроку — камеры
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { cleanup: ['admin'], host_nums: ['admin'], streams: ['player', 'host', 'admin'] } }));
+  assert.ok(ok(await call(ADMIN, 'GET', '/api/me')).perms.includes('cleanup'));
   err(await call(HOST, 'GET', '/api/host/nums'), 403);
   const tour = ok(await call(PL, 'POST', '/api/tournaments', { name: 'Камеры', format: 'pl', mode: 501, ltw: 1, players: ['p6', 'p9', 'p12'] }), 201).tournament;
   assert.equal(tour.can.stream, true);
@@ -141,8 +141,8 @@ test('права ролей: тех. администратор настраив
   // журнал: изменение прав видно
   assert.ok(ok(await call(ADMIN, 'GET', '/api/admin/audit')).items.some(x => x.action === 'perms'));
   // вернуть как было
-  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { banners: [], host_nums: ['host', 'admin'], streams: ['host', 'admin'] } }));
-  err(await call(ADMIN, 'GET', '/api/admin/banners'), 403);
+  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { cleanup: [], host_nums: ['host', 'admin'], streams: ['host', 'admin'] } }));
+  assert.ok(!ok(await call(ADMIN, 'GET', '/api/me')).perms.includes('cleanup'));
   ok(await call(HOST, 'GET', '/api/host/nums'));
 });
 
@@ -187,7 +187,7 @@ test('удаление аккаунта: право delete_players, не себ�
   ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { delete_players: [] } }));
 });
 
-test('права: создавать турниры (create_tour), видеть контакты (contacts), тарифы (plans_edit)', async () => {
+test('права: создавать турниры (create_tour), видеть контакты (contacts)', async () => {
   const body = { name: 'Проверка права', format: 'rr', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8'] };
   ok(await call(PL, 'POST', '/api/tournaments', body), 201);
   ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { create_tour: ['host', 'admin'] } }));
@@ -202,11 +202,6 @@ test('права: создавать турниры (create_tour), видеть 
   assert.equal(card.phone, 'скрыт'); assert.equal(card.contacts, false);
   assert.ok(!ok(await call(ADMIN, 'GET', '/api/admin/players?q=0001122')).players.some(x => x.id === 'p11'), 'поиск по телефону без права не находит');
   ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { contacts: ['admin'] } }));
-  // тарифы: по умолчанию только тех. администратор, право можно выдать
-  err(await call(ADMIN, 'PUT', '/api/admin/discounts', { ms: 20, kms: 10, r1: 5 }), 403);
-  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { plans_edit: ['admin'] } }));
-  ok(await call(ADMIN, 'PUT', '/api/admin/discounts', { ms: 20, kms: 10, r1: 5 }));
-  ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { plans_edit: [] } }));
 });
 
 test('очистка сервера от демо-данных: право cleanup, подтверждение; остаются аккаунты со входом и тот, кто чистил', async () => {
@@ -257,21 +252,9 @@ test('кривые параметры журнала и нулевой байт 
   ok(await call(TECH, 'GET', '/api/admin/audit?before=' + Date.now()));
 });
 
-test('баннеры: ссылка на страницу сайта, кнопка, сразу на несколько мест, копия', async () => {
-  err(await call(TECH, 'POST', '/api/admin/banners', { places: ['feed', 'feed'], title: 'x' }), 400);
-  err(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'x', link: 'javascript:alert(1)' }), 400);
-  err(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'x', link: '#plans<script>' }), 400);
-  const r = ok(await call(TECH, 'POST', '/api/admin/banners', { places: ['feed', 'tour'], title: 'Скидка на тарифы −50%', body: 'До конца месяца', link: '#plans', cta: 'Подключить →' }), 201);
-  assert.deepEqual(r.banners.map(b => [b.place, b.link, b.cta]), [['feed', '#plans', 'Подключить →'], ['tour', '#plans', 'Подключить →']]);
-  const pub = ok(await call(null, 'GET', '/api/banners?place=tour')).banners.find(b => b.id === r.banners[1].id);
-  assert.equal(pub.cta, 'Подключить →');
-  const cp = ok(await call(TECH, 'POST', '/api/admin/banners/' + r.banner.id + '/copy', { places: ['tv'] }), 201).banners;
-  assert.deepEqual(cp.map(b => [b.place, b.title, b.link]), [['tv', 'Скидка на тарифы −50%', '#plans']]);
-  // обычный игрок (новый: прежних могла удалить очистка в тесте выше)
-  const U = anon(), reg = ok(await call(U, 'POST', '/api/auth/register', { consent: true, name: 'Без Прав', email: 'noperm@mail.ru', password: 'darts-2026' }));
-  if (reg.devCode) ok(await call(U, 'POST', '/api/auth/email/verify', { email: 'noperm@mail.ru', purpose: 'reg', code: reg.devCode }));
-  err(await call(U, 'POST', '/api/admin/banners/' + r.banner.id + '/copy', { places: ['tv'] }), 403);
-  for (const b of r.banners.concat(cp)) ok(await call(TECH, 'DELETE', '/api/admin/banners/' + b.id));
+test('тарифов, промокодов и баннеров нет: их маршруты не отвечают', async () => {
+  for (const [m, u] of [['GET', '/api/plans'], ['GET', '/api/banners?place=feed'], ['GET', '/api/admin/plans'], ['GET', '/api/admin/banners'], ['POST', '/api/admin/promos'], ['PUT', '/api/admin/discounts']]) err(await call(TECH, m, u, m === 'GET' ? undefined : {}), 404);
+  err(await call(TECH, 'POST', '/api/photos?kind=banner&w=100&h=100'), 400);
 });
 
 test('администраторы входят только с паролем: код от ведущего и телефон закрыты; неверные коды на номер — 10 в сутки', async () => {

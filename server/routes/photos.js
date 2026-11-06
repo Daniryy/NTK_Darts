@@ -50,16 +50,15 @@ module.exports = async function (app) {
     app.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_BYTES }, (req, body, done) => done(null, body));
   }
 
-  // POST /api/photos?kind=avatar[&playerId=] | kind=tour&tournamentId=… | kind=banner (тех. администратор); w и h — размер после обрезки
+  // POST /api/photos?kind=avatar[&playerId=] | kind=tour&tournamentId=… | kind=club&clubId=… (логотип); w и h — размер после обрезки
   app.post('/api/photos', { bodyLimit: MAX_BYTES }, async (req, reply) => {
     const me = needPlayer(req), q = req.query, buf = req.body;
     if (!Buffer.isBuffer(buf) || !buf.length) throw E.bad('Нужна картинка: JPEG, WebP или PNG', 'body');
     const ext = kindOf(buf);
     if (!ext) throw E.bad('Это не JPEG, WebP или PNG', 'body');
-    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'banner', 'club']);
-    // логотип клуба и картинки спонсоров — ведущему клуба с тарифом «Ведущий»
-    const clubId = kind === 'club' || (kind === 'banner' && q.clubId != null) ? V.id(q.clubId, 'clubId') : null;
-    if (kind === 'banner' && !clubId && !can(me, 'banners')) throw E.forbidden('Баннерами занимается тех. администратор');
+    const kind = V.oneOf(q.kind, 'kind', ['avatar', 'tour', 'club']);
+    // логотип клуба — ведущему клуба
+    const clubId = kind === 'club' ? V.id(q.clubId, 'clubId') : null;
     const w = V.int(+q.w, 'w', 16, 4096), h = V.int(+q.h, 'h', 16, 4096);
     const id = crypto.randomBytes(12).toString('hex'), file = id + '.' + ext;
     await fs.promises.mkdir(config.uploadDir, { recursive: true });
@@ -77,7 +76,7 @@ module.exports = async function (app) {
         }
         if (clubId) {
           const host = await one(c, `SELECT 1 FROM club_hosts h JOIN clubs cl ON cl.id = h.club_id WHERE h.club_id = $1 AND h.player_id = $2 AND cl.status = 'active'`, [clubId, me.id]);
-          if (!(host || can(me, 'clubs')) || !can(me, 'club_tools')) throw E.forbidden('Логотип и спонсоры клуба — в тарифе «Ведущий»');
+          if (!(host || can(me, 'clubs')) || !can(me, 'club_tools')) throw E.forbidden('Логотип клуба меняет его ведущий');
         }
         if (kind === 'club') {
           const cur = await one(c, 'SELECT logo FROM clubs WHERE id = $1 FOR UPDATE', [clubId]);
@@ -86,11 +85,6 @@ module.exports = async function (app) {
           const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'club', $3, $4, $5, $6, $7) RETURNING *`,
             [id, file, me.id, w, h, buf.length, Date.now()]);
           await c.query('UPDATE clubs SET logo = $2 WHERE id = $1', [clubId, urlOf(file)]);
-          return { photo: photoJSON(row) };
-        }
-        if (kind === 'banner') {
-          const row = await one(c, `INSERT INTO photos (id, file, kind, owner_id, w, h, bytes, created_at) VALUES ($1, $2, 'banner', $3, $4, $5, $6, $7) RETURNING *`,
-            [id, file, me.id, w, h, buf.length, Date.now()]);
           return { photo: photoJSON(row) };
         }
         const t = await tourOwned(c, V.id(q.tournamentId, 'tournamentId'), me);

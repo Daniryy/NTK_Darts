@@ -175,7 +175,7 @@ test('роли: администратор выдаёт ведущего, тех
   assert.equal(st.roles.tech, 1);
 });
 
-test('клуб: заявка, подтверждение; роль ведущего — только по тарифу; турнир от клуба, камеры, закрытие', async () => {
+test('клуб: заявка, подтверждение; роль ведущего выдаёт администратор; турнир от клуба, камеры, закрытие', async () => {
   const U = await login('p10');
   const c = ok(await call(U, 'POST', '/api/clubs', { name: 'Казанский дротик', city: 'Казань', contact: '+7 843 000-00-00' }), 201).club;
   assert.equal(c.status, 'pending');
@@ -196,13 +196,12 @@ test('клуб: заявка, подтверждение; роль ведуще�
   assert.equal(me.role, 'player', 'клуб сам роль не даёт');
   assert.deepEqual(me.clubs.map(x => x.id), [c.id]);
   assert.ok(ok(await call(null, 'GET', '/api/clubs')).clubs.some(x => x.id === c.id));
-  // без тарифа: турнира от клуба нет, инструменты клуба закрыты
+  // без роли ведущего: турнира от клуба нет, инструменты клуба закрыты
   err(await call(U, 'POST', '/api/tournaments', { name: 'От клуба', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p10', 'p3', 'p5'] }), 403);
   const page = ok(await call(U, 'GET', '/api/clubs/' + c.id));
   assert.equal(page.manage, true); assert.equal(page.tools, false);
-  // тариф «Ведущий» — роль ведущего
-  const hostPlan = ok(await call(null, 'GET', '/api/plans')).plans.find(p => p.role === 'host');
-  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p10', planId: hostPlan.id }));
+  // роль ведущего выдаёт администратор
+  ok(await call(ADMIN, 'PATCH', '/api/admin/players/p10', { role: 'host' }));
   me = ok(await call(U, 'GET', '/api/me'));
   assert.equal(me.role, 'host');
   assert.equal(ok(await call(U, 'GET', '/api/clubs/' + c.id)).tools, true);
@@ -213,11 +212,11 @@ test('клуб: заявка, подтверждение; роль ведуще�
   ok(await call(U, 'PATCH', '/api/tournaments/' + t.id + '/streams', { streams: [{ url: 'https://vk.com/video-1_2' }] }));
   // чужой клуб в турнир не подставить
   err(await call(HOST, 'POST', '/api/tournaments', { name: 'Чужой', clubId: c.id, format: 'pl', mode: 501, ltw: 1, players: ['p1', 'p3', 'p5'] }), 403);
-  // второй ведущий клуба без тарифа роли не получает
+  // второй ведущий клуба роли сам не получает
   ok(await call(ADMIN, 'POST', '/api/admin/clubs/' + c.id + '/hosts', { playerId: 'p14' }));
   assert.equal(ok(await call(null, 'GET', '/api/players/p14')).player.role, 'player');
   ok(await call(ADMIN, 'DELETE', '/api/admin/clubs/' + c.id + '/hosts/p14'));
-  // закрытие клуба тариф не трогает
+  // закрытие клуба роль не трогает
   ok(await call(ADMIN, 'PATCH', '/api/admin/clubs/' + c.id, { status: 'closed', note: 'Клуб закрылся' }));
   assert.equal(ok(await call(U, 'GET', '/api/me')).role, 'host');
   // отказ в заявке
@@ -227,23 +226,3 @@ test('клуб: заявка, подтверждение; роль ведуще�
   assert.equal(ok(await call(P9, 'GET', '/api/clubs/mine')).clubs[0].note, 'Нет адреса');
 });
 
-test('баннеры: ведёт тех. администратор, показ по месту и времени, переходы', async () => {
-  err(await call(ADMIN, 'POST', '/api/admin/banners', { place: 'feed', title: 'x' }), 403);
-  err(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'x', link: 'javascript:alert(1)' }), 400);
-  const b = ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'tour', title: 'Магазин дротиков', body: 'Скидка участникам', link: 'https://example.com/darts' }), 201).banner;
-  const later = ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'tour', title: 'Позже', starts: Date.now() + 864e5 }), 201).banner;
-  const list = ok(await call(null, 'GET', '/api/banners?place=tour')).banners;
-  assert.deepEqual(list.map(x => x.id), [b.id]);
-  assert.equal(list[0].clicks, undefined, 'счётчик видит только тех. администратор');
-  const one1 = anon();
-  ok(await call(one1, 'POST', '/api/banners/' + b.id + '/click'));
-  ok(await call(anon(), 'POST', '/api/banners/' + b.id + '/click'));
-  // повтор с того же устройства за сутки не считается
-  ok(await call(one1, 'POST', '/api/banners/' + b.id + '/click'));
-  assert.equal(ok(await call(TECH, 'GET', '/api/admin/banners')).banners.find(x => x.id === b.id).clicks, 2);
-  ok(await call(TECH, 'PATCH', '/api/admin/banners/' + b.id, { active: false }));
-  assert.equal(ok(await call(null, 'GET', '/api/banners?place=tour')).banners.length, 0);
-  ok(await call(TECH, 'DELETE', '/api/admin/banners/' + later.id));
-  err(await call(TECH, 'DELETE', '/api/admin/banners/' + later.id), 404);
-  err(await call(null, 'GET', '/api/banners?place=nowhere'), 400);
-});

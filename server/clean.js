@@ -19,7 +19,6 @@ async function cleanAll(keep) {
     await c.query('UPDATE tournaments SET cover = NULL');
     await c.query('DELETE FROM matches');
     await c.query('DELETE FROM tournaments');
-    await c.query('DELETE FROM banners');
     await c.query('DELETE FROM clubs');
     await c.query('DELETE FROM players WHERE id NOT IN (SELECT id FROM keep)');
     await c.query('DELETE FROM player_stats');
