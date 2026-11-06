@@ -143,7 +143,7 @@ module.exports = async function (app) {
         if ((RANK[role] >= RANK.admin || RANK[cur.role] >= RANK.admin) && me.role !== 'tech') throw E.forbidden('Роль администратора выдаёт тех. администратор');
         if (!can(me, 'give_host') && me.role !== 'tech') throw E.forbidden('Роль ведущего выдаёт администратор');
         set.role = role;
-        // выданная вручную роль остаётся основой: к ней игрок вернётся, когда кончится тариф (plans.js)
+        // выданная вручную роль — основа: её же восстанавливает назначение и снятие ведущих клуба
         set.base_role = RANK[role] < RANK.admin ? role : 'player';
         // ниже администратора вход по логину не нужен; пароль остаётся, если по нему входят с почтой
         if (RANK[role] < RANK.admin && cur.login) { set.login = null; if (!cur.email) set.pass_hash = null; }

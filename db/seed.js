@@ -232,9 +232,6 @@ async function seed(c) {
     if (status === 'active') await c.query('INSERT INTO club_hosts (club_id, player_id) VALUES ($1, $2)', [id, owner]);
   }
   await c.query(`SELECT setval('club_seq', $1)`, [CLUBS.length]);
-  // пример баннера в ленте
-  await c.query(`INSERT INTO banners (place, title, body, link, active, created_by, created_at) VALUES ('feed', $1, $2, NULL, true, $3, $4)`,
-    ['Место для вашей рекламы', 'Баннеры показываются в ленте, на странице турнира и на табло. Ведёт тех. администратор.', ME, now]);
   // свои номера у тестового игрока: постоянные игроки «Оче-бара»
   for (const [n, pid] of [[1, 'p6'], [2, 'p9'], [3, 'p12'], [4, 'p15'], [5, 'p4'], [7, 'p35'], [8, 'p40'], [9, 'p55']]) await c.query('INSERT INTO host_nums (host_id, n, player_id) VALUES ($1, $2, $3)', [ME, n, pid]);
   const js = v => v == null ? null : JSON.stringify(v);

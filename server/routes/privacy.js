@@ -22,7 +22,6 @@ async function exportData(c, id) {
       WHERE t.owner_id = $1 OR EXISTS (SELECT 1 FROM entries e WHERE e.tournament_id = t.id AND e.player_id = $1) ORDER BY t.created_at`, [id]),
     matches: await all(c, `SELECT m.id, m.tournament_id, m.status, m.finished, l.* FROM match_lines l JOIN matches m ON m.id = l.match_id
       WHERE l.player_id = $1 ORDER BY m.finished NULLS LAST, m.id`, [id]),
-    plans: await all(c, 'SELECT * FROM player_plans WHERE player_id = $1 ORDER BY 1', [id]),
     title_requests: await all(c, 'SELECT * FROM title_requests WHERE player_id = $1 ORDER BY created_at', [id]),
     title_docs: await all(c, 'SELECT id, request_id, mime, bytes, created_at FROM title_docs WHERE player_id = $1 ORDER BY created_at', [id]),
     photos: await all(c, 'SELECT id, kind, tournament_id, created_at FROM photos WHERE owner_id = $1 OR player_id = $1 ORDER BY created_at', [id])

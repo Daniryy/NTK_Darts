@@ -1,4 +1,4 @@
-// Тариф Pro: статистика, личные встречи, выгрузка, выходная музыка, без рекламы, значок PRO.
+// Статистика игрока (бывший Pro, теперь без тарифа): за период, личные встречи, выгрузка, выходная музыка.
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
 if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
@@ -37,22 +37,15 @@ test.before(async () => {
 });
 test.after(async () => { await app.close(); await pool.end(); });
 
-test('без Pro: статистика, встречи, выгрузка и музыка закрыты', async () => {
-  err(await call(MS, 'GET', '/api/me/pro'), 403);
-  err(await call(MS, 'GET', '/api/players/p6/h2h'), 403);
-  err(await call(MS, 'GET', '/api/me/export.csv'), 403);
-  err(await call(MS, 'PATCH', '/api/me', { walkon: 'Песня' }), 403);
-  const plans = ok(await call(null, 'GET', '/api/plans')).plans;
-  assert.equal(plans.find(p => p.role === 'plus').name, 'Pro');
-  assert.ok(plans.find(p => p.role === 'host').about.startsWith('Всё из Pro'));
-  // Pro по умолчанию есть у роли plus, ведущего и администратора
-  assert.deepEqual(ok(await call(TECH, 'GET', '/api/admin/perms')).perms.find(x => x.key === 'pro').roles, ['host', 'plus', 'admin']);
+test('без входа статистика, встречи и выгрузка закрыты; тарифов нет', async () => {
+  err(await call(null, 'GET', '/api/me/pro'), 401);
+  err(await call(null, 'GET', '/api/players/p6/h2h'), 401);
+  err(await call(null, 'GET', '/api/me/export.csv'), 401);
+  err(await call(null, 'GET', '/api/plans'), 404);
+  assert.ok(!ok(await call(TECH, 'GET', '/api/admin/perms')).perms.some(x => x.key === 'pro'));
 });
 
-test('Pro: статистика по подходам, личные встречи, выгрузка', async () => {
-  const plus = ok(await call(null, 'GET', '/api/plans')).plans.find(p => p.role === 'plus');
-  ok(await call(ADMIN, 'POST', '/api/admin/plans/grant', { playerId: 'p3', planId: plus.id }));
-  assert.ok(ok(await call(MS, 'GET', '/api/me')).perms.includes('pro'));
+test('статистика по подходам, личные встречи, выгрузка — любому игроку, без тарифа', async () => {
   // дружеский матч p3 — p6: 180, 180, (отменённый подход), 141 — закрытие; соперник по 60
   const id = mid();
   ok(await call(MS, 'PUT', '/api/matches/' + id, { mode: 501, ltw: 1, players: [{ id: 'p3' }, { id: 'p6' }] }), 201);
@@ -84,17 +77,11 @@ test('Pro: статистика по подходам, личные встреч
   assert.ok(r.body.includes('дружеский;501;Тимур') || r.body.includes(';победа;'));
 });
 
-test('Pro: выходная музыка в составе турнира, значок PRO, без рекламы; лучшее среднее', async () => {
+test('выходная музыка в составе турнира — любому игроку; лучшее среднее', async () => {
   ok(await call(MS, 'PATCH', '/api/me', { walkon: 'Seven Nation Army' }));
   assert.equal(ok(await call(MS, 'GET', '/api/me')).player.walkon, 'Seven Nation Army');
-  const t = ok(await call(MS, 'POST', '/api/tournaments', { name: 'Pro-кубок', format: 'pl', mode: 501, ltw: 1, players: ['p3', 'p6', 'p9'] }), 201).tournament;
-  assert.deepEqual([t.roster.p3.walkon, t.roster.p3.pro, t.roster.p6.pro], ['Seven Nation Army', true, false]);
-  ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'feed', title: 'Реклама' }), 201);
-  ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'tv', title: 'Реклама на табло' }), 201);
-  assert.equal(ok(await call(MS, 'GET', '/api/banners?place=feed')).banners.length, 0);
-  const tv = n => ok(n).banners.length;
-  assert.equal(tv(await call(MS, 'GET', '/api/banners?place=tv')), tv(await call(PL, 'GET', '/api/banners?place=tv')), 'табло — для всех');
-  assert.ok(tv(await call(PL, 'GET', '/api/banners?place=feed')) >= 1);
-  assert.ok(tv(await call(TECH, 'GET', '/api/banners?place=feed')) >= 1, 'администратор видит рекламу, чтобы её проверять');
+  const t = ok(await call(MS, 'POST', '/api/tournaments', { name: 'Кубок с музыкой', format: 'pl', mode: 501, ltw: 1, players: ['p3', 'p6', 'p9'] }), 201).tournament;
+  assert.equal(t.roster.p3.walkon, 'Seven Nation Army');
+  assert.equal(t.roster.p3.pro, undefined, 'значка PRO больше нет');
   assert.equal(typeof ok(await call(null, 'GET', '/api/players/p3')).bestAvg, 'number');
 });

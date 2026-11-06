@@ -62,9 +62,8 @@ function build(opts = {}) {
     api.register(require('./routes/admin'));
     api.register(require('./routes/clubs'));
     api.register(require('./routes/host'));
-    api.register(require('./routes/banners'));
     api.register(require('./routes/titles'));
-    api.register(require('./routes/plans'));
+    api.register(require('./routes/roles'));
     api.register(require('./routes/pro'));
     api.register(require('./routes/privacy'));
   });

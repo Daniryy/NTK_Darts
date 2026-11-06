@@ -84,12 +84,13 @@ test('взносы: сумма у турнира, отметки «оплати�
   err(await call(PL, 'PATCH', '/api/tournaments/' + tour.id + '/paid', { playerId: 'p6', paid: false }), 403);
   err(await call(HOST, 'PATCH', '/api/tournaments/' + tour.id + '/paid', { playerId: 'p2', paid: true }), 404);
   ok(await call(HOST, 'PATCH', '/api/tournaments/' + tour.id, { fee: 700 }));
-  // сумму взноса может указать любой организатор, её видят все; отметки «оплатил» — только с тарифом
+  // сумму взноса и отметки «оплатил» ведёт любой организатор своего турнира (без тарифов); сумму видят все
   const own = ok(await call(PL, 'POST', '/api/tournaments', { name: 'Свой', format: 'pl', mode: 501, ltw: 1, fee: 300, players: ['p6', 'p10', 'p12'] }), 201).tournament;
-  assert.deepEqual([own.fee, own.fees, own.can.fees], [300, undefined, false]);
+  assert.deepEqual([own.fee, own.fees, own.can.fees], [300, { fee: 300, paid: [] }, true]);
   assert.equal(ok(await call(null, 'GET', '/api/tournaments/' + own.id)).tournament.fee, 300);
   assert.equal(ok(await call(null, 'GET', '/api/tournaments?status=live')).tournaments.find(x => x.id === own.id).fee, 300);
-  err(await call(PL, 'PATCH', '/api/tournaments/' + own.id + '/paid', { playerId: 'p10', paid: true }), 403);
+  ok(await call(PL, 'PATCH', '/api/tournaments/' + own.id + '/paid', { playerId: 'p10', paid: true }));
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + own.id + '/paid', { playerId: 'p10', paid: false }), 403);
   assert.equal(ok(await call(HOST, 'GET', '/api/clubs/c1')).stats.cash30, 1400, 'касса за 30 дней: двое оплатили по 700');
 });
 
@@ -105,15 +106,7 @@ test('отбор по взносам: на регистрации отметил
   assert.deepEqual(live.fees.paid.slice().sort(), ['p10', 'p12', 'p6'], 'отметки «оплатил» не сбросились');
 });
 
-test('логотип и спонсоры клуба вместо баннеров Oche; без тарифа — снова баннеры Oche', async () => {
-  ok(await call(TECH, 'POST', '/api/admin/banners', { place: 'tv', title: 'Реклама Oche' }), 201);
-  ok(await call(HOST, 'POST', '/api/clubs/c1/banners', { place: 'tv', title: 'Пиво «Дротик»' }), 201);
-  err(await call(HOST, 'POST', '/api/clubs/c1/banners', { place: 'feed', title: 'В ленту' }), 400);
-  err(await call(PL, 'POST', '/api/clubs/c1/banners', { place: 'tv', title: 'Чужой' }), 403);
-  const tv = ok(await call(null, 'GET', '/api/banners?place=tv&tid=' + tour.id));
-  assert.deepEqual([tv.club, tv.banners.map(b => b.title)], [true, ['Пиво «Дротик»']]);
-  assert.ok(!ok(await call(null, 'GET', '/api/banners?place=tv')).banners.some(b => b.title === 'Пиво «Дротик»'));
-  assert.ok(!ok(await call(TECH, 'GET', '/api/admin/banners')).banners.some(b => b.title === 'Пиво «Дротик»'));
+test('логотип клуба на странице турнира и табло; без права инструментов клуба — нет', async () => {
   // логотип
   const r = await app.inject({ method: 'POST', url: '/api/photos?kind=club&clubId=c1&w=200&h=200', payload: JPG, headers: { 'content-type': 'image/jpeg', 'x-device-id': HOST.dev, cookie: HOST.cookie } });
   assert.equal(r.statusCode, 201, r.body);
@@ -122,10 +115,9 @@ test('логотип и спонсоры клуба вместо баннеро�
   assert.equal(ok(await call(null, 'GET', '/api/clubs/c1')).club.logo, logo);
   const r2 = await app.inject({ method: 'POST', url: '/api/photos?kind=club&clubId=c1&w=200&h=200', payload: JPG, headers: { 'content-type': 'image/jpeg', 'x-device-id': PL.dev, cookie: PL.cookie } });
   assert.equal(r2.statusCode, 403);
-  // право club_tools сняли у ведущих — логотипа и спонсоров нет, снова баннеры Oche
+  // право club_tools сняли у ведущих — логотипа нет, помощников не добавить
   ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { club_tools: ['admin'] } }));
   assert.equal(ok(await call(null, 'GET', '/api/tournaments/' + tour.id)).tournament.org.logo, null);
-  assert.ok(ok(await call(null, 'GET', '/api/banners?place=tv&tid=' + tour.id)).banners.some(b => b.title === 'Реклама Oche'));
   err(await call(HOST, 'POST', '/api/clubs/c1/helpers', { playerId: 'p11' }), 403);
   ok(await call(TECH, 'PUT', '/api/admin/perms', { perms: { club_tools: ['host', 'admin'] } }));
 });

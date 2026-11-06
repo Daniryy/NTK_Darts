@@ -1,25 +1,24 @@
 // Клубы. Игрок подаёт заявку, администратор подтверждает — подавший становится ведущим клуба.
-// Роль ведущего (турниры от имени клуба, камеры, свои номера, инструменты клуба) даёт тариф «Ведущий»,
-// а не сам клуб: без тарифа у клуба есть только страница с расписанием.
+// Роль ведущего (турниры от имени клуба, камеры, свои номера, инструменты клуба) выдаёт администратор.
 const { pool, tx, one, all } = require('../db');
 const { E, V } = require('../errors');
 const { needPlayer, clearCache } = require('../auth');
 const { needPerm } = require('../auth');
 const { audit } = require('../audit');
 const config = require('../config');
-const { can } = require('../roles');
+const { can, RANK } = require('../roles');
 const { playerShort } = require('../players');
 const T = require('../tour');
 
 const DAY = 864e5, HELPERS_MAX = 5;
-// управляет клубом: его ведущий (или администратор с правом clubs); tools — ещё и тариф «Ведущий»
+// управляет клубом: его ведущий (или администратор с правом clubs); tools — ещё и право инструментов клуба
 async function clubOf(c, id, me, tools) {
   const club = await one(c, 'SELECT * FROM clubs WHERE id = $1', [id]);
   if (!club || club.status !== 'active') throw E.notFound('Клуб не найден');
   if (me) {
     const host = !!await one(c, 'SELECT 1 FROM club_hosts WHERE club_id = $1 AND player_id = $2', [id, me.id]);
     if (!host && !can(me, 'clubs')) throw E.forbidden('Это может ведущий клуба');
-    if (tools && !can(me, 'club_tools')) throw E.forbidden('Это в тарифе «Ведущий»');
+    if (tools && !can(me, 'club_tools')) throw E.forbidden('Инструменты клуба — у ведущего');
   }
   return club;
 }
@@ -72,8 +71,14 @@ function fields(b, full) {
   return o;
 }
 // игрок — ведущий, пока у него есть открытый клуб; роли выше ведущего не трогаем
-// с учётом тарифов: роль действующего тарифа, иначе ведущий при открытом клубе, иначе игрок (plans.js)
-const syncHostRole = (c, pid) => require('../plans').syncPlanRole(c, pid);
+// роль — выданная вручную (base_role), роли от администратора и выше не трогаем
+async function syncHostRole(c, pid) {
+  const p = await one(c, 'SELECT id, role, base_role FROM players WHERE id = $1 FOR UPDATE', [pid]);
+  if (!p || (RANK[p.role] || 0) >= RANK.admin) return p && p.role;
+  const want = p.base_role && (RANK[p.base_role] || 0) < RANK.admin ? p.base_role : 'player';
+  if (want !== p.role) await c.query('UPDATE players SET role = $2 WHERE id = $1', [pid, want]);
+  return want;
+}
 const nameTaken = async (c, name, except) => !!await one(c, `SELECT 1 FROM clubs WHERE lower(name) = lower($1) AND status IN ('pending', 'active') AND id <> $2`, [name, except || '']);
 
 module.exports = async function (app) {
@@ -101,7 +106,6 @@ module.exports = async function (app) {
     };
     if (tools) {
       out.helpers = (await all(pool, 'SELECT p.* FROM club_helpers h JOIN players p ON p.id = h.player_id WHERE h.club_id = $1 ORDER BY p.name', [club.id])).map(playerShort);
-      out.banners = (await all(pool, 'SELECT * FROM banners WHERE club_id = $1 ORDER BY created_at DESC', [club.id])).map(b => ({ id: b.id, place: b.place, title: b.title, body: b.body, image: b.image, link: b.link, active: b.active, clicks: b.clicks }));
       out.stats = await clubStats(pool, club.id);
     }
     return out;
@@ -119,7 +123,7 @@ module.exports = async function (app) {
     return { ok: true };
   });
 
-  // помощники клуба (тариф «Ведущий»): { playerId }
+  // помощники клуба: { playerId }
   app.post('/api/clubs/:id/helpers', async req => {
     const me = needPlayer(req), pid = V.id((req.body || {}).playerId, 'playerId');
     await tx(async c => {
@@ -141,36 +145,6 @@ module.exports = async function (app) {
       if (!r.rowCount) throw E.notFound('Это не помощник клуба');
       await audit(c, me, 'club.helper_rm', await one(c, 'SELECT id, name FROM players WHERE id = $1', [req.params.pid]), { club: club.name });
     });
-    return { ok: true };
-  });
-
-  // спонсоры клуба (тариф «Ведущий»): баннеры на странице турнира и табло вместо баннеров Oche
-  app.post('/api/clubs/:id/banners', async (req, reply) => {
-    const me = needPlayer(req), f = require('./banners').fields(req.body || {}, true);
-    if (!['tour', 'tv'].includes(f.place)) throw E.bad('Спонсоры клуба — на странице турнира (tour) или табло (tv)', 'place');
-    if (!f.title && !f.image) throw E.bad('Нужен заголовок или картинка', 'title');
-    const club = await clubOf(pool, req.params.id, me, true);
-    if ((await one(pool, 'SELECT count(*)::int AS n FROM banners WHERE club_id = $1', [club.id])).n >= 10) throw E.conflict('conflict', 'У клуба не больше 10 баннеров');
-    const row = await one(pool, `INSERT INTO banners (place, title, body, image, link, active, starts, ends, created_by, created_at, club_id, cta)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`, [f.place, f.title, f.body, f.image, f.link, f.active !== false, f.starts || null, f.ends || null, me.id, Date.now(), club.id, f.cta]);
-    await audit(pool, me, 'banner.create', { id: row.id, name: row.title }, { place: row.place, club: club.name });
-    return reply.code(201).send({ banner: { id: row.id } });
-  });
-  app.patch('/api/clubs/:id/banners/:bid', async req => {
-    const me = needPlayer(req), f = require('./banners').fields(req.body || {}, false), keys = Object.keys(f);
-    if (f.place && !['tour', 'tv'].includes(f.place)) throw E.bad('Спонсоры клуба — tour или tv', 'place');
-    if (!keys.length) throw E.bad('Нечего менять');
-    const club = await clubOf(pool, req.params.id, me, true);
-    const row = await one(pool, `UPDATE banners SET ${keys.map((k, n) => k + ' = $' + (n + 3)).join(', ')} WHERE id = $1 AND club_id = $2 RETURNING *`, [req.params.bid, club.id, ...keys.map(k => f[k])]);
-    if (!row) throw E.notFound('Баннер не найден');
-    return { ok: true };
-  });
-  app.delete('/api/clubs/:id/banners/:bid', async req => {
-    const me = needPlayer(req);
-    const club = await clubOf(pool, req.params.id, me, true);
-    const row = await one(pool, 'DELETE FROM banners WHERE id = $1 AND club_id = $2 RETURNING *', [req.params.bid, club.id]);
-    if (!row) throw E.notFound('Баннер не найден');
-    await audit(pool, me, 'banner.delete', { id: row.id, name: row.title }, { club: club.name });
     return { ok: true };
   });
 

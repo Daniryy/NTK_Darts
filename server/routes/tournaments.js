@@ -137,7 +137,7 @@ function tourFields(b, full, me) {
   if (b.labels != null) o.labels = V.oneOf(b.labels, 'labels', ['ab', 'num']);
   if (b.regUntil !== undefined) o.reg_until = V.optTime(b.regUntil, 'regUntil');
   if (b.start != null) o.start = V.optTime(b.start, 'start');
-  // взнос за участие, ₽ (null — без взноса); отметки «оплатил» — в тарифе «Ведущий»
+  // взнос за участие, ₽ (null — без взноса); отметки «оплатил» — у команды турнира
   if (b.fee !== undefined) o.fee = b.fee === null ? null : V.int(b.fee, 'fee', 0, 100000);
   if (b.official !== undefined || b.orgName !== undefined || b.orgVer !== undefined) {
     if (!can(me, 'official')) throw E.forbidden('Официальный статус задаёт администратор');
@@ -425,7 +425,7 @@ module.exports = async function (app) {
 
   // { seed: 'r' | 'x' | 'm', order } — посев: по рейтингу (по умолчанию), жеребьёвка или вручную в порядке order.
   // { paidOnly: true } — играют только отмеченные «оплатил» (пришли и оплатили на регистрации в клубе),
-  // остальные убираются из турнира; отметки — у команды турнира с тарифом «Ведущий»
+  // остальные убираются из турнира; отметки — у команды турнира
   app.post('/api/tournaments/:id/launch', async req => {
     const me = needPlayer(req), b = req.body || {};
     const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x', 'm']);
@@ -435,7 +435,7 @@ module.exports = async function (app) {
       needOwner(t, me);
       if (t.status !== 'reg') throw E.conflict('bad_state', 'Турнир уже начался');
       if (b.paidOnly === true) {
-        if (!T.feesOn(t, me)) throw E.forbidden('Отметки об оплате — в тарифе «Ведущий»');
+        if (!T.feesOn(t, me)) throw E.forbidden('Отметки об оплате ставит команда турнира');
         const paid = new Set(t._ents.filter(e => e.paid).map(e => e.player_id));
         if (paid.size < 3) throw E.conflict('bad_state', 'Оплатили меньше трёх — отметьте оплативших во вкладке «Взносы»');
         await c.query('DELETE FROM entries WHERE tournament_id = $1 AND NOT paid', [t.id]);
@@ -620,13 +620,13 @@ module.exports = async function (app) {
     });
   });
 
-  // взносы (команда турнира с тарифом «Ведущий»): { playerId, paid }
+  // взносы (команда турнира): { playerId, paid }
   app.patch('/api/tournaments/:id/paid', async req => {
     const me = needPlayer(req), b = req.body || {};
     const pid = V.id(b.playerId, 'playerId'), paid = V.bool(b.paid, 'paid');
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
-      if (!T.feesOn(t, me)) throw E.forbidden('Взносы отмечает организатор или помощник клуба с тарифом «Ведущий»');
+      if (!T.feesOn(t, me)) throw E.forbidden('Взносы отмечает организатор или помощник клуба');
       if (!t.players.includes(pid)) throw E.notFound('Игрок не участвует');
       await c.query('UPDATE entries SET paid = $3 WHERE tournament_id = $1 AND player_id = $2', [t.id, pid, paid]);
       await bump(c, t.id);
