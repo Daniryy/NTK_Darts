@@ -33,9 +33,14 @@ function shuffle(a) {
   for (let k = a.length - 1; k > 0; k--) { const j = crypto.randomInt(k + 1); [a[k], a[j]] = [a[j], a[k]]; }
   return a;
 }
-// порядок посева: по рейтингу (сильнейший первым) или жеребьёвка
-async function seedOrder(c, ids, seed) {
+// порядок посева: по рейтингу (сильнейший первым), жеребьёвка или вручную (order — порядок от организатора;
+// кого в нём нет — в конец по рейтингу)
+async function seedOrder(c, ids, seed, order) {
   if (seed === 'x') return shuffle(ids.slice());
+  if (seed === 'm' && Array.isArray(order)) {
+    const set = new Set(ids), head = [...new Set(order)].filter(id => set.has(id)), inHead = new Set(head);
+    return head.concat(await seedOrder(c, ids.filter(id => !inHead.has(id)), 'r'));
+  }
   const rows = await all(c, 'SELECT id, rating FROM players WHERE id = ANY($1)', [ids]);
   const r = Object.fromEntries(rows.map(x => [x.id, x.rating]));
   return ids.slice().sort((a, b) => r[b] - r[a] || (a < b ? -1 : 1));
@@ -196,7 +201,7 @@ module.exports = async function (app) {
     if (day.n >= (atLeast(me, 'host') ? 200 : 20)) throw E.quota('Слишком много турниров за сутки — продолжите завтра');
     const f = tourFields(b, true, me);
     const reg = b.reg === undefined ? false : V.bool(b.reg, 'reg');
-    const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x']);
+    const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x', 'm']);
     if (f.split && f.format !== 'pl') throw E.bad('Сетки частями — только в формате pl', 'format');
     if (f.groups && !['ko', 'pl'].includes(f.format)) throw E.bad('После групп — сетка: format ko или pl', 'format');
     if (f.groups && f.split) throw E.bad('С группами сетка частями не делится', 'split');
@@ -230,7 +235,7 @@ module.exports = async function (app) {
       }
       if (reg) await c.query('INSERT INTO entries (tournament_id, player_id, seed_no) SELECT $1, x.id, x.n FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [row.id, ids]);
       // с квалификацией порядок — как прислали (номера игроков), посев сделает квалификация
-      else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed), row);
+      else await launch(c, row.id, f.format, f.qual ? ids : f.format === 'rr' ? await seedOrder(c, ids, 'r') : await seedOrder(c, ids, seed, ids), row);
       return tourResp(c, row.id, me);
     });
     return reply.code(201).send(res);
@@ -418,10 +423,13 @@ module.exports = async function (app) {
     });
   });
 
+  // { seed: 'r' | 'x' | 'm', order } — посев: по рейтингу (по умолчанию), жеребьёвка или вручную в порядке order.
   // { paidOnly: true } — играют только отмеченные «оплатил» (пришли и оплатили на регистрации в клубе),
   // остальные убираются из турнира; отметки — у команды турнира с тарифом «Ведущий»
   app.post('/api/tournaments/:id/launch', async req => {
     const me = needPlayer(req), b = req.body || {};
+    const seed = b.seed == null ? 'r' : V.oneOf(b.seed, 'seed', ['r', 'x', 'm']);
+    if (seed === 'm' && (!Array.isArray(b.order) || b.order.length > 256 || b.order.some(x => typeof x !== 'string'))) throw E.bad('order: список id в порядке посева', 'order');
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needOwner(t, me);
@@ -436,7 +444,7 @@ module.exports = async function (app) {
       const max = T.maxPlayers(t.format);
       if (t.players.length < 3) throw E.conflict('bad_state', 'Нужно минимум 3 участника');
       if (t.players.length > max) throw E.conflict('bad_state', 'Для этого формата максимум ' + max + ' участников');
-      await launch(c, t.id, t.format, t._row.qual ? t.players : await seedOrder(c, t.players, 'r'), t._row);
+      await launch(c, t.id, t.format, t._row.qual ? t.players : await seedOrder(c, t.players, seed, b.order), t._row);
       forget('t', t.id);
       return tourResp(c, t.id, me);
     });
