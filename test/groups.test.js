@@ -49,10 +49,12 @@ test('группы змейкой, матчи групп, таблица и вы
   assert.deepEqual(B.table(['a', 'b', 'c', 'd'], gs.filter(g => g.grp === 0)).map(x => x.id), ['a', 'b', 'c', 'd']);
 });
 
+// сыграть все готовые матчи текущей стадии: после последнего матча групп стадия закрывается сама
 async function playAll(t, u) {
+  const st = t.stage;
   for (let k = 0; k < 40; k++) {
     const g = t.games.find(x => B.gameState(t, x).st === 'ready');
-    if (!g) return t;
+    if (!g || t.stage !== st) return t;
     t = ok(await call(u, 'POST', '/api/tournaments/' + t.id + '/games/' + g.r + '/' + g.i + '/result', { la: 1, lb: 0 })).tournament;
   }
   return t;
@@ -72,7 +74,8 @@ test('«Стандарт»: 2 группы по 4, выходят по двое,
   t = await playAll(t, HOST);
   assert.equal(t.status, 'live', 'группы сыграны, но впереди сетка');
   err(await call(PL, 'POST', '/api/tournaments/' + t.id + '/groups/close'), 403);
-  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
+  // последний матч групп — этап закрылся сам, сетка построена
+  err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close'), 409);
   assert.equal(t.stage, undefined);
   assert.equal(t.groups.done, true);
   assert.equal(t.groups.games.filter(g => g.res).length, 12, 'результаты групп остались');
@@ -95,7 +98,6 @@ test('«Лига»: одна группа, выходят четверо — п�
   let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Лига', format: 'ko', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8', 'p9', 'p10'], groups: { n: 1, adv: 4 } }), 201).tournament;
   assert.equal(t.games.length, 10);
   t = await playAll(t, HOST);
-  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
   assert.equal(t.slots.length, 4);
   t = await playAll(t, HOST);
   assert.equal(t.status, 'done');
@@ -106,20 +108,19 @@ test('«Комплексный»: квалификация → группы → 
   let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Комплексный', format: 'pl', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, groups: { n: 2, adv: 2 }, players: ids }), 201).tournament;
   assert.equal(t.stage, 'qual');
   assert.equal(t.split, undefined, 'с группами сетка частями не делится');
+  // все сдали, равенства нет — квалификация закрылась сама
   for (const [k, id] of ids.entries()) t = ok(await call(HOST, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 100 + k })).tournament;
-  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/qual/close')).tournament;
   assert.equal(t.stage, 'groups');
   // змейка по итогам квалификации: лучший (p11) — в A, второй (p10) — в B
   assert.equal(t.groups.ids[0][0], 'p11'); assert.equal(t.groups.ids[1][0], 'p10');
   t = await playAll(t, HOST);
-  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
   t = await playAll(t, HOST);
   assert.equal(t.status, 'done');
 });
 
 test('квалификация — к любому формату: ko — одна сетка по итогам, rr — таблица, pl — одна сетка без частей', async () => {
   const SCORE = { k: 'score', lim: 3 }, ids = ['p6', 'p7', 'p8', 'p9', 'p10'];
-  const qualify = async t => { for (const [k, id] of ids.entries()) t = ok(await call(HOST, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 100 + k })).tournament; return ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/qual/close')).tournament; };
+  const qualify = async t => { for (const [k, id] of ids.entries()) t = ok(await call(HOST, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 100 + k })).tournament; assert.equal(t.stage, undefined); return t; };
   let ko = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'КО с квалификацией', format: 'ko', mode: 501, ltw: 1, qual: { ex: SCORE, tries: 1 }, players: ids }), 201).tournament;
   assert.equal(ko.stage, 'qual');
   ko = await qualify(ko);
@@ -182,7 +183,6 @@ test('«Кубок B»: не вышедшие из групп играют от�
   let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'С кубками', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2, cups: true } }), 201).tournament;
   assert.equal(t.groups.cups, true);
   t = await playAll(t, HOST);
-  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
   assert.ok(t.groups.cupB);
   const cup = ok(await call(HOST, 'GET', '/api/tournaments/' + t.groups.cupB)).tournament;
   assert.equal(cup.parent, t.id); assert.equal(cup.status, 'live'); assert.equal(cup.format, 'ko');

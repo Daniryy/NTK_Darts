@@ -14,11 +14,8 @@ const { newClaim } = require('./admin');
 
 const LIST_MAX = 50;
 
-async function getTour(c, id, lock) {
-  const row = await one(c, T.TOUR_SQL + ' WHERE t.id = $1' + (lock ? ' FOR UPDATE OF t' : ''), [id]);
-  if (!row) throw E.notFound('Турнир не найден');
-  return (await T.loadTours(c, [row]))[0];
-}
+const S = require('../stages');
+const { getTour, launch, reseed, groupsCheck, BRK } = S;
 const tourResp = async (c, id, me) => {
   const t = await getTour(c, id, false), out = T.tourJSON(t, me);
   if (t.status === 'done') out.best = await T.tourBest(c, t.id);
@@ -44,46 +41,6 @@ async function seedOrder(c, ids, seed, order) {
   const rows = await all(c, 'SELECT id, rating FROM players WHERE id = ANY($1)', [ids]);
   const r = Object.fromEntries(rows.map(x => [x.id, x.rating]));
   return ids.slice().sort((a, b) => r[b] - r[a] || (a < b ? -1 : 1));
-}
-
-// посев и сетка; турнир становится live. С квалификацией сетки ещё нет: сначала стадия qual.
-// участники в порядке посева; отметки «оплатил» сохраняются
-async function reseed(c, id, order) {
-  const paid = (await all(c, 'SELECT player_id FROM entries WHERE tournament_id = $1 AND paid', [id])).map(x => x.player_id);
-  await c.query('DELETE FROM entries WHERE tournament_id = $1', [id]);
-  await c.query('INSERT INTO entries (tournament_id, player_id, seed_no, paid) SELECT $1, x.id, x.n, x.id = ANY($3) FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [id, order, paid]);
-}
-// групповой этап: в каждой группе должно быть больше игроков, чем из неё выходит
-function groupsCheck(G, n) {
-  if (G.n * G.adv > T.BR_MAX) throw E.bad('Из групп в сетку выходят не больше ' + T.BR_MAX, 'groups');
-  if (Math.floor(n / G.n) < Math.max(2, G.adv + 1)) throw E.conflict('bad_state', 'Мало участников для ' + G.n + ' ' + (G.n === 1 ? 'группы' : 'групп') + ': в каждой нужно больше, чем выходит из неё (' + G.adv + ')');
-}
-const BRK = ['ko', 'pl', 'de'];
-// «Кубок B»: отдельный турнир с той же игрой для не попавших в основную сетку; off — сколько мест до него
-async function makeCup(c, t, rest, off) {
-  const r = t._row, cup = await one(c, `INSERT INTO tournaments (name, official, owner_id, org_name, org_ver, city, venue, start, status, format, mode, dbl, ltw, cap, ex, club_id, layout, labels, created_at, ltw_by, refs, parent, fee, split, place_off)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'reg', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
-  [(r.name + ' · Кубок B').slice(0, 60), r.official, r.owner_id, r.org_name, r.org_ver, r.city, r.venue, Date.now(), t.format, r.mode, r.dbl, r.ltw, rest.length, r.ex ? JSON.stringify(r.ex) : null,
-    r.club_id, r.layout, r.labels, Date.now(), r.ltw_by ? JSON.stringify(r.ltw_by) : null, r.refs ? JSON.stringify({ chief: r.refs.chief || null, pool: r.refs.pool || [], at: {} }) : null, t.id, r.fee, t.format === 'pl' ? r.split : null, off]);
-  await launch(c, cup.id, t.format, rest, cup);
-  return cup.id;
-}
-const groupsRow = (G, ids) => JSON.stringify(Object.assign({ n: G.n, adv: G.adv, ids, done: false }, G.cups ? { cups: true } : {}));
-
-async function launch(c, id, fmt, order, row) {
-  const t = { players: [], games: [], layout: row.layout };
-  let slots = null, groups = row.groups || null;
-  if (row.groups) groupsCheck(row.groups, order.length);
-  if (fmt === 'sw' && row.rounds && row.rounds >= order.length) throw E.conflict('bad_state', 'Туров должно быть меньше, чем участников (' + order.length + ')');
-  if (row.qual) t.players = order;
-  else if (row.groups) groups = groupsRow(row.groups, B.drawGroups(order, row.groups.n));
-  else if (fmt === 'rr' || fmt === 'sw') t.players = order;
-  if (fmt === 'sw' && !row.rounds) await c.query('UPDATE tournaments SET rounds = $2 WHERE id = $1', [id, Math.min(15, Math.max(1, Math.ceil(Math.log2(order.length))))]);
-  else { B.setBracket(t, fmt, order, row.split); slots = t.slots; }
-  await reseed(c, id, order);
-  await c.query(`UPDATE tournaments SET status = 'live', slots = $2, block = $3, stage = $4, start = $5, groups = $6 WHERE id = $1`,
-    [id, slots && JSON.stringify(slots), t.block || null, row.qual ? 'qual' : row.groups ? 'groups' : null, Date.now(), groups && (typeof groups === 'string' ? groups : JSON.stringify(groups))]);
-  await T.refreshTour(c, await getTour(c, id, false));
 }
 
 // упражнение: обычный x01 без лимита хранится как mode/dbl, остальное — в ex
@@ -466,6 +423,7 @@ module.exports = async function (app) {
       if (t.players.length < 3) throw E.conflict('bad_state', 'Нужно минимум 3 участника');
       if (t.players.length > max) throw E.conflict('bad_state', 'Для этого формата максимум ' + max + ' участников');
       await launch(c, t.id, t.format, t._row.qual ? t.players : await seedOrder(c, t.players, seed, b.order), t._row);
+      await S.autoStage(c, t.id);
       forget('t', t.id);
       return tourResp(c, t.id, me);
     });
@@ -501,6 +459,7 @@ module.exports = async function (app) {
       if (t.official) await eloAdd(c, x.a, x.b, w === 0);
       await T.refreshTour(c, await getTour(c, t.id, false));
       await refreshStats(c, [x.a, x.b]);
+      await S.autoStage(c, t.id);
       forget('t', t.id);
       const m = await one(c, 'SELECT * FROM matches WHERE id = $1', [id]);
       return Object.assign(await tourResp(c, t.id, me), { match: (await matchCards(c, [m]))[0] });
@@ -526,6 +485,7 @@ module.exports = async function (app) {
         ON CONFLICT (tournament_id, player_id, try) DO UPDATE SET v = EXCLUDED.v, t = EXCLUDED.t, match_id = NULL`, [t.id, pid, k, v, Date.now()]);
       // сдавшие все попытки освобождают мишень — её получает следующий
       await T.refreshTour(c, await getTour(c, t.id, false));
+      await S.autoStage(c, t.id);
       forget('t', t.id);
       return tourResp(c, t.id, me);
     });
@@ -542,6 +502,8 @@ module.exports = async function (app) {
       const v = b.v === null ? null : V.int(b.v, 'v', 0, 9999);
       await c.query('UPDATE entries SET qual_tb = $3 WHERE tournament_id = $1 AND player_id = $2', [t.id, req.params.pid, v]);
       await c.query('UPDATE tournaments SET version = version + 1 WHERE id = $1', [t.id]);
+      // перестрелка решила равенство — квалификация закрывается сама
+      await S.autoStage(c, t.id);
       forget('t', t.id);
       return tourResp(c, t.id, me);
     });
@@ -575,27 +537,8 @@ module.exports = async function (app) {
       const ties = T.qualTies(t, true);
       if (ties.length && !(req.body && req.body.force === true)) throw E.conflict('ties', 'Есть равенство в квалификации: проведите перестрелку или закройте как есть', { ties });
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут попытки в счётчике: доиграйте или удалите их', { matches: Object.values(t.live) });
-      const order = T.qualOrder(t), g = { players: [], games: [], layout: t.layout }, G = t._row.groups;
-      // основная сетка — первые main (больше 64 участников — 64 сама), остальные играют «Кубок B»
-      let main = !G && BRK.includes(t.format) ? t.qual.main || (order.length > T.BR_MAX ? T.BR_MAX : null) : null;
-      if (main && order.length <= main) main = null;
-      const top = main ? order.slice(0, main) : order, rest = main ? order.slice(main) : [];
-      if (rest.length > T.BR_MAX) throw E.conflict('bad_state', 'В «Кубок B» уходит больше ' + T.BR_MAX + ' игроков — увеличьте основную сетку');
-      // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
-      if (G) groupsCheck(G, order.length); else if (t.format !== 'rr' && t.format !== 'sw') B.setBracket(g, t.format, top, t.format === 'pl' ? t.split : undefined);
-      await reseed(c, t.id, order);
-      if (main) {
-        const q = Object.assign({}, t._row.qual, { main });
-        if (rest.length >= 2) q.cupB = await makeCup(c, t, rest, main);
-        // места в этом турнире — после сетки; точные придут из «Кубка B»
-        q.rest = Object.fromEntries(rest.map(id => [id, [main + 1, main + rest.length]]));
-        await c.query('UPDATE tournaments SET qual = $2 WHERE id = $1', [t.id, JSON.stringify(q)]);
-      }
-      const nums = JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])));
-      if (G) await c.query(`UPDATE tournaments SET stage = 'groups', groups = $2, nums = $3 WHERE id = $1`, [t.id, groupsRow(G, B.drawGroups(order, G.n)), nums]);
-      else await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = $3, nums = $4 WHERE id = $1`, [t.id, g.slots ? JSON.stringify(g.slots) : null, g.block || null, nums]);
-      await T.refreshTour(c, await getTour(c, t.id, false));
-      forget('t', t.id);
+      await S.closeQual(c, t);
+      await S.autoStage(c, t.id);
       return tourResp(c, t.id, me);
     });
   });
@@ -612,22 +555,8 @@ module.exports = async function (app) {
       if (Object.keys(t.live).length) throw E.conflict('bad_state', 'Ещё идут матчи групп: доиграйте или удалите их', { matches: Object.values(t.live) });
       const pr = B.tProgress(t);
       if (pr.done < pr.total) throw E.conflict('bad_state', 'Сыграны не все матчи групп: осталось ' + (pr.total - pr.done));
-      const order = B.groupAdvance(t), g = { players: [], games: [], layout: t.layout };
-      B.setBracket(g, t.format, order);
-      await c.query('UPDATE matches SET r = r + 64 WHERE tournament_id = $1 AND r IS NOT NULL AND r < 64', [t.id]);
-      const G = Object.assign({}, t._row.groups, { done: true });
-      // «Кубок B»: остальные — по месту в группе — играют свою сетку в отдельном турнире
-      if (G.cups) {
-        const tabs = G.ids.map((ids, k) => B.table(ids, t.groups.games.filter(x => x.grp === k))), rest = [];
-        for (let p = G.adv; p < Math.max(...tabs.map(x => x.length)); p++) tabs.forEach(tb => { if (tb[p]) rest.push(tb[p].id); });
-        if (rest.length >= 2) G.cupB = await makeCup(c, t, rest, order.length);
-      }
-      const refs = t.refs && Object.keys(t.refs.at || {}).length ? Object.assign({}, t.refs, { at: Object.fromEntries(Object.entries(t.refs.at).map(([k, v]) => [/^g/.test(k) ? k : 'g' + k, v])) }) : t.refs || null;
-      const boards = t.boards ? Object.assign({}, t.boards, { at: {} }) : null;
-      await c.query(`UPDATE tournaments SET stage = NULL, slots = $2, block = NULL, groups = $3, refs = $4, boards = $5, ready = NULL WHERE id = $1`,
-        [t.id, JSON.stringify(g.slots), JSON.stringify(G), refs && JSON.stringify(refs), boards && JSON.stringify(boards)]);
-      await T.refreshTour(c, await getTour(c, t.id, false));
-      forget('t', t.id);
+      await S.closeGroups(c, t);
+      await S.autoStage(c, t.id);
       return tourResp(c, t.id, me);
     });
   });
@@ -699,7 +628,7 @@ module.exports = async function (app) {
     return tx(async c => {
       const t = await getTour(c, req.params.id, true);
       needStaff(t, me);
-      const cur = t.refs || {}, rf = { chief: cur.chief || null, pool: (cur.pool || []).slice(), at: Object.assign({}, cur.at) };
+      const cur = t.refs || {}, rf = Object.assign({ chief: cur.chief || null, pool: (cur.pool || []).slice(), at: Object.assign({}, cur.at) }, cur.auto ? { auto: true } : {});
       if (b.chief !== undefined || b.pool !== undefined) needOwner(t, me);
       if (b.chief !== undefined) {
         const ch = b.chief;
@@ -713,7 +642,7 @@ module.exports = async function (app) {
         // снятый из списка судья больше не стоит на матчах
         Object.keys(rf.at).forEach(k => { if (!rf.pool.includes(rf.at[k])) delete rf.at[k]; });
       }
-      if (b.ref !== undefined || b.auto) {
+      if (b.ref !== undefined) {
         if (t.status === 'reg') throw E.conflict('bad_state', 'Судей матчам — после старта');
         if (!t.games.length) throw E.conflict('bad_state', 'Матчей ещё нет');
       }
@@ -727,22 +656,13 @@ module.exports = async function (app) {
           rf.at[r + ':' + i] = name;
         }
       }
-      // по очереди: матчам, которые можно играть (и идущим), — судья, у которого меньше всего матчей
-      if (b.auto) {
-        if (!rf.pool.length) throw E.conflict('bad_state', 'Добавьте судей в список турнира');
-        const rv = B.resolver(t), load = Object.fromEntries(rf.pool.map(n => [n, 0]));
-        Object.values(rf.at).forEach(n => { if (n in load) load[n]++; });
-        for (const g of t.games) {
-          const k = g.r + ':' + g.i, gs = B.gameState(t, g, rv);
-          if (rf.at[k] || gs.st !== 'ready') continue;
-          // сам себя не судит
-          const pl = [gs.a, gs.b].map(id => (t._ents.find(e => e.player_id === id) || {}).name);
-          const free = rf.pool.filter(n => !pl.includes(n));
-          if (!free.length) continue;
-          const pick = free.reduce((a, n) => load[n] < load[a] ? n : a);
-          rf.at[k] = pick; load[pick]++;
-        }
+      // auto: судьи сами встают на готовые игры (по очереди, меньше всего матчей — первым), и дальше — после каждого результата
+      if (b.auto !== undefined) {
+        rf.auto = V.bool(b.auto, 'auto');
+        if (rf.auto && !rf.pool.length) throw E.conflict('bad_state', 'Добавьте судей в список турнира');
+        if (rf.auto) S.autoRefs(t, rf);
       }
+      if (!rf.auto) delete rf.auto;
       const empty = !rf.chief && !rf.pool.length && !Object.keys(rf.at).length;
       await c.query('UPDATE tournaments SET refs = $2 WHERE id = $1', [t.id, empty ? null : JSON.stringify(rf)]);
       await bump(c, t.id);

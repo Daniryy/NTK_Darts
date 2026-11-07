@@ -57,7 +57,9 @@ test('72 участника: сетка на 64, «Кубок B» на 8 с ме
   assert.equal(t.qual.main, 64); assert.equal(t.stage, 'qual');
   // результат квалификации: чем раньше в списке, тем больше очков
   for (const [k, id] of pl.entries()) ok(await call(TECH, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 1000 - k }));
-  t = ok(await call(TECH, 'POST', '/api/tournaments/' + t.id + '/qual/close')).tournament;
+  // все сдали — квалификация закрылась сама
+  t = ok(await call(null, 'GET', '/api/tournaments/' + t.id)).tournament;
+  assert.equal(t.stage, undefined);
   const inB = t.slots.filter(B.isReal);
   assert.equal(inB.length, 64);
   assert.deepEqual(inB.slice().sort(), pl.slice(0, 64).sort());
