@@ -8,6 +8,9 @@
 #
 # Необязательно: DEMO=1 — демо-данные (игроки, турниры, матчи); ADMIN_NAME, ADMIN_LOGIN, ADMIN_PASSWORD —
 # создать тех. администратора без вопросов; REPO, BRANCH — откуда брать код.
+# Сервер клуба (заказчика): NO_DEMO=1 BRANCH=release — без демо-сервера и переключателя «Демо»,
+# обновления только с ветки release (туда попадает проверенная версия):
+#   NO_DEMO=1 BRANCH=release DOMAIN=ndl-darts.ru EMAIL=you@mail.ru bash setup.sh
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-}"
@@ -105,6 +108,10 @@ EOF
 else
   # переход с теста по IP на домен (или обратно) — меняется только адрес сайта
   sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=$URL|" "$ENV_FILE"
+fi
+# сайт клуба без демо
+if [[ ${NO_DEMO:-} == 1 ]] && ! grep -qs '^NO_DEMO=1' "$ENV_FILE"; then
+  sed -i '/^NO_DEMO=/d' "$ENV_FILE"; echo "NO_DEMO=1" >> "$ENV_FILE"
 fi
 
 echo "== зависимости и миграции"

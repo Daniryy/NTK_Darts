@@ -10,6 +10,16 @@ MAIN=/etc/oche.env
 [[ -f $MAIN ]] || exit 0
 as() { sudo -u oche "$@"; }
 
+# сайт клуба без демо (NO_DEMO=1 в /etc/oche.env): демо-сервер не ставится, а поставленный раньше — выключается
+if grep -qs '^NO_DEMO=1' "$MAIN"; then
+  if systemctl is-enabled -q oche-demo 2>/dev/null; then
+    systemctl disable --now oche-demo >/dev/null 2>&1 || true
+    rm -f /etc/cron.d/oche-demo
+    echo "demo: NO_DEMO=1 — демо-сервер выключен"
+  fi
+  exit 0
+fi
+
 if [[ ! -f $ENV ]]; then
   # тот же пользователь базы, что у основного сайта; своя база
   url=$(grep -m1 '^DATABASE_URL=' "$MAIN" | cut -d= -f2-)

@@ -5,6 +5,7 @@
 #   bash /srv/oche/app/deploy/autoupdate.sh off     — выключить
 #   bash /srv/oche/app/deploy/autoupdate.sh status  — включено ли и что было в последние разы
 #   bash /srv/oche/app/deploy/autoupdate.sh run     — проверить и обновить сейчас
+#   bash /srv/oche/app/deploy/autoupdate.sh branch release — брать обновления с другой ветки (сервер клуба — release)
 set -euo pipefail
 APP=/srv/oche/app
 [[ $EUID -eq 0 ]] || { echo "Запустите от root: sudo bash $0 ${1:-}"; exit 1; }
@@ -41,7 +42,7 @@ off)
   ;;
 status)
   if systemctl is-active -q oche-update.timer; then echo "Автообновление включено"; else echo "Автообновление выключено"; fi
-  echo "Версия на сервере: $(sudo -u oche git -C "$APP" log --oneline -1)"
+  echo "Ветка: $(sudo -u oche git -C "$APP" rev-parse --abbrev-ref HEAD) · версия: $(sudo -u oche git -C "$APP" log --oneline -1)"
   journalctl -u oche-update -n 15 --no-pager 2>/dev/null | grep -v '^-- ' || true
   ;;
 run)
@@ -69,5 +70,21 @@ run)
     exit 1
   fi
   ;;
-*) echo "Команды: on, off, status, run"; exit 1 ;;
+branch)
+  # перейти на другую ветку: копия базы, если в новой версии есть миграции, затем обычное обновление
+  b=${2:-}
+  [[ $b =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Укажите ветку: bash $0 branch release"; exit 1; }
+  cd "$APP"
+  sudo -u oche git fetch -q origin "+refs/heads/$b:refs/remotes/origin/$b" 2>/dev/null || { echo "На GitHub нет ветки $b"; exit 1; }
+  prev=$(sudo -u oche git rev-parse HEAD)
+  if [[ -n $(sudo -u oche git diff --name-only "$prev" "origin/$b" -- db/migrations) ]]; then
+    bash "$APP/deploy/backup.sh" || { echo "копия базы не создалась — ветка не сменена" >&2; exit 1; }
+  fi
+  sudo -u oche git checkout -q -B "$b" "origin/$b"
+  sudo -u oche git branch -q --set-upstream-to "origin/$b"
+  rm -f /srv/oche/update-bad
+  echo "Сервер берёт обновления с ветки $b"
+  bash "$APP/deploy/deploy.sh"
+  ;;
+*) echo "Команды: on, off, status, run, branch <ветка>"; exit 1 ;;
 esac

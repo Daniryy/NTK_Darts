@@ -69,7 +69,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 
 test('чтение без входа и базовые ошибки', async () => {
   ok(await call(null, 'GET', '/api/health'));
-  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
+  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, noDemo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
   assert.equal(ok(await call(null, 'GET', '/api/me')).player, null);
   err(await call(null, 'POST', '/api/tournaments', {}), 400, 'bad_request'); // нет X-Device-Id
   err(await call({ dev: dev(), cookie: '' }, 'POST', '/api/tournaments', {}), 401, 'unauthorized');

@@ -98,7 +98,12 @@
             return Api.mode;
           }
         } catch (e) { /* демо-сервера нет */ }
-        Api.base = base; Api.mode = 'demo'; return Api.mode;
+        Api.base = base;
+        // сайт клуба без демо: прежний выбор «Демо» не оставляет страницу в демо — сразу сервер
+        let noDemo = false;
+        try { noDemo = !!(await Api.get('/api/config', { timeout: 3000 })).noDemo; } catch (e) { noDemo = false; }
+        if (!noDemo) { Api.mode = 'demo'; return Api.mode; }
+        ls.set('oche.mode', null);
       }
       try {
         Api.config = await Api.get('/api/config', { timeout: 3000 });

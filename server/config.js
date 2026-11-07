@@ -4,6 +4,8 @@ const prod = env.NODE_ENV === 'production';
 if (prod && !env.COOKIE_SECRET) throw new Error('COOKIE_SECRET не задан');
 // демо-сервер (DEMO=1): та же программа с отдельной базой демо-данных — вход «как любой игрок», данные сбрасываются каждую ночь
 const demo = env.DEMO === '1';
+// сайт клуба без демо (NO_DEMO=1): нет демо-сервера и переключателя «Демо» на странице
+const noDemo = env.NO_DEMO === '1' && !demo;
 
 module.exports = {
   prod,
@@ -16,6 +18,7 @@ module.exports = {
   // в разработке сервер сам отдаёт index.html и shared/; на VPS это делает nginx
   serveStatic: env.SERVE_STATIC ? env.SERVE_STATIC === '1' : !prod,
   demo,
+  noDemo,
   devLogin: demo || (!prod && env.DEV_LOGIN !== '0'),
   // cookie сеанса: у демо своя, чтобы вход в демо не путался с настоящим
   sidName: demo ? 'oche_demo_sid' : 'oche_sid',
