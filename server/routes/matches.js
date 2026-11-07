@@ -12,6 +12,10 @@ const B = require('../../shared/bracket.js');
 const { can } = require('../roles');
 
 const ID_RE = /^g[a-z0-9]{10,30}$/;
+const crypto = require('node:crypto');
+const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
+const REF_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newRefKey = () => Array.from(crypto.randomBytes(16), b => REF_ABC[b % 32]).join('');
 const LOCK_MS = 10 * 60000;
 const MATCH_SQL = 'SELECT m.*, lp.name AS lock_name FROM matches m LEFT JOIN players lp ON lp.id = m.lock_player';
 
@@ -19,7 +23,7 @@ const matchJSON = (m, req, card) => ({
   id: m.id, status: m.status, tid: m.tournament_id, r: m.r, i: m.i, mode: m.mode, ltw: m.ltw, dbl: m.dbl, starter: m.starter,
   ex: m.ex || null, q: m.q_player ? { id: m.q_player, k: m.q_try } : null,
   players: m.players, legs: m.legs, w: m.w, state: m.state, lastSeq: m.last_seq, version: m.version, started: m.started, finished: m.finished, duo: !!m.duo, joined: m.joined || [],
-  lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || null, until: m.lock_until }, card: card || null
+  lock: { mine: !!req.device && m.lock_device === req.device, by: m.lock_name || m.lock_ref || null, until: m.lock_until }, card: card || null
 });
 // повтор события совпадает с записанным: тот же тип, для подхода — тот же игрок, лег и очки
 function sameEvent(row, ev) {
@@ -30,6 +34,34 @@ function sameEvent(row, ev) {
 }
 const eventJSON = e => Object.assign({ seq: e.seq, type: e.type }, e.data, { t: e.t });
 
+
+// судья по QR матча: ключ — заголовок X-Ref-Key, имя — X-Ref-Name (encodeURIComponent)
+async function refOf(c, req) {
+  const key = req.headers['x-ref-key'];
+  if (typeof key !== 'string' || !/^[A-Z2-9]{16}$/.test(key)) return null;
+  const row = await one(c, 'SELECT * FROM ref_keys WHERE key_hash = $1', [sha(key)]);
+  if (!row) return null;
+  let name = '';
+  try { name = decodeURIComponent(String(req.headers['x-ref-name'] || '')); } catch (e) { name = ''; }
+  name = name.replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return { tid: row.tournament_id, r: row.r, i: row.i, pair: [row.pa, row.pb].sort().join(), name: name.length >= 2 ? name : 'Судья' };
+}
+const refFits = (ref, tid, r, i, ids) => !!ref && ref.tid === tid && ref.r === r && ref.i === i && ids.slice().sort().join() === ref.pair;
+const refMatch = (ref, m) => !!m.tournament_id && !m.q_player && refFits(ref, m.tournament_id, m.r, m.i, m.players.map(p => p.id));
+// вошедший игрок или судья по QR; ни того ни другого — 401
+async function actor(req) {
+  const me = req.player || null, ref = await refOf(pool, req);
+  if (!me && !ref) throw E.auth();
+  return { me, ref };
+}
+// судья по QR вёл матч — он в судьях турнира и на этой игре (сетка, протокол)
+async function refMark(c, t, r, i, name) {
+  const cur = t.refs || {}, rf = { chief: cur.chief || null, pool: (cur.pool || []).slice(), at: Object.assign({}, cur.at) };
+  if (!rf.pool.includes(name)) { if (rf.pool.length >= 40) return; rf.pool.push(name); }
+  if (rf.at[r + ':' + i] === name && (cur.pool || []).includes(name)) return;
+  rf.at[r + ':' + i] = name;
+  await c.query('UPDATE tournaments SET refs = $2, version = version + 1 WHERE id = $1', [t.id, JSON.stringify(rf)]);
+}
 
 async function lockMatch(c, id) {
   const m = await one(c, MATCH_SQL + ' WHERE m.id = $1 FOR UPDATE OF m', [id]);
@@ -57,17 +89,19 @@ async function checkClear(c, t, m) {
   if (!canClear(t, B.gameAt(t, m.r, m.i), live)) throw E.conflict('result_locked', 'Нельзя отменить: следующие матчи сетки уже сыграны или идут');
 }
 
-async function startTourMatch(c, req, me, b, id) {
+async function startTourMatch(c, req, me, b, id, ref) {
   const tid = V.id(b.tournamentId, 'tournamentId'), r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63);
   const t = await tourOf(c, tid, true);
   const busy = await one(c, 'SELECT id FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3', [tid, r, i]);
   if (busy) throw E.conflict('game_taken', 'Этот матч уже ведётся или сыгран', { matchId: busy.id });
   const x = readyPair(t, r, i);
   if (!x) throw E.conflict('bad_state', 'Этот матч сейчас нельзя начать');
-  if (!canScoreGame(t, me, x.a, x.b)) throw E.forbidden('Вести счёт может организатор или игрок этой пары');
+  const asRef = !canScoreGame(t, me, x.a, x.b);
+  if (asRef && !refFits(ref, tid, r, i, [x.a, x.b])) throw E.forbidden(ref ? 'QR судьи — для другого матча' : 'Вести счёт может организатор, судья или игрок этой пары');
   const nm = pid => t._ents.find(e => e.player_id === pid).name;
   const starter = b.starter == null ? 0 : V.int(b.starter, 'starter', 0, 1);
-  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: B.ltwOf(t, r, i), dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }] });
+  await insertMatch(c, req, me, { id, tid, r, i, mode: t.mode, ltw: B.ltwOf(t, r, i), dbl: t.dbl, ex: t.ex || null, starter, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }], ref: asRef ? ref.name : null });
+  if (asRef) await refMark(c, t, r, i, ref.name);
   // матч начался — отметки «Готов» этой игры больше не нужны
   await c.query(`UPDATE tournaments SET version = version + 1, ready = ready - $2 WHERE id = $1`, [tid, r + ':' + i]);
   forget('t', tid);
@@ -115,10 +149,10 @@ async function startFriendly(c, req, me, b, id) {
 
 function insertMatch(c, req, me, m) {
   const now = Date.now();
-  return c.query(`INSERT INTO matches (id, tournament_id, r, i, q_player, q_try, status, mode, ltw, dbl, ex, starter, players, legs, state, lock_device, lock_player, lock_until, created_by, started)
-    VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $16, $18)`,
+  return c.query(`INSERT INTO matches (id, tournament_id, r, i, q_player, q_try, status, mode, ltw, dbl, ex, starter, players, legs, state, lock_device, lock_player, lock_until, created_by, started, lock_ref)
+    VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $16, $18, $19)`,
   [m.id, m.tid, m.r, m.i, m.q_player || null, m.q_player ? m.q_try : null, m.mode, m.ltw, m.dbl, m.ex ? JSON.stringify(m.ex) : null, m.starter,
-    JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)), JSON.stringify(liveState(m, [])), req.device, me.id, now + LOCK_MS, now]);
+    JSON.stringify(m.players), JSON.stringify(m.players.map(() => 0)), JSON.stringify(liveState(m, [])), req.device, me ? me.id : null, now + LOCK_MS, now, m.ref || null]);
 }
 
 async function finishMatch(c, m, st, lines, now) {
@@ -176,13 +210,53 @@ module.exports = async function (app) {
     });
   });
 
+  // QR судьи на игру сетки: организатор выдаёт (новый ключ — прежний перестаёт работать), смотрит, выдан ли, и отзывает
+  const refGame = async (c, req, lock) => {
+    const me = needPlayer(req), t = await tourOf(c, req.params.id, lock);
+    if (!isStaff(t, me)) throw E.forbidden('QR судьи выдаёт организатор турнира');
+    return { me, t, r: V.int(+req.params.r, 'r', 0, 63), i: V.int(+req.params.i, 'i', 0, 63) };
+  };
+  app.get('/api/tournaments/:id/games/:r/:i/refkey', async req => {
+    const { t, r, i } = await refGame(pool, req, false);
+    const row = await one(pool, 'SELECT created_at FROM ref_keys WHERE tournament_id = $1 AND r = $2 AND i = $3', [t.id, r, i]);
+    const live = await one(pool, `SELECT lock_ref FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3 AND status = 'live'`, [t.id, r, i]);
+    return { active: !!row, at: row ? +row.created_at : null, by: live ? live.lock_ref : null };
+  });
+  app.post('/api/tournaments/:id/games/:r/:i/refkey', async req => tx(async c => {
+    const { me, t, r, i } = await refGame(c, req, true);
+    const x = readyPair(t, r, i);
+    if (!x) throw E.conflict('bad_state', 'Этот матч сейчас нельзя судить: нет пары или уже сыгран');
+    const key = newRefKey();
+    await c.query(`INSERT INTO ref_keys (tournament_id, r, i, key_hash, pa, pb, created_at, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (tournament_id, r, i) DO UPDATE SET key_hash = $4, pa = $5, pb = $6, created_at = $7, created_by = $8`, [t.id, r, i, sha(key), x.a, x.b, Date.now(), me.id]);
+    return { key };
+  }));
+  app.delete('/api/tournaments/:id/games/:r/:i/refkey', async req => tx(async c => {
+    const { t, r, i } = await refGame(c, req, true);
+    await c.query('DELETE FROM ref_keys WHERE tournament_id = $1 AND r = $2 AND i = $3', [t.id, r, i]);
+    return { ok: true };
+  }));
+  // судья открыл QR: что за матч. Ключ действует, пока у игры та же пара и нет результата
+  app.get('/api/ref/:key', async req => {
+    const key = String(req.params.key || '').toUpperCase();
+    const row = /^[A-Z2-9]{16}$/.test(key) && await one(pool, 'SELECT * FROM ref_keys WHERE key_hash = $1', [sha(key)]);
+    const gone = () => E.notFound('QR судьи больше не действует — попросите у организатора новый');
+    if (!row) throw gone();
+    const t = await tourOf(pool, row.tournament_id, false), x = readyPair(t, row.r, row.i);
+    if (!x || [x.a, x.b].sort().join() !== [row.pa, row.pb].sort().join()) throw gone();
+    const nm = pid => (t._ents.find(e => e.player_id === pid) || {}).name || '';
+    const live = await one(pool, `SELECT id FROM matches WHERE tournament_id = $1 AND r = $2 AND i = $3 AND status = 'live'`, [t.id, row.r, row.i]);
+    const rf = t.refs || {};
+    return { tid: t.id, r: row.r, i: row.i, name: t.name, players: [{ id: x.a, name: nm(x.a) }, { id: x.b, name: nm(x.b) }], ltw: B.ltwOf(t, row.r, row.i), match: live ? live.id : null, ref: (rf.at || {})[row.r + ':' + row.i] || null, pool: rf.pool || [] };
+  });
+
   app.put('/api/matches/:id', async (req, reply) => {
-    const me = needPlayer(req), id = req.params.id, b = req.body || {};
+    const { me, ref } = await actor(req), id = req.params.id, b = req.body || {};
     if (!ID_RE.test(id)) throw E.bad('id матча: «g» и 10–30 латинских букв или цифр', 'id');
     const res = await tx(async c => {
       const ex = await one(c, MATCH_SQL + ' WHERE m.id = $1 FOR UPDATE OF m', [id]);
       if (ex) {
-        if (ex.created_by === me.id && ex.lock_device === req.device) {
+        if ((me ? ex.created_by === me.id : !!ex.lock_ref) && ex.lock_device === req.device) {
           // до первого подхода повтор старта может сменить того, кто начинает («Начинает другой»)
           const st = b.starter == null ? ex.starter : V.int(b.starter, 'starter', 0, ex.players.length - 1);
           if (ex.status === 'live' && ex.last_seq === 0 && st !== ex.starter) {
@@ -194,8 +268,10 @@ module.exports = async function (app) {
         }
         throw E.conflict('conflict', 'Матч с таким id уже есть');
       }
+      // судья без аккаунта начинает только матч сетки по своему QR
+      if (!me && (b.tournamentId == null || b.qual != null)) throw E.auth();
       if (b.tournamentId != null && b.qual != null) await startQualMatch(c, req, me, b, id);
-      else if (b.tournamentId != null) await startTourMatch(c, req, me, b, id);
+      else if (b.tournamentId != null) await startTourMatch(c, req, me, b, id, ref);
       else await startFriendly(c, req, me, b, id);
       return { code: 201, m: await one(c, MATCH_SQL + ' WHERE m.id = $1', [id]) };
     });
@@ -203,13 +279,14 @@ module.exports = async function (app) {
   });
 
   app.post('/api/matches/:id/events', async req => {
-    const me = needPlayer(req);
+    const { me, ref } = await actor(req);
     const evs = (req.body || {}).events;
     if (!Array.isArray(evs) || evs.length < 1 || evs.length > 50) throw E.bad('events: от 1 до 50 событий', 'events');
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
+      if (!me && !refMatch(ref, m)) throw E.forbidden('QR судьи — для другого матча');
       // «каждый за себя»: игрок пары вносит со своего телефона только свои подходы (и отменяет только свой последний)
-      const own = m.duo ? m.players.findIndex(p => p.id === me.id) : -1;
+      const own = m.duo && me ? m.players.findIndex(p => p.id === me.id) : -1;
       if (own < 0 && m.lock_device !== req.device) throw E.locked(m.lock_name, m.lock_until);
       const rows = await all(c, 'SELECT seq, type, data FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]);
       const visits = activeVisits(rows), now = Date.now(), add = [], byseq = new Map(rows.map(r => [r.seq, r]));
@@ -280,15 +357,18 @@ module.exports = async function (app) {
   });
 
   app.post('/api/matches/:id/takeover', async req => {
-    const me = needPlayer(req);
+    const { me, ref } = await actor(req);
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
       if (m.status !== 'live') throw E.conflict('bad_state', 'Матч уже завершён');
-      const inMatch = m.players.some(p => p.id === me.id);
-      const ok = m.tournament_id ? inMatch || isStaff(await tourOf(c, m.tournament_id, false), me) : inMatch || m.created_by === me.id || can(me, 'any_tour');
-      if (!ok) throw E.forbidden('Забрать счёт может организатор или игрок этого матча');
+      const t = m.tournament_id ? await tourOf(c, m.tournament_id, false) : null;
+      const inMatch = !!me && m.players.some(p => p.id === me.id);
+      const ok = !!me && (t ? inMatch || isStaff(t, me) : inMatch || m.created_by === me.id || can(me, 'any_tour'));
+      const asRef = !ok && refMatch(ref, m);
+      if (!ok && !asRef) throw E.forbidden('Забрать счёт может организатор, судья или игрок этого матча');
       // забрать ведение — дальше счёт за обоих с этого телефона
-      await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, duo = false, version = version + 1 WHERE id = $1', [m.id, req.device, me.id, Date.now() + LOCK_MS]);
+      await c.query('UPDATE matches SET lock_device = $2, lock_player = $3, lock_until = $4, lock_ref = $5, duo = false, version = version + 1 WHERE id = $1', [m.id, req.device, me ? me.id : null, Date.now() + LOCK_MS, asRef ? ref.name : null]);
+      if (asRef) { await refMark(c, t, m.r, m.i, ref.name); forget('t', t.id); }
       forget('m', m.id);
       const rows = await all(c, 'SELECT * FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]);
       return { match: matchJSON(await one(c, MATCH_SQL + ' WHERE m.id = $1', [m.id]), req), events: rows.map(eventJSON) };
@@ -296,11 +376,12 @@ module.exports = async function (app) {
   });
 
   app.post('/api/matches/:id/reopen', async req => {
-    const me = needPlayer(req);
+    const { me, ref } = await actor(req);
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
+      if (!me && !refMatch(ref, m)) throw E.forbidden('QR судьи — для другого матча');
       // «каждый за себя»: вернуть матч может тот, кто бросил последний (закрывающий) подход
-      const own = m.duo ? m.players.findIndex(p => p.id === me.id) : -1;
+      const own = m.duo && me ? m.players.findIndex(p => p.id === me.id) : -1;
       if (own >= 0) {
         const vs = activeVisits(await all(c, 'SELECT seq, type, data FROM match_events WHERE match_id = $1 ORDER BY seq', [m.id]));
         if (!vs.length || vs[vs.length - 1].p !== own) throw E.forbidden('Вернуть матч может тот, кто бросил закрывающий подход');
@@ -319,11 +400,12 @@ module.exports = async function (app) {
   });
 
   app.delete('/api/matches/:id', async req => {
-    const me = needPlayer(req);
+    const { me, ref } = await actor(req);
     return tx(async c => {
       const m = await lockMatch(c, req.params.id);
       const t = m.tournament_id ? await tourOf(c, m.tournament_id, true) : null;
-      const owner = t ? isStaff(t, me) : m.created_by === me.id || can(me, 'any_tour');
+      const owner = !!me && (t ? isStaff(t, me) : m.created_by === me.id || can(me, 'any_tour'));
+      if (!me && !refMatch(ref, m)) throw E.forbidden('QR судьи — для другого матча');
       if (m.status === 'live') {
         if (!owner && m.lock_device !== req.device) throw E.forbidden('Бросить матч может тот, кто ведёт счёт, или организатор');
         await c.query('DELETE FROM matches WHERE id = $1', [m.id]);
