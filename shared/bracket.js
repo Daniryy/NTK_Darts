@@ -378,8 +378,15 @@
     for (let j = G.adv; j < k; j++) lo += tabs.filter(x => x.length > j).length;
     return [lo, lo + tabs.filter(x => x.length > k).length - 1];
   }
+  // места; у «Кубка B» — сквозные, после основной сетки (t.off)
   function placeRange(t, pid, rv) {
+    const rg = placeIn(t, pid, rv);
+    return rg && t.off ? [rg[0] + t.off, rg[1] + t.off] : rg;
+  }
+  function placeIn(t, pid, rv) {
     if (!isBracket(t)) return null;
+    // квалификация с основной сеткой: не попавшие в неё — места из «Кубка B» (или после сетки, пока он не сыгран)
+    if (t.qual && t.qual.main && t.slots && !t.slots.includes(pid)) return (t.qual.rest && t.qual.rest[pid]) || [t.qual.main + 1, t.players.length];
     if (t.groups && t.groups.games && isBracket(t) && t.slots && !t.slots.includes(pid)) return groupPlace(t, pid);
     rv = rv || resolver(t);
     if (t.format === 'de') return dePlace(t, pid, rv);
