@@ -42,8 +42,10 @@
 
     async req(method, path, body, o) {
       o = o || {};
-      const headers = { 'X-Device-Id': deviceId() };
+      const headers = { 'X-Device-Id': deviceId() }, ref = Api.ref;
       if (body !== undefined) headers['Content-Type'] = 'application/json';
+      // судья по QR матча: ключ и имя — с каждым запросом, пока режим судьи не истёк
+      if (ref) { headers['X-Ref-Key'] = ref.key; headers['X-Ref-Name'] = encodeURIComponent(ref.name || ''); }
       let res;
       const ctl = W.AbortController ? new W.AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), o.timeout || 15000);
       try {
@@ -124,6 +126,9 @@
       return r;
     },
     async loadMe() { return Api.setMe(await Api.get('/api/me')); },
+    // режим судьи по QR: { key, name, tid, r, i, until } — сутки
+    get ref() { const x = ls.get('oche.ref'); return x && x.until > Date.now() ? x : null; },
+    setRef(x) { ls.set('oche.ref', x ? Object.assign({ until: Date.now() + 86400000 }, x) : null); },
     // роль не ниже: player < host и свои роли (тарифы) < admin < tech
     can: role => { const R = { player: 0, host: 1, admin: 2, tech: 3 }, rk = r => r in R ? R[r] : 1; return !!Api.me && rk(Api.role) >= rk(role); },
     // право из настроек ролей сервера (club_tour, streams, accounts, host_nums, players, block, give_host, clubs, …)
