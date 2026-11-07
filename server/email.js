@@ -73,6 +73,7 @@ module.exports = function routes(app) {
   // регистрация: { name, city?, email, password } → письмо с кодом (шаг 2 — /api/auth/email/verify с purpose reg).
   // Почта на сервере не настроена — аккаунт сразу, адрес неподтверждённый.
   app.post('/api/auth/register', async (req, reply) => {
+    require('./site').needSignup();
     const b = req.body || {}, name = V.str(b.name, 'name', 2, 32), city = V.optStr(b.city, 'city', 40), email = normEmail(b.email), pw = needPass(b.password);
     if (b.consent !== true) throw E.bad('Нужно согласие на обработку персональных данных', 'consent');
     // в зале регистрируются десятки человек с одного адреса — порог с большим запасом
@@ -98,6 +99,7 @@ module.exports = function routes(app) {
     A.ipLimit(req, 'mail', 100, 36e5);
     if (purpose === 'link') {
       const me = A.needPlayer(req), owner = await one(pool, 'SELECT id FROM players WHERE email = $1', [email]);
+      require('./site').needSelfEdit(me);
       if (owner && owner.id !== me.id) throw taken();
       return sendCode(req, email, 'link', { player: me.id });
     }
@@ -114,6 +116,8 @@ module.exports = function routes(app) {
     const keys = [['ev:' + email, 10, 36e5], ['evip:' + req.ip, 60, 10 * 6e4]];
     A.failCheck(keys);
     const me = purpose === 'link' ? A.needPlayer(req) : null, pw = purpose === 'reset' ? needPass(b.password) : null;
+    if (me) require('./site').needSelfEdit(me);
+    if (purpose === 'reg') require('./site').needSignup();
     let row;
     try { row = await takeCode(email, purpose, b.code); } catch (e) { A.failAdd(keys); throw e; }
     if (me && row.player_id !== me.id) throw E.conflict('code_expired', 'Код запрошен с другого аккаунта — запросите новый');
@@ -159,6 +163,7 @@ module.exports = function routes(app) {
   // пароль нужен, если его ещё нет (вход по почте и паролю). Когда письма заработают — подтверждается кодом.
   app.put('/api/me/email', async req => {
     const me = A.needPlayer(req), b = req.body || {}, email = normEmail(b.email);
+    require('./site').needSelfEdit(me);
     if (mailOn()) throw E.conflict('need_code', 'Подтвердите почту кодом из письма');
     A.ipLimit(req, 'mail', 100, 36e5);
     const pass = b.password ? await hashPassword(needPass(b.password)) : null;

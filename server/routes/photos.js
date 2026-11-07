@@ -37,7 +37,7 @@ async function tourOwned(c, id, me) {
 }
 // чей аватар можно менять: свой, гостя или аккаунта, который я завёл, любой — администратору
 async function avatarTarget(c, me, pid) {
-  if (!pid || pid === me.id) return me;
+  if (!pid || pid === me.id) { require('../site').needSelfEdit(me); return me; }
   const p = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [pid]);
   if (!p) throw E.notFound('Игрок не найден');
   if (!can(me, 'players') && !(p.vk_id == null && p.phone == null && p.owner_id === me.id)) throw E.forbidden('Менять фото можно себе, своим гостям или администратору');

@@ -4,6 +4,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:och
 // тест стирает базу целиком — только базы с «test» в имени
 if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
+process.env.SITE_OPEN = '1'; // регистрация и правка профиля открыты — как было до настроек сайта
 process.env.VK_APP_ID = '5550001';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -68,7 +69,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 
 test('чтение без входа и базовые ошибки', async () => {
   ok(await call(null, 'GET', '/api/health'));
-  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '' });
+  assert.deepEqual(ok(await call(null, 'GET', '/api/config')), { vk: true, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
   assert.equal(ok(await call(null, 'GET', '/api/me')).player, null);
   err(await call(null, 'POST', '/api/tournaments', {}), 400, 'bad_request'); // нет X-Device-Id
   err(await call({ dev: dev(), cookie: '' }, 'POST', '/api/tournaments', {}), 401, 'unauthorized');

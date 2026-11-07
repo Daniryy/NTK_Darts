@@ -2,6 +2,7 @@
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
 if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
+process.env.SITE_OPEN = '1'; // регистрация и правка профиля открыты — как было до настроек сайта
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { build } = require('../server/app');
@@ -42,7 +43,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 test('режим, вход для разработки, выход', async () => {
   const w = browser(), Api = makeApi(w);
   assert.equal(await Api.detect(), 'server');
-  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '' });
+  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
   assert.equal(Api.me, null);
   await Api.devLogin(ME);
   assert.equal(Api.me.id, ME);

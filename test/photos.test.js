@@ -2,6 +2,7 @@
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
 if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
+process.env.SITE_OPEN = '1'; // регистрация и правка профиля открыты — как было до настроек сайта
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');

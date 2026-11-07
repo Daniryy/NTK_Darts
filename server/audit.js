@@ -8,12 +8,13 @@ async function audit(c, me, action, target, data) {
     [Date.now(), me ? me.id : null, me ? me.name : '', action, target ? target.id : null, target ? target.name || '' : null, data == null ? null : JSON.stringify(data)]);
 }
 
-// роли и права ролей — при старте и после изменения
+// роли, права ролей и настройки сайта — при старте и после изменения
 async function loadSettings(c) {
   c = c || pool;
   setRoles((await c.query('SELECT key, name, rank FROM roles')).rows);
-  const st = await c.query(`SELECT value FROM settings WHERE key = 'perms'`);
-  setPerms(st.rows.length ? st.rows[0].value : {});
+  const st = Object.fromEntries((await c.query(`SELECT key, value FROM settings WHERE key IN ('perms', 'site')`)).rows.map(r => [r.key, r.value]));
+  setPerms(st.perms || {});
+  require('./site').setSite(st.site || {});
 }
 
 module.exports = { audit, loadSettings };
