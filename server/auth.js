@@ -10,6 +10,7 @@ const { hashPassword, verifyPassword, passwordProblem, normLogin } = require('./
 const { sendCode, DIGITS } = require('./sms');
 const { createPlayer, meJSON } = require('./players');
 const T = require('./totp');
+const S = require('./site');
 
 const SID = config.sidName, VKC = 'oche_vk';
 const SESSION_MS = 180 * 864e5;
@@ -139,10 +140,11 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, demo: config.demo, contact: config.contact }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, demo: config.demo, contact: config.contact, site: S.site() }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
+    S.needSelfEdit(me);
     if (b.name !== undefined) set.name = V.str(b.name, 'name', 2, 32);
     if (b.city !== undefined) set.city = V.optStr(b.city, 'city', 40);
     // клуб — только из зарегистрированных (открытых); прежнее значение можно оставить как есть
@@ -214,6 +216,9 @@ function routes(app) {
   app.post('/api/auth/phone', async (req, reply) => {
     if (!phoneOn()) throw E.notFound('Вход по телефону не настроен');
     const phone = normPhone((req.body || {}).phone), now = Date.now(), method = config.sms.method;
+    // регистрация закрыта — код только на номер, к которому уже привязан аккаунт; привязать номер к себе — по настройке
+    if (req.player) S.needSelfEdit(req.player);
+    else if (!S.site().signup && !await one(pool, 'SELECT 1 FROM players WHERE phone = $1', [phone])) S.needSignup();
     ipLimit(req, 'sms', 100, 36e5);
     // лимиты и запись в журнал — до отправки: ошибки провайдера тоже считаются
     await tx(async c => {
@@ -247,6 +252,7 @@ function routes(app) {
     failCheck(keys);
     if (code.length !== DIGITS.call && code.length !== DIGITS.sms) throw E.bad('Код — 4 последние цифры номера, с которого звонили, или 6 цифр из SMS', 'code');
     const link = b.link === true, me = link ? needPlayer(req) : null;
+    if (me) S.needSelfEdit(me);
     // попытка считается сразу и вне транзакции: неверный код не откатывает счётчик
     const row = await one(pool, `UPDATE phone_codes SET tries = tries + 1 WHERE phone = $1 AND expires_at > $2 AND tries < CASE digits WHEN 4 THEN ${TRIES[4]} ELSE ${TRIES[6]} END RETURNING code_hash`, [phone, now]);
     if (!row) { failAdd(keys); throw E.conflict('code_expired', 'Код устарел или кончились попытки — запросите новый'); }
@@ -262,7 +268,7 @@ function routes(app) {
       }
       let t = owner;
       // новый аккаунт: на экране входа написано, что вход — согласие с политикой
-      if (!t) { t = await createPlayer(c, { name: 'Игрок ' + phone.slice(-4), phone, consent: true }); created = true; }
+      if (!t) { S.needSignup(); t = await createPlayer(c, { name: 'Игрок ' + phone.slice(-4), phone, consent: true }); created = true; }
       if (t.blocked) throw blockedErr();
       if (atLeast(t, 'admin')) throw adminPassErr();
       await startSession(reply, c, t.id, req.device);
@@ -272,8 +278,8 @@ function routes(app) {
     return Object.assign(await meResp(pool, p), { created });
   });
 
-  // вход администратора по логину и паролю (страница #staff). Логин и пароль задаются командой на сервере
-  // (npm run admin) или тех. администратором в панели; после 5 неверных паролей вход по логину закрыт на 15 минут.
+  // вход по логину и паролю: игрокам логин выдаёт администратор или ведущий, администраторам — тех. администратор
+  // (или npm run admin на сервере); администраторы ещё вводят код из приложения. 5 неверных паролей — 15 минут ждать.
   app.post('/api/auth/password', async (req, reply) => {
     const b = req.body || {}, login = normLogin(b.login), pw = typeof b.password === 'string' ? b.password : '';
     const keys = passKeys(req, 'l:' + login);
@@ -288,9 +294,11 @@ function routes(app) {
       throw bad();
     }
     if (p.blocked) throw blockedErr();
-    if (!atLeast(p, 'admin')) throw E.forbidden('Вход по паролю — только для администраторов');
     await pool.query('UPDATE players SET pass_fails = 0, pass_lock_until = NULL WHERE id = $1', [p.id]);
-    return adminTicket(p, 'login.password');
+    // администраторы — ещё код из приложения; игроки и ведущие входят сразу
+    if (atLeast(p, 'admin')) return adminTicket(p, 'login.password');
+    await tx(c => startSession(reply, c, p.id, req.device));
+    return meResp(pool, p);
   });
 
   // второй шаг входа администратора: { ticket, code } — код из приложения (6 цифр) или резервный (abcd-efgh).
@@ -351,6 +359,7 @@ function routes(app) {
   // сменить свой пароль: { current, password }. Пароля ещё нет, а почта привязана — задать без current
   app.put('/api/me/password', async req => {
     const me = needPlayer(req), b = req.body || {}, keys = [['pwc:' + me.id, 10, PASS_LOCK]];
+    S.needSelfPass(me);
     failCheck(keys);
     const cur = await one(pool, 'SELECT * FROM players WHERE id = $1', [me.id]);
     if (!cur.pass_hash && !cur.email) throw E.conflict('conflict', 'Сначала привяжите почту — по ней и паролю будете входить');
@@ -371,6 +380,7 @@ function routes(app) {
   // отвязать способ входа: { phone | vk | email }; хотя бы один должен остаться
   app.delete('/api/me/login/:kind', async req => {
     const me = needPlayer(req), kind = V.oneOf(req.params.kind, 'kind', ['phone', 'vk', 'email']);
+    S.needSelfEdit(me);
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [me.id]);
       const ways = { phone: cur.phone != null, vk: cur.vk_id != null, email: !!(cur.email && cur.pass_hash), login: !!(cur.login && cur.pass_hash) };
@@ -446,12 +456,14 @@ function routes(app) {
         const p = await one(c, 'SELECT id, blocked, role FROM players WHERE vk_id = $1', [vkId]);
         if (saved.l) {
           if (!req.player || req.player.id !== saved.l) return 'fail';
+          if (!S.site().selfEdit && S.plain(req.player)) return 'closed';
           if (p && p.id !== saved.l) return 'vk_taken';
           await c.query('UPDATE players SET vk_id = $2 WHERE id = $1', [saved.l, vkId]);
           return 'linked';
         }
         if (p && p.blocked) return 'blocked';
         if (p && atLeast(p, 'admin')) return 'admin_pass';
+        if (!p && !S.site().signup) return 'closed';
         await startSession(reply, c, p ? p.id : (await createPlayer(c, { name, vk_id: vkId, consent: true })).id, req.device);
         return null;
       });

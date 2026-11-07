@@ -1129,6 +1129,8 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 .perm-h { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
 .adm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .adm-row:last-child { border-bottom: 0; }
+.note-box.iss { display: grid; gap: 6px; }
+.note-box.iss .code { font-size: 20px; }
 .code { font-family: var(--display); font-size: 18px; letter-spacing: .12em; padding: 2px 8px; border-radius: 6px; background: var(--surface2); border: 1px dashed var(--line-bright); user-select: all; }
 .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .players { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; } }
@@ -2037,7 +2039,7 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const closeModals = () => { S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
 const anyModal = () => !!(S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
@@ -2073,6 +2075,8 @@ function go(r, fromHash) {
   if (!fromHash) try { if (location.hash.slice(1) !== r) location.hash = r; } catch (e) {}
 }
 window.addEventListener('hashchange', () => {
+  const lg = loginParse(location.hash);
+  if (lg) { loginLink(lg); return; }
   const qa = qrParse(location.hash);
   if (qa) { qrStrip(qa); if (qa.t) go('t.' + qa.t, true); qrIn(qa); return; }
   const mj = mjoinParse(location.hash);
@@ -3552,7 +3556,8 @@ function profileHTML(p, s, all, tours, ax) {
     if (p.code) h += '<div class="row"><button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b class="sel">' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
     const rated = RATING[id] && RATING[id].n;
     h += '<div class="prate">' + (p.lite ? '<span class="meta" title="Аккаунт завёл ведущий; игрок входит по QR-карточке. Привяжет свой вход — попадёт в рейтинг">Лайт-профиль · вне общего рейтинга · ' : rated ? '<b>' + RATING[id].r + '</b><span class="meta">' + (RANK[id] ? RANK[id] + '-е место в рейтинге · ' : '') : '<span class="meta">В рейтинге — после первого турнирного матча · ') + all.n + ' ' + pl(all.n, 'матч', 'матча', 'матчей') + '</span></div>';
-    if (isMe) h += '<div class="row"><button class="mini" data-act="editname">Изменить профиль</button></div>';
+    if (isMe && !selfOff('selfEdit')) h += '<div class="row"><button class="mini" data-act="editname">Изменить профиль</button></div>';
+    else if (isMe) h += '<span class="meta">Профиль меняет администратор клуба.</span>';
   }
   h += '</div></div>';
   if (isMe && SRV && Api.confirms) h += confirmCard();
@@ -4451,7 +4456,7 @@ const plPhoto = id => S.photos && photoOf(id) ? '<img class="ph" src="' + esc(ph
 // менять фото игрока: себе; в демо — и своим гостям; на сервере — гостям, которых создал я, и всем — администратору
 function canEditPlayer(p) {
   if (!p || !p.id) return false;
-  if (p.id === ME) return true;
+  if (p.id === ME) return !selfOff('selfEdit');
   return SRV ? !!Api.admin : /^x/.test(p.id);
 }
 // виды обрезки: аватар — квадрат, итоги — 4:3
@@ -4751,6 +4756,11 @@ function qrIn(a) {
   if (Api.me && !Api.me.lite) { closeModals(); S.qrAsk = a; render(); return; }
   svDo(Api.codeLogin(a.code), () => { loggedIn(); if (a.t) go('t.' + a.t); });
 }
+const loginParse = h => { const m = /^#login=([A-Za-z0-9._-]{3,32})$/.exec(h); return m ? m[1] : null; };
+function loginLink(lg) {
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  if (SRV && !Api.me) loginOpen({ tab: 'pass', lg });
+}
 const qrParse = h => { const m = /^#k=([A-Za-z0-9]{4,16})(?:&t=([\w-]+))?$/.exec(h); return m ? { code: m[1].toUpperCase(), t: m[2] || null } : null; };
 // код из адреса убираем: не остаётся в истории и не уходит дальше
 function qrStrip(a) { try { history.replaceState(null, '', location.pathname + location.search + (a.t ? '#t.' + a.t : '')); } catch (e) {} }
@@ -4806,9 +4816,12 @@ function parseNums(s) {
 
 // окно входа: почта и пароль (и регистрация), телефон (код из SMS), VK ID, код от ведущего;
 // link: true — привязать телефон, 'email' — привязать почту к своему аккаунту
+// что игрок делает сам — решает тех. администратор («Управление» → «Права ролей»); ведущих и администраторов это не касается
+const siteCfg = () => Object.assign({ signup: true, selfEdit: true, selfPass: true }, (Api.config && Api.config.site) || {});
+const selfOff = k => SRV && !siteCfg()[k] && (RANKS_UI[Api.role] || 0) < 1;
 function loginOpen(o) {
   closeModals();
-  S.login = Object.assign({ tab: 'email', mode: 'login', phone: '', otp: '', code: '', sent: false, dev: '', err: '', busy: false, email: '', name: (Api.me && Api.me.name) || '', city: '', step: '' }, o || {});
+  S.login = Object.assign({ tab: siteCfg().signup ? 'email' : 'pass', mode: 'login', phone: '', otp: '', code: '', sent: false, dev: '', err: '', busy: false, email: '', name: (Api.me && Api.me.name) || '', city: '', step: '' }, o || {});
   render();
   setTimeout(() => { const el = document.querySelector('.ocard.login input'); if (el) el.focus(); }, 30);
 }
@@ -4816,7 +4829,7 @@ const devBox = () => Api.config && Api.config.dev ? '<details class="meta"><summ
 function loginModal() {
   const L = S.login, c = Api.config || {};
   if (Api.demo && !L.link) return demoLoginModal();
-  const tabs = [['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'QR / код', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
+  const tabs = [['pass', 'Логин', !L.link], ['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'QR / код', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
   const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
   let h = '<div class="over" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
@@ -4824,7 +4837,9 @@ function loginModal() {
   if (tabs.length > 1) h += '<div class="seg2 full" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (L.tab === v) + '" class="' + (L.tab === v ? 'on' : '') + '" data-act="login-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const dis = L.busy ? ' disabled' : '', call = (L.method || c.phoneBy) !== 'sms', digits = L.digits || (call ? 4 : 6);
   if (L.tab === 'email') h += mailForm(L, c, dis);
-  else if (L.tab === 'phone' && !L.sent) {
+  else if (L.tab === 'pass') {
+    h += '<p class="meta">Логин и пароль выдаёт администратор клуба или ведущий.</p><input class="inp big" id="lg-login" data-lf="lg" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин" aria-label="Логин" value="' + esc(L.lg || '') + '"><input class="inp big" id="lg-pass" data-lf="lpw" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль" value="' + esc(L.lpw || '') + '"><button class="btn" data-act="pass-login"' + dis + '>Войти</button>';
+  } else if (L.tab === 'phone' && !L.sent) {
     h += '<div class="field"><label class="label" for="login-phone">Номер телефона</label><input class="inp big" id="login-phone" data-lf="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" value="' + esc(L.phone) + '"></div>';
     h += '<button class="btn" data-act="login-send"' + dis + '>' + (call ? 'Позвоните мне' : 'Получить код') + '</button><span class="meta">' + (call ? 'Вам поступит звонок — брать трубку не нужно: код — последние 4 цифры номера, с которого звонят.' : 'Пришлём SMS с кодом из 6 цифр.') + (L.link ? '' : ' Номер новый — создадим аккаунт, имя укажете в профиле.') + '</span>';
   } else if (L.tab === 'phone') {
@@ -4837,8 +4852,8 @@ function loginModal() {
     h += '<p class="meta">Ведущий дал QR-карточку? Наведите на неё камеру телефона — вход сразу, без SMS и пароля. Камера не читает QR — введите код с карточки (8 букв и цифр):</p><input class="inp big code-inp" id="login-code" data-lf="code" autocomplete="off" maxlength="16" placeholder="K7MQ2XRA" aria-label="Код от ведущего" value="' + esc(L.code) + '"><button class="btn" data-act="login-code"' + dis + '>Войти</button>';
   }
   if (L.err) h += '<div class="err">' + esc(L.err) + '</div>';
-  if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>. Новый аккаунт создаётся с этим согласием.</p>';
-  if (!L.link) h += '<button class="lnk meta" data-act="staff-open" style="justify-self:center">Вход для администраторов по логину</button>' + devBox();
+  if (!L.link && !(L.tab === 'email' && L.mode === 'reg')) h += '<p class="meta pd-note">Входя, вы соглашаетесь с <button class="lnk" data-act="privacy-open">политикой обработки персональных данных</button>.' + (siteCfg().signup ? ' Новый аккаунт создаётся с этим согласием.' : ' Нет логина — его выдаст администратор клуба.') + '</p>';
+  if (!L.link) h += devBox();
   return h + '</div></div>';
 }
 // демо: войти за любого — игрока, ведущего, администратора
@@ -4869,6 +4884,7 @@ function mailForm(L, c, dis) {
   }
   if (L.link === 'email' && !c.email) return h + '<p class="meta">Почта и пароль — вход на любом устройстве. Подтвердить почту кодом можно будет, когда на сервере включат письма.</p>' + mailInp + (Api.me && Api.me.pass ? '' : inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"')) + '<button class="btn" data-act="mail-set"' + dis + '>Сохранить почту</button>';
   if (L.link === 'email') return h + '<p class="meta">Пришлём код на почту. Подтверждённая почта — вход по паролю и восстановление пароля, если забудете.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>';
+  if (L.mode === 'reg' && !siteCfg().signup) L.mode = 'login';
   if (L.mode === 'reg') {
     h += inp('mail-name', 'name', 'text', 'Имя и фамилия', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
     h += '<label class="consent meta"><input type="checkbox" id="mail-consent"' + (L.consent ? ' checked' : '') + '><span>Согласен на обработку персональных данных по <button class="lnk" data-act="privacy-open">политике</button></span></label>';
@@ -4878,7 +4894,7 @@ function mailForm(L, c, dis) {
   if (L.mode === 'reset') return h + '<p class="meta">Пришлём на почту код — с ним зададите новый пароль.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>' + linkBtn('login', '← Назад ко входу');
   h += mailInp + inp('mail-pass', 'pass', 'password', 'Пароль', ' autocomplete="current-password"') + '<button class="btn" data-act="mail-login"' + dis + '>Войти</button>';
   if (c.email) h += '<button class="lnk meta" data-act="mail-mode" data-v="reset" style="justify-self:end">Забыли пароль?</button>';
-  h += '<div class="reg-cta"><span class="meta">Впервые в Oche?</span><button class="btn alt" data-act="mail-mode" data-v="reg">Зарегистрироваться</button></div>';
+  if (siteCfg().signup) h += '<div class="reg-cta"><span class="meta">Впервые в Oche?</span><button class="btn alt" data-act="mail-mode" data-v="reg">Зарегистрироваться</button></div>';
   return h;
 }
 function mailAct(a) {
@@ -5001,15 +5017,19 @@ function loginAct(a) {
 function meCard() {
   const me = Api.me, c = Api.config || {};
   if (!me) return '';
-  const row = (name, val, act) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + (act ? '<span class="lrow-a">' + act + '</span>' : '') + '</div>';
+  // правку входа закрыл тех. администратор — способы только показываем
+  const lock = selfOff('selfEdit'), pwLock = selfOff('selfPass');
+  const row = (name, val, act, pw) => '<div class="lrow"><span><b>' + name + '</b><br><span class="meta">' + val + '</span></span>' + (act && !(pw ? pwLock : lock) ? '<span class="lrow-a">' + act + '</span>' : '') + '</div>';
   const ways = n => [me.phone, me.vk, me.email && me.pass, me.login].filter(Boolean).length > n;
   const off = (k, v) => ways(1) ? '<button class="ghost sm" data-act="unlink" data-v="' + k + '">Отвязать</button>' : '';
   let h = '<div class="card sec acc-c"><span class="label">Вход в аккаунт</span><div>';
   // почта — всегда: без писем на сервере привязывается сразу, подтверждается кодом, когда письма заработают
   h += row('Почта', me.email ? esc(me.email) + (me.emailOk ? ' · <span class="ok">подтверждена</span>' : ' · не подтверждена') : 'не привязана',
     (!me.email ? '<button class="mini go" data-act="link-email">Привязать</button>' : !me.emailOk && c.email ? '<button class="mini go" data-act="link-email">Подтвердить</button>' : '') + (me.email ? off('email') : ''));
-  if (me.email && !me.login) h += row('Пароль', me.pass ? 'задан — вход по почте и паролю' : 'не задан', '<button class="mini" data-act="pass-ed">' + (me.pass ? 'Сменить' : 'Задать') + '</button>');
-  if (S.passEd && me.email && !me.login) h += '<div class="panel">' + (me.pass ? '<input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль">' : '') + '<input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль"><input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="pass-set">Сохранить пароль</button></div>';
+  if (me.login && !Api.can('admin')) h += row('Логин', esc(me.login) + ' — вход по логину и паролю', '<button class="mini" data-act="pass-ed">Сменить пароль</button>', true);
+  if (S.passEd && me.login && !pwLock && !Api.can('admin')) h += '<div class="panel">' + passBox() + '</div>';
+  if (me.email && !me.login) h += row('Пароль', me.pass ? 'задан — вход по почте и паролю' : 'не задан', '<button class="mini" data-act="pass-ed">' + (me.pass ? 'Сменить' : 'Задать') + '</button>', true);
+  if (S.passEd && me.email && !me.login && !pwLock) h += '<div class="panel">' + (me.pass ? '<input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль">' : '') + '<input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль"><input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="pass-set">Сохранить пароль</button></div>';
   // телефон и VK — только если настроены на сервере или уже привязаны
   if (me.twofa) h += row('Двухфакторный вход', 'включён · резервных кодов: ' + (me.backupLeft || 0), '<button class="mini" data-act="tfa-new-ask">Новые коды</button>');
   if (me.twofa && S.tfaNew) h += '<div class="panel"><span class="meta">Старые резервные коды перестанут работать. Введите код из приложения:</span><div class="nrow"><input class="inp code-inp" id="tfa-new-code" inputmode="numeric" maxlength="9" placeholder="000000" aria-label="Код из приложения"><button class="mini go" data-act="tfa-new">Создать</button></div></div>';
@@ -5017,7 +5037,8 @@ function meCard() {
   if (c.vk || me.vk) h += row('VK ID', me.vk ? 'привязан' : 'не привязан', me.vk ? off('vk') : '<button class="mini" data-act="link-vk">Привязать</button>');
   h += '</div>';
   if (me.email && !me.emailOk && !c.email) h += '<p class="meta">Входить по почте' + (me.login ? '' : ' и паролю') + ' можно уже сейчас, подтвердить её — когда на сервере включат письма.</p>';
-  if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
+  if (lock) h += '<p class="meta">Способы входа и пароль меняет администратор клуба.</p>';
+  else if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
   if (Api.role === 'tech' && (!c.vk || !c.email)) h += '<p class="meta">На сервере пока не подключены: ' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(', ') + '.</p>';
   h += '</div>';
   return '<div class="acc-grid">' + h + titleCard() + clubCard() + dataCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
@@ -5165,7 +5186,7 @@ function proCard() {
   const per = S.proP || '90', e = lz('pro:' + per, () => Api.get('/api/me/pro?period=' + per), 60000);
   let h = '<div class="card sec procard"><div class="tstat"><span class="label">Моя статистика</span><a class="mini" href="' + esc(Api.base) + '/api/me/export.csv" download>Выгрузить в Excel</a></div>';
   // выходная музыка — играет на табло, когда игрок выходит на матч
-  h += '<div class="walk-ed"><label class="label" for="me-walkon">Выходная музыка на табло</label><div class="nrow"><input class="inp" id="me-walkon" maxlength="60" value="' + esc((Api.me && Api.me.walkon) || '') + '" placeholder="Исполнитель — трек"><button class="mini" data-act="walkon-save">Сохранить</button></div></div>';
+  if (!selfOff('selfEdit')) h += '<div class="walk-ed"><label class="label" for="me-walkon">Выходная музыка на табло</label><div class="nrow"><input class="inp" id="me-walkon" maxlength="60" value="' + esc((Api.me && Api.me.walkon) || '') + '" placeholder="Исполнитель — трек"><button class="mini" data-act="walkon-save">Сохранить</button></div></div>';
   h += '<div class="seg2">' + [['30', '30 дней'], ['90', '90 дней'], ['365', 'Год'], ['all', 'Всё время']].map(([v, l]) => '<button class="' + (per === v ? 'on' : '') + '" data-act="pro-p" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const st = svState(e, 'статистики');
   if (st) return h + st + '</div>';
@@ -5619,7 +5640,7 @@ function adminView() {
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
     P2('titles') ? [['titles', 'Звания']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
-    Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('cleanup') ? [['srv', 'Сервер']] : [], Api.me.login ? [['me', 'Мой вход']] : []);
+    Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('cleanup') ? [['srv', 'Сервер']] : [], Api.me.login && Api.can('admin') ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
   // администратору нужен подтверждённый контакт: по нему восстанавливается доступ
@@ -5643,7 +5664,7 @@ function admAccounts() {
   h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
   h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
   h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
-  if (S.admNew) h += codeNote(S.admNew);
+  if (S.admNew) h += codeNote(S.admNew) + admLoginSec(S.admNew);
   h += '</details>';
   if (full) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   h += '<input class="inp" id="adm-q" data-admq="1" value="' + esc(S.admQ || '') + '" placeholder="Найти: имя, ID, телефон, почта, логин" aria-label="Найти игрока">';
@@ -5662,7 +5683,7 @@ function admRow(p) {
 // карточка игрока (окно): всё об аккаунте и все действия, на которые есть права
 const ACT_NAME = {
   'login.password': 'вошёл по паролю', 'login.email': 'вошёл по почте и паролю', 'email.link': 'подтвердил почту', 'email.set': 'привязал почту (без подтверждения)', 'password.reset': 'задал новый пароль по письму', 'password.change': 'сменил свой пароль', 'player.create': 'завёл аккаунт', 'player.edit': 'изменил аккаунт', 'player.role': 'сменил роль',
-  'player.delete': 'удалил аккаунт', cleanup: 'очистил сервер от демо-данных', 'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей',
+  'player.delete': 'удалил аккаунт', cleanup: 'очистил сервер от демо-данных', 'player.block': 'блокировка', 'player.logout': 'завершил сеансы', 'player.login': 'выдал логин и пароль', 'player.login_off': 'убрал вход по паролю', perms: 'изменил права ролей', site: 'изменил, что игроки делают сами',
   'club.active': 'подтвердил клуб', 'club.rejected': 'отклонил заявку клуба', 'club.closed': 'закрыл клуб', 'club.pending': 'вернул клуб в заявки', 'club.edit': 'изменил клуб',
   'club.host_add': 'назначил ведущим', 'club.helper_add': 'добавил помощника клуба', 'club.helper_rm': 'убрал помощника клуба', 'club.host_rm': 'снял с ведущих', 
   'title.submit': 'подал заявку на звание', 'title.approved': 'подтвердил звание', 'title.rejected': 'отклонил звание', 'title.revoke': 'снял звание',
@@ -5686,6 +5707,22 @@ function auditData(a) {
   return '';
 }
 const RANKS_UI = { player: 0, host: 1, admin: 2, tech: 3 };
+// выданный пароль показываем один раз: переписать, скопировать или распечатать карточку
+const issuedBox = x => '<div class="note-box iss"><span>Логин <b class="code">' + esc(x.login) + '</b></span><span>Пароль <b class="code">' + esc(x.password) + '</b></span><span class="meta">Пароль виден только сейчас — потом можно лишь выдать новый. Передайте лично, в чатах не пересылайте.</span><div class="row"><button class="mini" data-act="iss-copy">Скопировать</button><button class="mini" data-act="iss-print">Печать карточки</button></div></div>';
+function admLoginSec(p) {
+  const x = S.issued && S.issued.id === p.id ? S.issued : null;
+  let h = '<div class="ac-sec"><span class="label">Вход по логину и паролю</span>';
+  h += x ? issuedBox(x) : '<p class="meta">' + (p.login ? 'Логин <b>' + esc(p.login) + '</b>. Забыл пароль — выдайте новый, старый перестанет работать.' : 'Логин подберётся по фамилии, пароль — случайный. Игрок входит ими на любом устройстве.') + '</p>';
+  return h + '<div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-issue" data-v="' + p.id + '">' + (p.login ? 'Новый пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Отключить вход</button>' : '') + '</div></div>';
+}
+function printLogin(x) {
+  if (!window.qrcode) { loadQr(); toast('QR-код загружается — нажмите ещё раз.'); return; }
+  const w = window.open('', '_blank');
+  if (!w) { toast('Браузер не дал открыть окно печати — разрешите всплывающие окна.'); return; }
+  const site = location.origin + location.pathname;
+  w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Вход в Oche — ' + esc(x.name) + '</title><style>body{font:14px/1.4 system-ui,sans-serif;margin:12mm;color:#000;background:#fff}.c{display:flex;gap:6mm;border:1px dashed #888;border-radius:3mm;padding:5mm;max-width:120mm}.q{width:34mm;flex:none}.q svg{width:100%;height:auto;display:block}.t{display:grid;gap:2mm;align-content:start}code{font:600 16px ui-monospace,monospace;letter-spacing:.04em}span{color:#333}</style></head><body><div class="c"><div class="q">' + qrHTML(site + '#login=' + encodeURIComponent(x.login)) + '</div><div class="t"><b>' + esc(x.name) + '</b><span>Сайт: ' + esc(site) + '</span><span>Логин: <code>' + esc(x.login) + '</code></span><span>Пароль: <code>' + esc(x.password) + '</code></span><span>Наведите камеру на QR — откроется вход с вашим логином, останется ввести пароль.</span></div></div><script>onload=function(){print()}<\/script></body></html>');
+  w.document.close();
+}
 function admCardModal() {
   const id = S.admOpen, e = lz('acard:' + id, () => Api.get('/api/admin/players/' + id), 15000);
   const close = '<button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button>';
@@ -5718,6 +5755,8 @@ function admCardModal() {
   if (full && (!high || tech) && p.id !== ME) acts.push('<button class="mini" data-act="ac-logout" data-v="' + p.id + '">Завершить сеансы</button>');
   if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
+  // логин и пароль игрока — выдаёт администратор или ведущий, который завёл аккаунт
+  if (!high && (full || (mine && Api.perm('accounts')))) h += admLoginSec(p);
   // логин и пароль администратора — выдаёт тех. администратор
   if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Вход: ' + esc(location.origin) + '/#admin — логин, пароль и код из Google Authenticator. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div><p class="meta">Двухфакторный вход: ' + (p.twofa ? 'включён <button class="lnk dng" data-act="ac-2fa-off" data-v="' + p.id + '">сбросить (потерян телефон)</button>' : 'привяжет при следующем входе') + '</p></div>';
 
@@ -5743,7 +5782,9 @@ function admPerms() {
   if (st) return st;
   const d = e.data, ed = S.permEd || (S.permEd = Object.fromEntries(d.perms.map(x => [x.key, x.roles.slice()])));
   const changed = d.perms.some(x => x.roles.slice().sort().join() !== ed[x.key].slice().sort().join());
-  let h = '<p class="meta">Отметьте, каким ролям что доступно. Тех. администратору доступно всё; роли администратора и тех. администратора и эту таблицу меняет только он.</p>';
+  const sc = siteCfg(), sw = (k, l, sub) => '<label class="consent"><input type="checkbox" data-site="' + k + '"' + (sc[k] ? ' checked' : '') + '><span><b>' + l + '</b><br><span class="meta">' + sub + '</span></span></label>';
+  let h = '<div class="panel"><span class="h2">Что игроки делают сами</span>' + sw('signup', 'Регистрация на сайте', 'Выключено — аккаунты заводят администратор и ведущие, вход по выданному логину и паролю или QR-карточке.') + sw('selfEdit', 'Правка своего профиля', 'Имя, город, фото, почта, телефон. Выключено — меняет администратор в карточке игрока.') + sw('selfPass', 'Смена своего пароля', 'Выключено — забыл пароль, новый выдаёт администратор.') + '<p class="meta">Ведущих и администраторов это не касается.</p></div>';
+  h += '<p class="meta">Отметьте, каким ролям что доступно. Тех. администратору доступно всё; роли администратора и тех. администратора и эту таблицу меняет только он.</p>';
   const SHORT = { player: 'игрок', host: 'ведущий', admin: 'админ' }, cols = d.roles.concat([{ key: 'tech', name: 'тех. админ' }]), gtc = 'minmax(200px, 1fr) repeat(' + cols.length + ', 86px)';
   h += '<div class="card perm-t"><div class="perm-r perm-h" style="grid-template-columns:' + gtc + '"><span>Право</span>' + cols.map(r => '<span>' + esc(SHORT[r.key] || r.name) + '</span>').join('') + '</div>';
   h += d.perms.map(x => '<div class="perm-r" style="grid-template-columns:' + gtc + '"><span>' + esc(x.name) + '</span>' + d.roles.map(r => '<label><input type="checkbox" data-perm="' + x.key + '|' + r.key + '"' + (ed[x.key].includes(r.key) ? ' checked' : '') + ' aria-label="' + esc(x.name + ': ' + r.name) + '"></label>').join('') + '<label><input type="checkbox" checked disabled aria-label="тех. администратор"></label></div>').join('') + '</div>';
@@ -5768,8 +5809,10 @@ function admAudit() {
 }
 // мой вход по паролю: смена пароля
 function admMe() {
-  return '<div class="panel"><span class="h2">Мой вход</span><p class="meta">Логин <b>' + esc(Api.me.login) + '</b>. Вход: ' + esc(location.origin) + '/#admin — логин, пароль и код из Google Authenticator.</p><input class="inp" id="me-pass-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль"><input class="inp" id="me-pass-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 10 символов" aria-label="Новый пароль"><input class="inp" id="me-pass-new2" type="password" autocomplete="new-password" placeholder="Новый пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="me-pass">Сменить пароль</button></div>';
+  return '<div class="panel"><span class="h2">Мой вход</span><p class="meta">Логин <b>' + esc(Api.me.login) + '</b>. Вход: ' + esc(location.origin) + '/#admin — логин, пароль и код из Google Authenticator.</p>' + passBox() + '</div>';
 }
+// смена пароля при входе по логину
+const passBox = () => '<input class="inp" id="me-pass-cur" type="password" autocomplete="current-password" placeholder="Текущий пароль" aria-label="Текущий пароль"><input class="inp" id="me-pass-new" type="password" autocomplete="new-password" placeholder="Новый пароль, от 10 символов" aria-label="Новый пароль"><input class="inp" id="me-pass-new2" type="password" autocomplete="new-password" placeholder="Новый пароль ещё раз" aria-label="Повтор пароля"><button class="btn sm" data-act="me-pass">Сменить пароль</button>';
 // вход администратора — только здесь, на #admin: логин, пароль и код из Google Authenticator
 function staffForm() {
   return '<div class="panel"><input class="inp big" id="st-login" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Логин" aria-label="Логин" value="' + esc(S.staffLogin || '') + '"><input class="inp big" id="st-pass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль">' + (S.staffErr ? '<div class="err">' + esc(S.staffErr) + '</div>' : '') + '<button class="btn" data-act="staff-login">Войти</button></div><p class="meta">Затем — код из Google Authenticator: при первом входе приложение привязывается по QR-коду. После 5 неверных паролей вход закрывается на 15 минут.</p>';
@@ -6655,6 +6698,15 @@ document.addEventListener('click', e => {
     case 'mail-back': if (S.login) { Object.assign(S.login, { step: '', err: '', otp: '', dev: '' }); render(); } break;
     case 'link-email': loginOpen({ tab: 'email', link: 'email', email: (Api.me && Api.me.email) || '' }); break;
     case 'pass-ed': S.passEd = !S.passEd; render(); break;
+    case 'pass-login': {
+      const L = S.login;
+      if (!L) break;
+      const l = $('lg-login'), pw = $('lg-pass');
+      L.lg = l ? l.value.trim() : ''; L.lpw = pw ? pw.value : '';
+      if (!L.lg || !L.lpw) { L.err = 'Введите логин и пароль.'; render(); break; }
+      loginDo(Api.passwordLogin(L.lg, L.lpw), r => r.need2fa ? tfaStart(r) : loggedIn());
+      break;
+    }
     case 'pass-set': {
       const g = id => { const el = $(id); return el ? el.value : ''; };
       if (g('pw-new') !== g('pw-new2')) { toast('Пароли не совпадают.'); break; }
@@ -6769,6 +6821,9 @@ document.addEventListener('click', e => {
       svDo(Api.put('/api/admin/players/' + v + '/login', { login: l ? l.value.trim() : '', password: pw ? pw.value : '' }), () => { svStale('acard:'); svStale('admin:'); toast('Логин и пароль сохранены. Передайте пароль лично.'); });
       break;
     }
+    case 'ac-issue': svDo(Api.put('/api/admin/players/' + v + '/login', {}), r => { S.issued = { id: v, name: r.player.name, login: r.login, password: r.password }; if (S.admNew && S.admNew.id === v) S.admNew.login = r.login; svPlayer(r.player); svStale('acard:'); svStale('admin:'); }); break;
+    case 'iss-copy': if (S.issued) copyText('Oche: ' + location.origin + location.pathname + '\nЛогин: ' + S.issued.login + '\nПароль: ' + S.issued.password, 'Логин и пароль скопированы.'); break;
+    case 'iss-print': if (S.issued) printLogin(S.issued); break;
     case 'ac-login-off': svDo(Api.del('/api/admin/players/' + v + '/login'), () => { svStale('acard:'); svStale('admin:'); toast('Вход по паролю убран.'); }); break;
     case 'perm-save': {
       const d = SVC.aperms && SVC.aperms.data;
@@ -6792,7 +6847,7 @@ document.addEventListener('click', e => {
     case 'me-pass': {
       const g = id => { const el = $(id); return el ? el.value : ''; };
       if (g('me-pass-new') !== g('me-pass-new2')) { toast('Новые пароли не совпадают.'); break; }
-      svDo(Api.put('/api/me/password', { current: g('me-pass-cur'), password: g('me-pass-new') }), () => { ['me-pass-cur', 'me-pass-new', 'me-pass-new2'].forEach(id => { const el = $(id); if (el) el.value = ''; }); toast('Пароль изменён.'); });
+      svDo(Api.put('/api/me/password', { current: g('me-pass-cur'), password: g('me-pass-new') }), () => { ['me-pass-cur', 'me-pass-new', 'me-pass-new2'].forEach(id => { const el = $(id); if (el) el.value = ''; }); S.passEd = false; toast('Пароль изменён.'); });
       break;
     }
     case 'staff-login': {
@@ -7161,6 +7216,12 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.id === 'tf-file') { titleUpload([...(t.files || [])]); t.value = ''; return; }
+  // что игроки делают сами: сохраняется сразу
+  if (SRV && t.dataset && t.dataset.site) {
+    const k = t.dataset.site, on = t.checked;
+    svDo(Api.put('/api/admin/site', { [k]: on }), r => { if (Api.config) Api.config.site = r.site; svStale('aaudit'); toast(on ? 'Включено.' : 'Выключено.'); });
+    return;
+  }
   if (t.dataset && t.dataset.perm && S.permEd) {
     const [k, r] = t.dataset.perm.split('|'), cur = S.permEd[k] || [];
     S.permEd[k] = t.checked ? cur.concat(cur.includes(r) ? [] : [r]) : cur.filter(x => x !== r);
@@ -7183,7 +7244,8 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
-  if (e.key === 'Enter' && t && /^mail-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
+  if (e.key === 'Enter' && t && t.id === 'lg-login' && S.login) { e.preventDefault(); const n = $('lg-pass'); if (n) n.focus(); return; }
+  if (e.key === 'Enter' && t && /^(mail|lg)-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
   if (e.key === 'Enter' && t && t.id === 'tp-add') { e.preventDefault(); const b = document.querySelector('[data-act="tp-add"]'); if (b) addParticipant(b.dataset.v); return; }
   if (e.key === 'Enter' && t && /^login-(phone|otp|code)$/.test(t.id)) { e.preventDefault(); loginAct(t.id === 'login-phone' ? 'send' : t.id === 'login-otp' ? 'verify' : 'code'); return; }
   if (e.key === 'Enter' && t && t.id === 'nt-nums') { e.preventDefault(); const b = $('app').querySelector('[data-act="nt-nums"]'); if (b) b.click(); return; }
@@ -7376,7 +7438,8 @@ async function boot() {
       if (!x || !ids.includes(x.a) || !ids.includes(x.b)) G.ctx = null;
     }
   }
-  const qa = qrParse(location.hash), ma = mresParse(location.hash), mj = mjoinParse(location.hash);
+  const qa = qrParse(location.hash), ma = mresParse(location.hash), mj = mjoinParse(location.hash), lg = loginParse(location.hash);
+  if (lg) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
   if (mj) try { history.replaceState(null, '', location.pathname + location.search + '#play'); } catch (e) {}
   if (qa) qrStrip(qa);
   if (ma) try { history.replaceState(null, '', location.pathname + location.search + '#t.' + ma.tid); } catch (e) {}
@@ -7388,6 +7451,7 @@ async function boot() {
   if (qa) qrIn(qa);
   if (ma) mresIn(ma);
   if (mj) mjoinIn(mj);
+  if (lg) loginLink(lg);
 }
 boot();
 </script>

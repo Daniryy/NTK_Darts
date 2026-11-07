@@ -12,6 +12,26 @@ const { RANK, ROLES, ROLE_NAME, PERM, grantable, can, permTable, setPerms } = re
 const { audit } = require('../audit');
 const { hashPassword, passwordProblem, LOGIN_RE, normLogin } = require('../password');
 
+// кто выдаёт логин и пароль: администратору — тех. администратор; игроку — администратор с правом players
+// или ведущий своему аккаунту (право accounts)
+function loginRight(me, cur) {
+  if (RANK[cur.role] >= RANK.admin) { if (me.role !== 'tech' || me.blocked) throw E.forbidden('Логин администратора выдаёт тех. администратор'); return; }
+  if (!can(me, 'players') && !(can(me, 'accounts') && cur.owner_id === me.id)) throw E.forbidden('Логин и пароль игроку выдаёт администратор или ведущий, заведший аккаунт');
+}
+// пароль для игрока: 12 знаков без похожих букв, например k7mq-x9pd-4f
+function newPassword() {
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.randomBytes(10);
+  const s = [...r].map(x => A[x % A.length]).join('');
+  return s.slice(0, 4) + '-' + s.slice(4, 8) + '-' + s.slice(8, 10);
+}
+// логин по фамилии латиницей: ivanov, ivanov2…
+const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+async function freeLogin(c, p) {
+  const words = String(p.last_name || p.name || '').trim().toLowerCase().split(/\s+/);
+  let b = [...(p.last_name ? words[0] : words[words.length - 1])].map(ch => TR[ch] != null ? TR[ch] : ch).join('').replace(/[^a-z0-9]/g, '').slice(0, 24);
+  if (b.length < 3) b = 'player';
+  for (let n = 1; ; n++) { const l = n === 1 ? b : b + n; if (!await one(c, 'SELECT 1 FROM players WHERE login = $1', [l])) return l; }
+}
 const needTech = req => { const me = needPlayer(req); if (me.role !== 'tech' || me.blocked) throw E.forbidden('Это может только тех. администратор'); return me; };
 // код без похожих букв и цифр (0/O, 1/I)
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -145,12 +165,11 @@ module.exports = async function (app) {
         set.role = role;
         // выданная вручную роль — основа: её же восстанавливает назначение и снятие ведущих клуба
         set.base_role = RANK[role] < RANK.admin ? role : 'player';
-        // ниже администратора вход по логину не нужен; пароль остаётся, если по нему входят с почтой
-        if (RANK[role] < RANK.admin && cur.login) { set.login = null; if (!cur.email) set.pass_hash = null; }
       }
       const keys = Object.keys(set);
       if (!keys.length) throw E.bad('Нечего менять');
-      if (set.blocked || 'login' in set) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
+      // блокировка или понижение администратора — его входы закрываются
+      if (set.blocked || (set.role && RANK[cur.role] >= RANK.admin && RANK[set.role] < RANK.admin)) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
       const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
@@ -177,24 +196,31 @@ module.exports = async function (app) {
     return { ok: true, sessions: out };
   });
 
-  // логин и пароль администратора (тех. администратор): { login, password }; пароль задаёт тот, кто знает, и передаёт лично
+  // логин и пароль: { login?, password? }. Игроку — администратор (право players) или ведущий своему аккаунту (accounts):
+  // без логина он подбирается по фамилии, без пароля — генерируется и один раз приходит в ответе (password).
+  // Администратору — только тех. администратор и только свой пароль из рук в руки (от 10 символов).
   app.put('/api/admin/players/:id/login', async req => {
-    const me = needTech(req), b = req.body || {}, login = normLogin(b.login);
-    if (!LOGIN_RE.test(login)) throw E.bad('Логин: 3–32 символа, латиница, цифры, точка, дефис, подчёркивание', 'login');
-    const bad = passwordProblem(b.password);
-    if (bad) throw E.bad(bad, 'password');
-    const hash = await hashPassword(b.password);
+    const me = needPlayer(req), b = req.body || {};
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!cur) throw E.notFound('Игрок не найден');
-      if (RANK[cur.role] < RANK.admin) throw E.conflict('conflict', 'Вход по паролю — только для администраторов: сначала выдайте роль');
+      loginRight(me, cur);
+      const high = RANK[cur.role] >= RANK.admin;
+      let login = b.login == null || b.login === '' ? cur.login || (high ? null : await freeLogin(c, cur)) : normLogin(b.login);
+      if (!login || !LOGIN_RE.test(login)) throw E.bad('Логин: 3–32 символа, латиница, цифры, точка, дефис, подчёркивание', 'login');
+      const gen = b.password == null || b.password === '';
+      if (gen && high) throw E.bad('Пароль администратора задаётся вручную', 'password');
+      const pw = gen ? newPassword() : b.password, bad = passwordProblem(pw);
+      if (bad) throw E.bad(bad, 'password');
       if (await one(c, 'SELECT 1 FROM players WHERE login = $1 AND id <> $2', [login, cur.id])) throw E.conflict('login_taken', 'Такой логин уже занят');
-      const out = await one(c, 'UPDATE players SET login = $2, pass_hash = $3, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id, login, hash]);
+      const out = await one(c, 'UPDATE players SET login = $2, pass_hash = $3, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id, login, await hashPassword(pw)]);
+      // новый пароль: прежние входы закрываются
+      await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       await audit(c, me, 'player.login', out, { login });
-      return out;
+      return Object.assign(out, { _pw: gen ? pw : null });
     });
     clearCache();
-    return { player: adminJSON(p, me) };
+    return Object.assign({ player: adminJSON(p, me) }, p._pw ? { login: p.login, password: p._pw } : {});
   });
   // сбросить двухфакторный вход (потерян телефон): при следующем входе — привязка заново; сеансы закрываются
   app.delete('/api/admin/players/:id/2fa', async req => {
@@ -212,10 +238,11 @@ module.exports = async function (app) {
     return { player: adminJSON(p, me) };
   });
   app.delete('/api/admin/players/:id/login', async req => {
-    const me = needTech(req);
+    const me = needPlayer(req);
     const p = await tx(async c => {
       const cur = await one(c, 'SELECT * FROM players WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!cur) throw E.notFound('Игрок не найден');
+      loginRight(me, cur);
       if (cur.id === me.id && cur.vk_id == null && cur.phone == null && !cur.email) throw E.conflict('conflict', 'Это ваш единственный способ входа');
       // пароль остаётся, если по нему входят с почтой
       const out = await one(c, 'UPDATE players SET login = NULL, pass_hash = CASE WHEN email IS NULL THEN NULL ELSE pass_hash END, pass_fails = 0, pass_lock_until = NULL WHERE id = $1 RETURNING *', [cur.id]);
@@ -273,6 +300,21 @@ module.exports = async function (app) {
     needPlayer(req);
     return permsResp();
   });
+  // настройки сайта (тех. администратор): { signup?, selfEdit?, selfPass? } — см. server/site.js
+  app.put('/api/admin/site', async req => {
+    const me = needTech(req), b = req.body || {}, S = require('../site');
+    const upd = {};
+    for (const k of S.KEYS) if (b[k] !== undefined) upd[k] = V.bool(b[k], k);
+    if (!Object.keys(upd).length) throw E.bad('Нечего менять');
+    const next = Object.assign({}, S.site(), upd);
+    await tx(async c => {
+      await c.query(`INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('site', $1, $2, $3)
+        ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = $2, updated_by = $3`, [JSON.stringify(next), Date.now(), me.id]);
+      await audit(c, me, 'site', null, upd);
+    });
+    return { site: S.setSite(next) };
+  });
+
   app.put('/api/admin/perms', async req => {
     const me = needTech(req), b = req.body || {};
     if (!b.perms || typeof b.perms !== 'object' || Array.isArray(b.perms)) throw E.bad('perms: { ключ: [роли] }', 'perms');

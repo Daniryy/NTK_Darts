@@ -2,6 +2,7 @@
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://oche:oche@127.0.0.1:5432/oche_test';
 if (!/test/.test(new URL(process.env.DATABASE_URL).pathname)) throw new Error('TEST_DATABASE_URL должен указывать на тестовую базу');
 process.env.RATE_MAX = '100000';
+process.env.SITE_OPEN = '1'; // регистрация и правка профиля открыты — как было до настроек сайта
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { build } = require('../server/app');
@@ -70,9 +71,11 @@ test('вход по логину и паролю: верный, неверный
   assert.ok(lk.retryAfter > 0);
   ok(await call(Object.assign(anon(), { ip: '10.1.1.1' }), 'POST', '/api/auth/password', { login: 'danil', password: 'Darts-Secret-1' }));
   limits.reset();
-  // роль ниже администратора — пароль не пускает
+  // роль ниже администратора — вход сразу, без кода из приложения
   await pool.query(`UPDATE players SET login = 'host1', pass_hash = $1 WHERE id = 'p1'`, [await hashPassword('Host-Secret-1')]);
-  err(await call(anon(), 'POST', '/api/auth/password', { login: 'host1', password: 'Host-Secret-1' }), 403);
+  const hu = anon(), hr = ok(await call(hu, 'POST', '/api/auth/password', { login: 'host1', password: 'Host-Secret-1' }));
+  assert.equal(hr.need2fa, undefined); assert.equal(hr.player.id, 'p1');
+  assert.equal(ok(await call(hu, 'GET', '/api/me')).player.id, 'p1');
   await pool.query(`UPDATE players SET login = NULL, pass_hash = NULL WHERE id = 'p1'`);
   // вход записан в журнал
   assert.ok(ok(await call(TECH, 'GET', '/api/admin/audit?target=' + ME)).items.some(x => x.action === 'login.password'));
@@ -110,16 +113,15 @@ test('смена своего пароля', async () => {
 
 test('логин администратору выдаёт только тех. администратор', async () => {
   err(await call(ADMIN, 'PUT', '/api/admin/players/p4/login', { login: 'customer', password: 'Customer-Pass-1' }), 403);
-  err(await call(TECH, 'PUT', '/api/admin/players/p6/login', { login: 'player6', password: 'Player-Pass-11' }), 409, 'conflict');
+  err(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'customer' }), 400, 'bad_request');
   err(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'Д', password: 'Customer-Pass-1' }), 400);
   err(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'danil', password: 'Customer-Pass-1' }), 409, 'login_taken');
   assert.equal(ok(await call(TECH, 'PUT', '/api/admin/players/p4/login', { login: 'customer', password: 'Customer-Pass-1' })).player.login, 'customer');
   const u = anon();
   assert.equal((await full(u, '/api/auth/password', { login: 'customer', password: 'Customer-Pass-1' })).role, 'admin');
-  // роль ниже администратора — логин снимается, сеансы закрываются
+  // роль ниже администратора — логин остаётся, вход уже без кода из приложения
   ok(await call(TECH, 'PATCH', '/api/admin/players/p4', { role: 'host' }));
-  assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
-  err(await call(anon(), 'POST', '/api/auth/password', { login: 'customer', password: 'Customer-Pass-1' }), 409, 'bad_login');
+  assert.equal(ok(await call(anon(), 'POST', '/api/auth/password', { login: 'customer', password: 'Customer-Pass-1' })).player.id, 'p4');
   ok(await call(TECH, 'PATCH', '/api/admin/players/p4', { role: 'admin' }));
   ADMIN = await login('p4');
 });
@@ -235,13 +237,14 @@ test('роль игроку с почтой и снятие входа по ло
   err(await call(anon(), 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' }), 409, 'bad_login');
   // администратор по почте не входит — только по логину
   err(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }), 403);
-  // понижение администратора с логином: логин снят, сеансы закрыты, почта снова пускает
+  // понижение администратора с логином: сеансы закрыты, логин остаётся — входит как игрок, без кода; почта снова пускает
   ok(await call(TECH, 'PUT', '/api/admin/players/' + id + '/login', { login: 'mailadm', password: 'Strong-Pass-12' }));
   const a = anon();
   await full(a, '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' });
   const down = ok(await call(TECH, 'PATCH', '/api/admin/players/' + id, { role: 'player' }));
-  assert.equal(down.player.login, null);
+  assert.equal(down.player.login, 'mailadm');
   err(await call(a, 'GET', '/api/admin/stats'), 401);
+  assert.equal(ok(await call(anon(), 'POST', '/api/auth/password', { login: 'mailadm', password: 'Strong-Pass-12' })).player.id, id);
   ok(await call(anon(), 'POST', '/api/auth/email/login', { email: 'mailer@mail.ru', password: 'Strong-Pass-12' }));
 });
 
