@@ -88,9 +88,12 @@ module.exports = async function (app) {
     if (!canSee(me, p)) throw E.forbidden('Нет доступа к этому аккаунту');
     const n = async (sql) => (await one(pool, sql, [p.id])).n;
     const owner = p.owner_id ? await one(pool, 'SELECT id, name FROM players WHERE id = $1', [p.owner_id]) : null;
+    // средний набор за 3 дротика: все матчи и только турнирные
+    const st = await all(pool, 'SELECT scope, n, w, pts, darts FROM player_stats WHERE player_id = $1', [p.id]);
+    const avg = Object.fromEntries(st.map(x => [x.scope, { n: x.n, w: x.w, avg: x.darts ? Math.round(x.pts / x.darts * 30) / 10 : null }]));
     return {
       player: adminJSON(p, me),
-      owner,
+      owner, avg,
       clubs: await all(pool, `SELECT c.id, c.name, c.status FROM club_hosts h JOIN clubs c ON c.id = h.club_id WHERE h.player_id = $1 ORDER BY c.name`, [p.id]),
       sessions: await n('SELECT count(*)::int AS n FROM sessions WHERE player_id = $1 AND expires_at > ' + Date.now()),
       matches: await n('SELECT count(*)::int AS n FROM match_lines WHERE player_id = $1'),

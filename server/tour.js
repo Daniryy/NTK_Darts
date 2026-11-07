@@ -4,10 +4,12 @@ const { all } = require('./db');
 const { can } = require('./roles');
 const config = require('./config');
 
-const RR_MAX = 10, BR_MAX = 64;
+const RR_MAX = 10, BR_MAX = 64, SEL_MAX = 128;
 // строки турниров всегда берём с именем владельца
 const TOUR_SQL = 'SELECT t.*, o.name AS owner_name FROM tournaments t LEFT JOIN players o ON o.id = t.owner_id';
-const maxPlayers = fmt => fmt === 'rr' ? RR_MAX : BR_MAX;
+// с отбором (квалификация или группы) — до 128: в сетку идут до 64, остальные играют «Кубок B»
+const maxPlayers = (fmt, sel) => fmt === 'rr' ? RR_MAX : sel && fmt !== 'sw' ? SEL_MAX : BR_MAX;
+const selOf = row => !!(row && (row.qual || row.groups));
 
 // rows — строки tournaments; один запрос на участников и один на матчи для всех сразу
 async function loadTours(c, rows) {
@@ -60,12 +62,18 @@ function build(row, ents, ms, qs) {
   if (row.rounds) t.rounds = row.rounds;
   if (row.groups) t.groups = Object.assign({ n: row.groups.n, adv: row.groups.adv, ids: row.groups.ids || null, done: !!row.groups.done }, row.groups.cups ? { cups: true } : {}, row.groups.cupB ? { cupB: row.groups.cupB } : {});
   if (row.parent) t.parent = row.parent;
+  // «Кубок B»: места после основной сетки
+  if (row.place_off) t.off = row.place_off;
   if (row.ready) t.ready = row.ready;
   if (row.nums) t.nums = row.nums;
   if (row.layout) t.layout = row.layout;
   if (row.labels) t.labels = row.labels;
   if (row.qual) {
     t.qual = { ex: row.qual.ex, tries: row.qual.tries, res: {} };
+    // основная сетка: первые main по квалификации; остальные — «Кубок B» (cupB), их места в этом турнире — rest
+    if (row.qual.main) t.qual.main = row.qual.main;
+    if (row.qual.cupB) t.qual.cupB = row.qual.cupB;
+    if (row.qual.rest) t.qual.rest = row.qual.rest;
     qs.forEach(q => { (t.qual.res[q.player_id] = t.qual.res[q.player_id] || [])[q.try] = { v: q.v, mid: q.match_id, t: q.t }; });
     // перестрелки при равенстве: { игрок: результат }
     const tb = ents.filter(e => e.qual_tb != null);
@@ -179,6 +187,16 @@ async function refreshTour(c, t) {
   await c.query(`UPDATE entries e SET place_lo = x.lo, place_hi = x.hi
     FROM unnest($2::text[], $3::int[], $4::int[]) AS x(id, lo, hi) WHERE e.tournament_id = $1 AND e.player_id = x.id`,
   [t.id, ids, ids.map(k => pl[k][0]), ids.map(k => pl[k][1])]);
+  // «Кубок B» после квалификации: его места — и в основном турнире
+  if (t.parent && t.off && ids.length) {
+    const up = await c.query(`UPDATE tournaments SET qual = jsonb_set(qual, '{rest}', $2::jsonb), version = version + 1 WHERE id = $1 AND qual ? 'main' RETURNING id`, [t.parent, JSON.stringify(pl)]);
+    if (up.rowCount) {
+      await c.query(`UPDATE entries e SET place_lo = x.lo, place_hi = x.hi
+        FROM unnest($2::text[], $3::int[], $4::int[]) AS x(id, lo, hi) WHERE e.tournament_id = $1 AND e.player_id = x.id`,
+      [t.parent, ids, ids.map(k => pl[k][0]), ids.map(k => pl[k][1])]);
+      require('./versions').forget('t', t.parent);
+    }
+  }
   t.status = st;
 }
 
@@ -294,6 +312,6 @@ function tourCard(t, me) {
 }
 
 module.exports = {
-  RR_MAX, BR_MAX, TOUR_SQL, maxPlayers, loadTours, standings, tStatus, champion, placesOf, refreshTour, qualTies,
+  RR_MAX, BR_MAX, SEL_MAX, TOUR_SQL, maxPlayers, selOf, loadTours, standings, tStatus, champion, placesOf, refreshTour, qualTies,
   roundLabel, gameLabel, isOwner, isStaff, feesOn, tourBest, readyPair, canScoreGame, canClear, tourJSON, tourCard, qualDone, qualOrder
 };
