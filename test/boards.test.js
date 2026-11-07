@@ -126,9 +126,9 @@ test('квалификация по мишеням: по двое на мише�
   ok(await call(A, 'DELETE', '/api/tournaments/' + t.id + '/qual/' + first + '/0'));
   assert.equal(Object.keys((await tourOf(A, t.id)).boards.q).length, 4);
   // все сдали — закрыли квалификацию: мишени у игр сетки
+  // последний результат — квалификация закрылась сама
   for (const id of ids) await call(A, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 100 + ids.indexOf(id) });
-  assert.deepEqual((await tourOf(A, t.id)).boards.q, {});
-  const sb = ok(await call(A, 'POST', '/api/tournaments/' + t.id + '/qual/close')).tournament.boards;
+  const sb = (await tourOf(A, t.id)).boards;
   assert.equal(sb.q, undefined);
   assert.equal(Object.keys(sb.at).length, 2);
 });

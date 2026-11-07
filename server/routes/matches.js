@@ -81,6 +81,8 @@ async function afterResult(c, tid, ids, fullElo) {
     if (fullElo) await eloAll(c);
   }
   await refreshStats(c, ids);
+  // всё сыграно — квалификация или группы закрываются сами; судьи — на новые игры
+  if (tid) await require('../stages').autoStage(c, tid);
 }
 // снять результат можно, только если от него ничего не зависит; попытку квалификации — пока квалификация идёт
 async function checkClear(c, t, m) {

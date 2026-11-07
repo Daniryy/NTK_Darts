@@ -947,6 +947,9 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .stg-row .chip { min-width: 42px; padding: 6px 10px; font-size: 17px; }
 .stg-row .chip.txt { font-size: 13px; }
 .stg-tg { justify-self: start; text-align: left; }
+.nt-more { display: grid; gap: 14px; }
+.nt-more > summary { list-style: none; cursor: pointer; justify-self: start; text-align: left; }
+.nt-more > summary::-webkit-details-marker { display: none; }
 .handoff { display: grid; gap: 8px; }
 .num.big .hearts { display: block; font-size: 13px; letter-spacing: 1px; color: var(--red); line-height: 1.2; }
 .num.big.out { color: var(--muted); font-size: 22px; }
@@ -2806,10 +2809,12 @@ function refsView(t) {
   h += pool.length ? '<div class="selchips">' + pool.map((n, k) => '<span class="selchip"><span>' + esc(n) + '</span>' + (org ? '<button class="lnk" data-act="rf-del" data-v="' + t.id + '|' + k + '" aria-label="Убрать судью ' + esc(n) + '">✕</button>' : '') + '</span>').join('') + '</div>' : '<p class="meta">' + (org ? 'Добавьте тех, кто будет судить матчи: судей, свободных игроков, помощников.' : 'Пока никого.') + '</p>';
   if (org) h += '<div class="nrow"><input class="inp" id="rf-add" maxlength="60" placeholder="Фамилия И." aria-label="Добавить судью"><button class="mini" data-act="rf-add" data-v="' + t.id + '">Добавить</button></div>';
   h += '</div>';
-  if (t.status === 'reg' || !t.games.length) return h + (pool.length ? '<p class="meta">Судей матчам можно назначить после старта.</p>' : '');
+  // судьи сами на готовые игры: по очереди, кто меньше судил; сам себя не судит
+  if (staff && pool.length) h += '<label class="consent"><input type="checkbox" data-rf-auto="' + t.id + '"' + (rf.auto ? ' checked' : '') + '><span><b>Расставлять судей автоматически</b><br><span class="meta">На каждый матч, который можно играть, — судья из списка, у кого меньше матчей. Вручную поправить можно всегда.</span></span></label>';
+  if (t.status === 'reg' || !t.games.length) return h + (pool.length && !rf.auto ? '<p class="meta">Судей матчам можно назначить после старта.</p>' : '');
   const rv = resolver(t), nums = gameNums(t, rv), nm = id => P[id] ? P[id].name : '—';
   const games = t.games.filter(g => { const s = gameState(t, g, rv).st; return s === 'ready' || (s === 'done' && at[g.r + ':' + g.i]); });
-  h += '<div class="card sec"><div class="tstat"><span class="label">Кто судит</span>' + (staff && pool.length ? '<button class="mini" data-act="rf-auto" data-v="' + t.id + '">Раздать по очереди</button>' : '') + '</div>';
+  h += '<div class="card sec"><div class="tstat"><span class="label">Кто судит</span>' + (staff && pool.length && !rf.auto ? '<button class="mini" data-act="rf-auto" data-v="' + t.id + '">Раздать по очереди</button>' : '') + '</div>';
   if (!games.length) h += '<p class="meta">Сейчас нет матчей, которые можно играть.</p>';
   h += games.map(g => {
     const gs = gameState(t, g, rv), k = g.r + ':' + g.i, cur = at[k] || '', done = gs.st === 'done';
@@ -2845,7 +2850,7 @@ function groupsView(t) {
   let h = '<div class="tstat"><span class="meta">Места в группе — по победам, затем по разнице легов. В сетку ' + (open ? 'выходят' : 'вышли') + ' ' + G.adv + ' из каждой группы' + (G.n > 1 ? '' : '') + '.</span></div>';
   if (open && canDo(t, 'org')) {
     const pr = tProgress(t), left = pr.total - pr.done;
-    h += left ? '<div class="note-box">Осталось ' + left + ' ' + pl(left, 'матч', 'матча', 'матчей') + ' в группах. Когда все сыграны — закройте групповой этап, сетка построится сама.</div>'
+    h += left ? '<div class="note-box">Осталось ' + left + ' ' + pl(left, 'матч', 'матча', 'матчей') + ' в группах. Как только сыграют последний — групповой этап закроется сам и построится сетка.</div>'
       : '<div class="note-box ok"><b>Все матчи групп сыграны.</b><div class="warn-a"><button class="btn sm" data-act="grp-close" data-v="' + t.id + '">Закрыть группы и построить сетку</button></div></div>';
   }
   h += '<div class="grp-grid">' + G.ids.map((ids, k) => {
@@ -3147,7 +3152,7 @@ function qualView(t) {
     if (ties.length && canDo(t, 'staff')) h += '<div class="note-box"><b>Равенство в квалификации.</b> ' + ties.map(tieNames).join('; ') + '. Проведите перестрелку у судьи и внесите её результат кнопкой «Перестрелка» в строке игрока — больше значит выше.' + (S.confirmQual === t.id ? ' Закроете как есть — порядок решит рейтинг.' : '') + '</div>';
     h += S.confirmQual === t.id
       ? '<div class="card tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? '; без результата ' + (n - done) + ' — встанут в конец по рейтингу' : '') + '. ' + next + ', квалификация закроется.</span><div class="row2" style="width:100%"><button class="btn sm" data-act="qual-close" data-v="' + t.id + '">' + (t.groups ? 'Разложить по группам' : t.format === 'rr' ? 'Начать круговую' : split ? 'Построить сетки' : 'Построить сетку') + '</button><button class="btn sm alt" data-act="qual-close-no">Отмена</button></div></div>'
-      : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + '</span>' + (canDo(t, 'org') ? '<button class="btn sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить квалификацию</button>' : '') + '</div>';
+      : '<div class="tstat"><span class="meta">Сдали ' + done + ' из ' + n + (done < n ? ' · когда сдадут все, квалификация закроется сама' : ties.length ? ' · после перестрелки квалификация закроется сама' : '') + '</span>' + (canDo(t, 'org') ? '<button class="ghost sm" data-act="qual-close-ask" data-v="' + t.id + '"' + (done < 2 ? ' disabled' : '') + '>Закончить сейчас</button>' : '') + '</div>';
   }
   // сортировка по столбцам: место (как есть), фамилия, попытки, лучший, среднее; повторный щелчок — обратный порядок
   const QS = S.qsort && S.qsort.tid === t.id && S.qsort.k !== 'place' ? S.qsort : null;
@@ -3343,6 +3348,9 @@ function newTourView() {
   }
   h += '<div class="field"><span class="label">' + (nt.qualOn ? 'Игра после квалификации' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips(LTW_LIST, nt.ltw, 'nt-ltw') + '</div></div>';
+  // редкое — в «Дополнительно»: по умолчанию всё разумно (посев по рейтингу, без взноса, мишени — по желанию)
+  const more = [nt.ltwBy && Object.keys(nt.ltwBy).length ? 'победы по стадиям' : '', !nt.qualOn && nt.seed === 'x' ? 'жеребьёвка' : !nt.qualOn && nt.seed === 'm' ? 'посев вручную' : '', ntFee(nt) ? 'взнос ' + ntFee(nt) + ' ₽' : '', +nt.bcount ? 'мишеней ' + nt.bcount : '', nt.club ? 'от клуба' : ''].filter(Boolean);
+  h += '<details class="nt-more"' + (nt.moreOpen ? ' open' : '') + '><summary class="lnk" data-act="nt-more">' + (nt.moreOpen ? '▾' : '▸') + ' Дополнительно' + (more.length ? ': ' + more.join(', ') : ' — посев, взнос, мишени, вид сетки') + '</summary>';
   if (nt.fmt !== 'rr') {
     const by = nt.ltwBy || {}, n = Object.keys(by).length;
     h += '<div class="field ltw-stg"><button class="lnk stg-tg" data-act="nt-stg-tg" aria-expanded="' + !!nt.stgOpen + '">' + (nt.stgOpen ? '▾' : '▸') + ' По стадиям сетки' + (n ? ': ' + STAGES.filter(k => by[k]).map(k => STAGE_SHORT[k] + ' до ' + by[k]).join(', ') : '') + '</button>' +
@@ -3360,6 +3368,7 @@ function newTourView() {
   h += '<div class="field"><span class="label">Мишени в зале</span><div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Сколько</span><input class="inp" id="nt-bcount" data-nt="bcount" inputmode="numeric" maxlength="2" value="' + esc(nt.bcount || '') + '" placeholder="0"></label><label class="nt-bl"><span class="meta">Номера, если не по порядку</span><input class="inp" id="nt-bnames" data-nt="bnames" inputmode="numeric" maxlength="200" value="' + esc(nt.bnames || '') + '" placeholder="по порядку 1, 2, 3… — или свои: 3, 5, 7"></label></div><span class="meta">Сайт сам разведёт игроков по мишеням' + (nt.fmt === 'ndl' ? ' (на квалификации — по двое)' : '') + ' и напишет каждому, куда пройти. Можно указать и потом.</span></div>';
   if (SRV && Api.clubs.length && !Api.perm('club_tour')) h += '<div class="field"><span class="label">Организатор</span><span class="meta">Турниры от имени клуба «' + esc(Api.clubs[0].name) + '» — у ведущего клуба; роль ведущего выдаёт администратор.</span></div>';
   else if (SRV && Api.clubs.length) h += '<div class="field"><span class="label">Организатор</span><div class="chips">' + [['', 'Лично я']].concat(Api.clubs.map(c => [c.id, c.name])).map(([v, l]) => '<button class="chip txt' + ((nt.club || '') === v ? ' on' : '') + '" data-act="nt-club" data-v="' + esc(v) + '">' + esc(l) + '</button>').join('') + '</div>' + (nt.club ? '<span class="meta">Турнир от имени клуба — официальный.</span>' : '') + '</div>';
+  h += '</details>';
   if (SRV) {
     const capMax = ntMax(nt);
     h += '<div class="field"><span class="label">Участники</span><div class="chips">' + [['sel', 'Выбрать сейчас'], ['reg', 'Открытая регистрация']].map(([v, l]) => '<button class="chip txt' + ((nt.reg ? 'reg' : 'sel') === v ? ' on' : '') + '" data-act="nt-regmode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -7068,6 +7077,7 @@ document.addEventListener('click', e => {
     case 'nt-gadv': S.nt.gadv = +v; render(); break;
     case 'nt-po': S.nt.po = v; render(); break;
     case 'nt-stg-tg': S.nt.stgOpen = !S.nt.stgOpen; render(); break;
+    case 'nt-more': S.nt.moreOpen = !S.nt.moreOpen; render(); break;
     case 'nt-stg': case 'le-stg': {
       const [k, n] = v.split('|'), o = a === 'nt-stg' ? S.nt : S.ltwEdit, by = Object.assign({}, o.ltwBy || o.by);
       if (n) by[k] = +n; else delete by[k];
@@ -7181,7 +7191,7 @@ document.addEventListener('click', e => {
     case 'rf-chief': { const g = id => { const el = $(id); return el ? el.value.trim() : ''; }; svDo(Api.patch('/api/tournaments/' + v + '/refs', { chief: g('rf-chief') ? { name: g('rf-chief'), city: g('rf-city') } : null }), r => { svTourSet(r); toast('Главный судья сохранён.'); }); break; }
     case 'rf-add': { const el = $('rf-add'), n = el ? el.value.trim() : '', t = TBY[v]; if (!n || !t) break; svDo(Api.patch('/api/tournaments/' + v + '/refs', { pool: ((t.refs && t.refs.pool) || []).concat(n) }), r => { svTourSet(r); setTimeout(() => { const x = $('rf-add'); if (x) x.focus(); }, 30); }); break; }
     case 'rf-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (!t || !t.refs) break; svDo(Api.patch('/api/tournaments/' + tid + '/refs', { pool: t.refs.pool.filter((_, j) => j !== +k) }), r => svTourSet(r)); break; }
-    case 'rf-auto': svDo(Api.patch('/api/tournaments/' + v + '/refs', { auto: true }), r => { svTourSet(r); toast('Судьи расставлены.'); }); break;
+    case 'rf-auto': svDo(Api.patch('/api/tournaments/' + v + '/refs', { auto: true }), r => { svTourSet(r); toast('Судьи расставлены и дальше встают на матчи сами.'); }); break;
     case 'grp-close': svDo(Api.post('/api/tournaments/' + v + '/groups/close'), r => { svTourSet(r); S.ttab = 'grid'; toast('Сетка построена: вышли ' + r.tournament.slots.filter(Boolean).length + ' ' + pl(r.tournament.slots.filter(Boolean).length, 'игрок', 'игрока', 'игроков') + '.'); }); break;
     case 'proto-pdf': { const e = SVC['proto:' + v]; if (e && e.data && TBY[v]) protoPrint(window.open('', '_blank'), TBY[v], e.data); break; }
     case 'ttab-refs': closeModals(); go('t.' + v); S.ttab = 'refs'; render(); break;
@@ -7335,6 +7345,11 @@ document.addEventListener('change', e => {
   if (SRV && t.dataset && t.dataset.site) {
     const k = t.dataset.site, on = t.checked;
     svDo(Api.put('/api/admin/site', { [k]: on }), r => { if (Api.config) Api.config.site = r.site; svStale('aaudit'); toast(on ? 'Включено.' : 'Выключено.'); });
+    return;
+  }
+  if (SRV && t.dataset && t.dataset.rfAuto) {
+    const on = t.checked;
+    svDo(Api.patch('/api/tournaments/' + t.dataset.rfAuto + '/refs', { auto: on }), r => { svTourSet(r); toast(on ? 'Судьи встают на матчи сами.' : 'Судей расставляете вручную.'); });
     return;
   }
   if (t.dataset && t.dataset.perm && S.permEd) {
