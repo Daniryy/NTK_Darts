@@ -43,7 +43,7 @@ test.after(async () => { await app.close(); await pool.end(); });
 test('режим, вход для разработки, выход', async () => {
   const w = browser(), Api = makeApi(w);
   assert.equal(await Api.detect(), 'server');
-  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
+  assert.deepEqual(Api.config, { vk: false, phone: true, phoneBy: 'call', email: true, dev: true, demo: false, noDemo: false, contact: '', site: { signup: true, selfEdit: true, selfPass: true } });
   assert.equal(Api.me, null);
   await Api.devLogin(ME);
   assert.equal(Api.me.id, ME);
@@ -61,8 +61,10 @@ test('режим, вход для разработки, выход', async () =>
   assert.equal(A2.offline, true);
   const w3 = browser(); w3.localStorage.setItem('oche.mode', '"demo"');
   assert.equal(await makeApi(w3).detect(), 'demo', 'закреплённое демо: демо-сервера нет — демо в браузере');
-  assert.equal(w3.calls.length, 1, 'спросили только демо-сервер');
+  // спросили демо-сервер, затем основной: не сайт ли клуба без демо (тогда — сразу сервер)
+  assert.equal(w3.calls.length, 2);
   assert.match(w3.calls[0].url || String(w3.calls[0]), /\/demo\/api\/config/);
+  assert.doesNotMatch(w3.calls[1].url || String(w3.calls[1]), /\/demo\//);
 });
 
 test('очередь: без сети копится, при появлении сети уходит по порядку; повтор безопасен', async () => {

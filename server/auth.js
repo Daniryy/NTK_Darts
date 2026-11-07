@@ -140,7 +140,7 @@ async function vkPost(path, query, body) {
 function routes(app) {
   app.get('/api/me', async req => meResp(pool, req.player));
   // что умеет сервер: вход через VK, по телефону, вход для разработки
-  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, demo: config.demo, contact: config.contact, site: S.site() }));
+  app.get('/api/config', async () => ({ vk: !!config.vk.appId, phone: phoneOn(), phoneBy: config.sms.method, email: require('./mail').mailOn(), dev: config.devLogin, demo: config.demo, noDemo: config.noDemo, contact: config.contact, site: S.site() }));
 
   app.patch('/api/me', async req => {
     const me = needPlayer(req), b = req.body || {}, set = {};
