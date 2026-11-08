@@ -31,7 +31,10 @@ async function makeCup(c, t, rest, off) {
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'reg', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
   [(r.name + ' · Кубок B').slice(0, 60), r.official, r.owner_id, r.org_name, r.org_ver, r.city, r.venue, Date.now(), t.format, r.mode, r.dbl, r.ltw, rest.length, r.ex ? JSON.stringify(r.ex) : null,
     r.club_id, r.layout, r.labels, Date.now(), r.ltw_by ? JSON.stringify(r.ltw_by) : null, r.refs ? JSON.stringify(Object.assign({ chief: r.refs.chief || null, pool: r.refs.pool || [], at: {} }, r.refs.auto ? { auto: true } : {})) : null, t.id, r.fee, t.format === 'pl' ? r.split : null, off]);
-  await launch(c, cup.id, t.format, rest, cup);
+  // мишени — те же номера, что у основного турнира (ведущий может поменять)
+  const bd = r.boards && (r.boards.n || (r.boards.names || []).length) ? Object.assign({ n: r.boards.n }, r.boards.names ? { names: r.boards.names } : {}) : null;
+  if (bd) await c.query('UPDATE tournaments SET boards = $2 WHERE id = $1', [cup.id, JSON.stringify(bd)]);
+  await launch(c, cup.id, t.format, rest, Object.assign({}, cup, bd ? { boards: bd } : {}));
   return cup.id;
 }
 const groupsRow = (G, ids) => JSON.stringify(Object.assign({ n: G.n, adv: G.adv, ids, done: false }, G.cups ? { cups: true } : {}));
@@ -59,15 +62,16 @@ async function closeQual(c, t) {
   let main = !G && BRK.includes(t.format) ? t.qual.main || (order.length > T.BR_MAX ? T.BR_MAX : null) : null;
   if (main && order.length <= main) main = null;
   const top = main ? order.slice(0, main) : order, rest = main ? order.slice(main) : [];
-  if (rest.length > T.BR_MAX) throw E.conflict('bad_state', 'В «Кубок B» уходит больше ' + T.BR_MAX + ' игроков — увеличьте основную сетку');
+  const cups = t._row.qual.cups !== false;
+  if (cups && rest.length > T.BR_MAX) throw E.conflict('bad_state', 'В «Кубок B» уходит больше ' + T.BR_MAX + ' игроков — увеличьте основную сетку');
   // «Комплексный»: после квалификации — группы змейкой по её итогам; круговая — таблица в этом порядке; иначе сетка (pl — частями, если задано)
   if (G) groupsCheck(G, order.length); else if (t.format !== 'rr' && t.format !== 'sw') B.setBracket(g, t.format, top, t.format === 'pl' ? t.split : undefined);
   await reseed(c, t.id, order);
   if (main) {
     const q = Object.assign({}, t._row.qual, { main });
-    if (rest.length >= 2) q.cupB = await makeCup(c, t, rest, main);
-    // места в этом турнире — после сетки; точные придут из «Кубка B»
-    q.rest = Object.fromEntries(rest.map(id => [id, [main + 1, main + rest.length]]));
+    if (cups && rest.length >= 2) q.cupB = await makeCup(c, t, rest, main);
+    // места в этом турнире — после сетки: точные придут из «Кубка B»; без кубка — по квалификации
+    q.rest = Object.fromEntries(rest.map((id, k) => [id, q.cupB ? [main + 1, main + rest.length] : [main + 1 + k, main + 1 + k]]));
     await c.query('UPDATE tournaments SET qual = $2 WHERE id = $1', [t.id, JSON.stringify(q)]);
   }
   const nums = JSON.stringify(Object.fromEntries(order.map((id, k) => [id, k + 1])));
