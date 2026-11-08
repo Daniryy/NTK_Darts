@@ -89,8 +89,8 @@ module.exports = async function (app) {
     const n = async (sql) => (await one(pool, sql, [p.id])).n;
     const owner = p.owner_id ? await one(pool, 'SELECT id, name FROM players WHERE id = $1', [p.owner_id]) : null;
     // средний набор за 3 дротика: все матчи и только турнирные
-    const st = await all(pool, 'SELECT scope, n, w, pts, darts FROM player_stats WHERE player_id = $1', [p.id]);
-    const avg = Object.fromEntries(st.map(x => [x.scope, { n: x.n, w: x.w, avg: x.darts ? Math.round(x.pts / x.darts * 30) / 10 : null }]));
+    const st = await all(pool, 'SELECT scope, n, w, pts, darts, f9s, f9n FROM player_stats WHERE player_id = $1', [p.id]);
+    const avg = Object.fromEntries(st.map(x => [x.scope, { n: x.n, w: x.w, avg: x.darts ? Math.round(x.pts / x.darts * 30) / 10 : null, f9: x.f9n ? Math.round(x.f9s / x.f9n * 10) / 10 : null }]));
     return {
       player: adminJSON(p, me),
       owner, avg,

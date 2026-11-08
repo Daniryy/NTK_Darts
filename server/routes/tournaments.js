@@ -97,6 +97,8 @@ function tourFields(b, full, me) {
     o.qual = { ex, tries: q.tries == null ? 2 : V.int(q.tries, 'qual.tries', 1, 2) };
     // игроков в основной сетке; остальные после квалификации играют «Кубок B»
     if (q.main != null) o.qual.main = V.oneOf(q.main, 'qual.main', [8, 16, 32, 64]);
+    // false — не попавшие в основную сетку не играют «Кубок B», места — по квалификации
+    if (q.cups != null && !V.bool(q.cups, 'qual.cups')) o.qual.cups = false;
     // по умолчанию, как в NDL, — сетки по 8 (только у розыгрыша всех мест)
     if (b.split === undefined && !o.groups && (o.format || 'pl') === 'pl') o.split = 8;
   } else if (b.qual === null) o.qual = null;
@@ -192,7 +194,7 @@ module.exports = async function (app) {
       if (f.qual.main && !sep) throw E.bad('Основная сетка — у сетки с квалификацией без групп', 'qual.main');
       // больше 64 — основная сетка 64 сама
       if (sep && !f.qual.main && cap > T.BR_MAX) f.qual.main = T.BR_MAX;
-      if (f.qual.main && cap - f.qual.main > T.BR_MAX) throw E.bad('В «Кубок B» уйдут больше ' + T.BR_MAX + ' игроков — увеличьте основную сетку', 'qual.main');
+      if (f.qual.main && f.qual.cups !== false && cap - f.qual.main > T.BR_MAX) throw E.bad('В «Кубок B» уйдут больше ' + T.BR_MAX + ' игроков — увеличьте основную сетку', 'qual.main');
     }
     const res = await tx(async c => {
       if (ids.length && (await all(c, 'SELECT id FROM players WHERE id = ANY($1)', [ids])).length !== ids.length) throw E.bad('Игрок не найден', 'players');

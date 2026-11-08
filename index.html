@@ -3271,16 +3271,16 @@ function ntSummary(nt) {
     if (!Number.isInteger(cap) || cap < 3 || cap > max) return { ok: false, txt: 'Мест — от 3 до ' + max };
     if (n > cap) return { ok: false, txt: 'Вписано больше, чем мест: ' + n + ' из ' + cap };
     const mn = ntMain(nt, cap);
-    if (mn && cap - mn > BR_MAX) return { ok: false, txt: 'В «Кубок B» уйдут больше ' + BR_MAX + ' — увеличьте основную сетку' };
-    return { ok: true, txt: ['Открытая регистрация', 'до ' + cnt(cap, 'места', 'мест', 'мест'), n ? 'вписано ' + n : 'игроки запишутся сами', nt.qualOn ? 'квалификация' : '', mn ? 'в сетке ' + mn + ', остальные — «Кубок B»' : ''].filter(Boolean).join(' · ') };
+    if (mn && !nt.cupsOff && cap - mn > BR_MAX) return { ok: false, txt: 'В «Кубок B» уйдут больше ' + BR_MAX + ' — увеличьте основную сетку' };
+    return { ok: true, txt: ['Открытая регистрация', 'до ' + cnt(cap, 'места', 'мест', 'мест'), n ? 'вписано ' + n : 'игроки запишутся сами', nt.qualOn ? 'квалификация' : '', mn ? 'в сетке ' + mn + (nt.cupsOff ? ', остальные — место по квалификации' : ', остальные — «Кубок B»') : ''].filter(Boolean).join(' · ') };
   }
   if (n < 3) return { ok: false, txt: 'Выберите минимум 3 участника' };
   if (n > max) return { ok: false, txt: 'Для этого формата максимум ' + max + ' участников' + (max === BR_MAX && br ? ' — больше 64 можно с квалификацией' : '') };
   // с квалификацией больше основной сетки: сетка — на первых, остальные играют «Кубок B»
   const mn = isGrpFmt(nt.fmt) ? 0 : ntMain(nt, n);
   if (mn) {
-    if (n - mn > BR_MAX) return { ok: false, txt: 'В «Кубок B» уйдут ' + (n - mn) + ' — больше ' + BR_MAX + '. Увеличьте основную сетку' };
-    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), 'квалификация', 'в сетке ' + mn, '«Кубок B» — ' + (n - mn) + ' (места ' + (mn + 1) + '–' + n + ')'].join(' · ') };
+    if (!nt.cupsOff && n - mn > BR_MAX) return { ok: false, txt: 'В «Кубок B» уйдут ' + (n - mn) + ' — больше ' + BR_MAX + '. Увеличьте основную сетку' };
+    return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), 'квалификация', 'в сетке ' + mn, (nt.cupsOff ? 'остальные ' + (n - mn) + ' — места ' : '«Кубок B» — ' + (n - mn) + ' (места ') + (mn + 1) + '–' + n + (nt.cupsOff ? ' по квалификации' : ')')].join(' · ') };
   }
   if (isGrpFmt(nt.fmt)) {
     if (nt.gn * nt.gadv > BR_MAX) return { ok: false, txt: 'Из групп в сетку — не больше ' + BR_MAX };
@@ -3344,7 +3344,8 @@ function newTourView() {
   if (nt.qualOn) {
     h += '<div class="field"><span class="label">Упражнение квалификации</span><div class="chips">' + QUAL_CHOICES.map(([v, l]) => '<button class="chip txt' + (nt.qk === v ? ' on' : '') + '" data-act="nt-qk" data-v="' + v + '">' + l + '</button>').join('') + '</div><span class="meta">' + esc(exRules(exFrom(nt.qk))) + '</span></div>';
     h += '<div class="field"><span class="label">Попыток квалификации</span><div class="chips">' + chips([1, 2], nt.tries, 'nt-tries', v => v === 1 ? 'Одна' : 'Две, идёт лучшая') + '</div></div>';
-    if (ntMainOk(nt)) h += '<div class="field"><span class="label">Игроков в основной сетке</span><div class="chips">' + chips([0, 8, 16, 32, 64], nt.main || 0, 'nt-main', v => v ? String(v) : 'Все') + '</div><span class="meta">Остальные после квалификации сами уходят в «Кубок B» — отдельную сетку, места продолжаются: ' + ((nt.main || 64) + 1) + '-е, ' + ((nt.main || 64) + 2) + '-е… ' + (nt.main ? '' : '«Все» — больше 64 участников, в сетке 64.') + '</span></div>';
+    if (ntMainOk(nt)) h += '<div class="field"><span class="label">Игроков в основной сетке</span><div class="chips">' + chips([0, 8, 16, 32, 64], nt.main || 0, 'nt-main', v => v ? String(v) : 'Все') + '</div><span class="meta">' + (nt.main ? '' : '«Все» — больше 64 участников, в сетке 64. ') + 'Места не попавших в сетку — с ' + ((nt.main || 64) + 1) + '-го.</span></div>' +
+      '<div class="field"><span class="label">Не попавшие в основную сетку</span><div class="chips">' + chips(['0', '1'], nt.cupsOff ? '1' : '0', 'nt-cupsoff', v => v === '1' ? 'Выбывают — место по квалификации' : 'Играют «Кубок B»') + '</div></div>';
   }
   h += '<div class="field"><span class="label">' + (nt.qualOn ? 'Игра после квалификации' : 'Игра') + '</span>' + exPicker(nt.exk, nt.lim, 'nt-ex', 'nt-lim') + '</div>';
   h += '<div class="field"><span class="label">До побед в легах</span><div class="chips">' + chips(LTW_LIST, nt.ltw, 'nt-ltw') + '</div></div>';
@@ -3416,7 +3417,7 @@ function createTour() {
     const grp = isGrpFmt(nt.fmt), body = { name: nt.name.trim(), city: (nt.city || meP().city || '').trim(), venue: (nt.venue || '').trim(), format: grp ? nt.po : nt.fmt, ltw: nt.ltw, ex, seed: nt.seed, players: ids };
     if (grp) body.groups = Object.assign({ n: nt.gn, adv: nt.gadv }, nt.cups ? { cups: true } : {});
     if (nt.fmt === 'sw' && nt.rounds) body.rounds = nt.rounds;
-    if (qual) body.qual = Object.assign({ ex: exFrom(nt.qk), tries: nt.tries }, ntMainOk(nt) && nt.main ? { main: nt.main } : {});
+    if (qual) body.qual = Object.assign({ ex: exFrom(nt.qk), tries: nt.tries }, ntMainOk(nt) && nt.main ? { main: nt.main } : {}, ntMainOk(nt) && nt.cupsOff ? { cups: false } : {});
     if (nt.fmt === 'pl') body.split = nt.split || null;
     if (nt.fmt !== 'rr' && nt.ltwBy && Object.keys(nt.ltwBy).length) body.ltwBy = nt.ltwBy;
     if (nt.fmt !== 'rr') { body.layout = nt.layout || 'std'; body.labels = nt.labels || 'ab'; }
@@ -5854,7 +5855,7 @@ function admCardModal() {
   h += '<div class="ac-cs">' + cr('Почта', p.email ? esc(p.email) : '—', p.email && p.email !== 'скрыта' ? (p.emailOk ? '✓ подтверждена' : 'не подтверждена') : '') + cr('Телефон', p.phone ? (p.phone === 'скрыт' ? 'скрыт' : esc(showPhone(p.phone))) : '—') +
     cr('VK ID', p.vk ? 'привязан' : '—') + cr('Логин', p.login ? esc(p.login) : '—', d.locked ? 'закрыт до ' + new Date(d.locked).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '') + '</div>';
   const av = d.avg || {}, avTxt = x => x && x.avg != null ? x.avg.toFixed(1) : '—';
-  h += '<div class="ac-grid">' + kv('Средний', avTxt(av.all)) + kv('В турнирах', avTxt(av.tour)) + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
+  h += '<div class="ac-grid">' + kv('Средний', avTxt(av.all)) + kv('В турнирах', avTxt(av.tour)) + kv('Первые 9', av.all && av.all.f9 != null ? av.all.f9.toFixed(1) : '—') + kv('Сеансов', d.sessions) + kv('Матчей', d.matches) + kv('Турниров', d.tours) + kv('Завёл', d.owner ? esc(d.owner.name) : 'сам') + kv('Создан', fmtDate(p.created)) + '</div>';
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
@@ -7076,6 +7077,7 @@ document.addEventListener('click', e => {
     case 'nt-cups': S.nt.cups = v === '1'; render(); break;
     case 'nt-rounds': S.nt.rounds = +v; render(); break;
     case 'nt-main': S.nt.main = +v || 0; render(); break;
+    case 'nt-cupsoff': S.nt.cupsOff = v === '1'; render(); break;
     case 'nt-qual': S.nt.qualOn = v === '1'; if (S.nt.qualOn && !S.nt.qk) S.nt.qk = 'score'; render(); break;
     case 'nt-splitmode': S.nt.split = v === '1' ? 8 : 0; render(); break;
     case 'nt-split': S.nt.split = +v; render(); break;
@@ -7502,7 +7504,8 @@ const HELP = [
   ]],
   ['Ведущему', [
     ['Создать турнир', '«Турниры» → «+ Создать турнир»: название, формат, игра и до скольких побед. Форматы: «Круговая» — все со всеми; «Олимпийская» — проиграл и выбыл; «Все места» — проигравшие продолжают и разыгрывают каждое место; «Стандарт» и «Лига» — группы и сетка; квалификация — к любому формату, как в лиге NDL. Посев, взнос, мишени, вид сетки — в «Дополнительно», по умолчанию всё уже настроено.'],
-    ['Больше 64 игроков', 'С квалификацией (или группами) — до 128 участников. «Игроков в основной сетке» — 8, 16, 32 или 64: остальные после квалификации сами уходят в «Кубок B» — отдельную сетку, места продолжаются (65-е, 66-е…). Больше 64 участников — основная сетка 64 сама.'],
+    ['Больше 64 игроков', 'С квалификацией (или группами) — до 128 участников. «Игроков в основной сетке» — 8, 16, 32 или 64: остальные после квалификации сами уходят в «Кубок B» — отдельную сетку с теми же мишенями, места продолжаются (65-е, 66-е…). Больше 64 участников — основная сетка 64 сама. «Кубок B» не нужен — «Выбывают»: места по квалификации.'],
+    ['Сел телефон посреди матча', 'Счёт уже на сервере. С другого телефона откройте матч и нажмите «Забрать ведение счёта» — игра продолжится с того же места. Без сети подходы копятся на телефоне и уходят сами; доиграли без сети — «Покажите ведущему», он внесёт итог кнопкой «Счёт».'],
     ['Начать и вести', 'Когда все записались — «Начать турнир». На вкладке «Матчи» фильтр «Можно играть» показывает, кого звать к мишеням; число мишеней задаётся кнопками +/−, матчи раскладываются по ним сами. Счёт вводят сами игроки со своих телефонов, судья по QR или вы — кнопкой «Счёт».'],
     ['Что происходит само', 'Квалификация закрывается сама, когда все сдали попытки (при равенстве — после перестрелки, её результат вносите кнопкой «Перестрелка»). Групповой этап закрывается сам после последнего матча — сетка строится автоматически. Мишени, «Ваш матч», места и рейтинг — тоже сами. «Закончить сейчас» — если нужно раньше.'],
     ['Судьи', 'Вкладка «Судьи»: главный судья (в протокол) и список судей. Галочка «Расставлять судей автоматически» — на каждый матч, который можно играть, встаёт судья, у кого меньше матчей. Судья без аккаунта: «Счёт» у матча → «QR для судьи» — судья наводит камеру, вводит имя и ведёт счёт этого матча; имя попадёт в сетку и протокол.'],

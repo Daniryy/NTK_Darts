@@ -35,7 +35,7 @@ test.before(async () => {
   await app.ready();
   TECH = await login(ME);
   ids = (await pool.query('SELECT id FROM players ORDER BY id')).rows.map(r => r.id);
-  for (let k = ids.length; k < 90; k++) ids.push(ok(await call(TECH, 'POST', '/api/admin/players', { name: 'Игрок ' + k }), 201).player.id);
+  for (let k = ids.length; k < 128; k++) ids.push(ok(await call(TECH, 'POST', '/api/admin/players', { name: 'Игрок ' + k }), 201).player.id);
 });
 test.after(async () => { await app.close(); await pool.end(); });
 
@@ -83,4 +83,28 @@ test('72 участника: сетка на 64, «Кубок B» на 8 с ме
   assert.deepEqual(B.placeRange(main, pl[65]), [66, 66]);
   const ent = (await pool.query('SELECT place_lo, place_hi FROM entries WHERE tournament_id = $1 AND player_id = $2', [t.id, pl[64]])).rows[0];
   assert.deepEqual([ent.place_lo, ent.place_hi], [65, 65]);
+});
+
+test('128 участников: сетка 64 и «Кубок B» 64; мишени кубка — как у основного', async () => {
+  const pl = ids.slice(0, 128);
+  let t = ok(await call(TECH, 'POST', '/api/tournaments', { name: 'Кубок 128', format: 'ko', mode: 501, ltw: 1, players: pl, qual: QUAL, boards: [3, 5, 7, 9] }), 201).tournament;
+  assert.equal(t.qual.main, 64);
+  for (const [k, id] of pl.entries()) ok(await call(TECH, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 1700 - k }));
+  t = ok(await call(null, 'GET', '/api/tournaments/' + t.id)).tournament;
+  assert.equal(t.slots.filter(B.isReal).length, 64);
+  const cup = ok(await call(null, 'GET', '/api/tournaments/' + t.qual.cupB)).tournament;
+  assert.equal(cup.players.length, 64); assert.equal(cup.off, 64);
+  assert.deepEqual(cup.boards.names, [3, 5, 7, 9]);
+  assert.deepEqual(B.placeRange(t, pl[127]), [65, 128]);
+});
+
+test('100 участников без «Кубка B»: сетка 32, остальные — места по квалификации', async () => {
+  const pl = ids.slice(0, 100);
+  let t = ok(await call(TECH, 'POST', '/api/tournaments', { name: 'Сотня', format: 'ko', mode: 501, ltw: 1, players: pl, qual: Object.assign({ main: 32, cups: false }, QUAL) }), 201).tournament;
+  for (const [k, id] of pl.entries()) ok(await call(TECH, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 1700 - k }));
+  t = ok(await call(null, 'GET', '/api/tournaments/' + t.id)).tournament;
+  assert.equal(t.slots.filter(B.isReal).length, 32);
+  assert.equal(t.qual.cupB, undefined);
+  assert.deepEqual(B.placeRange(t, pl[32]), [33, 33]);
+  assert.deepEqual(B.placeRange(t, pl[99]), [100, 100]);
 });
