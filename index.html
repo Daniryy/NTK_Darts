@@ -3329,8 +3329,11 @@ function newTourView() {
   h += '<div class="field"><span class="label">Формат</span><div class="fmts" role="radiogroup">' + FMTS.map(([v, l, d]) => '<button class="fmt' + (nt.fmt === v ? ' on' : '') + '" role="radio" aria-checked="' + (nt.fmt === v) + '" data-act="nt-fmt" data-v="' + v + '"><b>' + l + '</b><span>' + d + '</span></button>').join('') + '</div></div>';
   if (nt.fmt === 'sw') h += '<div class="field"><span class="label">Туров</span><div class="chips">' + chips([0, 3, 4, 5, 6, 7], nt.rounds || 0, 'nt-rounds', v => v ? String(v) : 'по числу игроков') + '</div><span class="meta">«По числу игроков» — сколько нужно, чтобы выявить победителя: 8 игроков — 3 тура, 16 — 4.</span></div>';
   if (isGrpFmt(nt.fmt)) {
-    if (nt.fmt !== 'lg') h += '<div class="field"><span class="label">Групп</span><div class="chips">' + chips([2, 3, 4, 6, 8], nt.gn, 'nt-gn') + '</div></div>';
+    if (nt.fmt !== 'lg') h += '<div class="field"><span class="label">Групп</span><div class="chips">' + chips([2, 3, 4, 6, 8, 16], nt.gn, 'nt-gn') + '</div></div>';
     h += '<div class="field"><span class="label">Выходят из каждой группы</span><div class="chips">' + chips(nt.fmt === 'lg' ? [2, 4, 8] : [1, 2, 3, 4], nt.gadv, 'nt-gadv') + '</div></div>';
+    // то же другими словами: сколько игроков в основной сетке — выход из группы подбирается сам
+    const gm = [4, 8, 16, 32, 64].filter(v => v % nt.gn === 0 && v / nt.gn >= 1 && v / nt.gn <= 16);
+    if (nt.fmt !== 'lg' && gm.length) h += '<div class="field"><span class="label">Игроков в основной сетке</span><div class="chips">' + chips(gm, nt.gn * nt.gadv, 'nt-gmain') + '</div><span class="meta">Сейчас в сетку выходят ' + nt.gn * nt.gadv + ': по ' + nt.gadv + ' из каждой группы.</span></div>';
     h += '<div class="field"><span class="label">Сетка после групп</span><div class="chips">' + chips(['ko', 'pl'], nt.po, 'nt-po', v => v === 'ko' ? 'На вылет' : 'С розыгрышем всех мест') + '</div></div>';
     h += '<div class="field"><span class="label">Кто не вышел из групп</span><div class="chips">' + chips(['0', '1'], nt.cups ? '1' : '0', 'nt-cups', v => v === '1' ? 'Играют «Кубок B»' : 'Заканчивают турнир') + '</div><span class="meta">' + (nt.cups ? 'После групп лучшие играют основную сетку (Кубок A), остальные — свою сетку «Кубок B» отдельным турниром.' : 'Не вышедшие делят места после сетки — по месту в группе.') + '</span></div>';
   }
@@ -7082,6 +7085,7 @@ document.addEventListener('click', e => {
     case 'nt-splitmode': S.nt.split = v === '1' ? 8 : 0; render(); break;
     case 'nt-split': S.nt.split = +v; render(); break;
     case 'nt-gadv': S.nt.gadv = +v; render(); break;
+    case 'nt-gmain': S.nt.gadv = Math.max(1, Math.round(+v / S.nt.gn)); render(); break;
     case 'nt-po': S.nt.po = v; render(); break;
     case 'nt-stg-tg': S.nt.stgOpen = !S.nt.stgOpen; render(); break;
     case 'nt-more': S.nt.moreOpen = !S.nt.moreOpen; render(); break;

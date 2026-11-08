@@ -21,10 +21,12 @@ async function demoExtra() {
   };
   // сыграть n готовых матчей быстрым счётом: побеждает тот, кто выше в посеве (иногда — нет)
   let k = 0;
+  // в пределах текущей стадии: после последнего матча групп они закрываются сами, сетка — уже следующая стадия
   const play = async (t, n) => {
+    const st = t.stage;
     for (let j = 0; j < n; j++) {
       const g = t.games.find(x => B.gameState(t, x).st === 'ready');
-      if (!g) break;
+      if (!g || t.stage !== st) break;
       const s = B.gameState(t, g), ltw = B.ltwOf(t, g.r, g.i), aWins = (k++ % 5 !== 0) === (t.players.indexOf(s.a) < t.players.indexOf(s.b));
       const lose = (k * 7) % ltw;
       t = (await call('POST', '/api/tournaments/' + t.id + '/games/' + g.r + '/' + g.i + '/result', { la: aWins ? ltw : lose, lb: aWins ? lose : ltw })).tournament;
@@ -39,7 +41,6 @@ async function demoExtra() {
     let t = (await call('POST', '/api/tournaments', Object.assign({ name: 'Кубок клуба · Стандарт', format: 'ko', players: PLAYERS.slice(0, 12), groups: { n: 3, adv: 2, cups: true }, ltwBy: { groups: 1, f: 3 } }, base))).tournament;
     await call('PATCH', '/api/tournaments/' + t.id + '/refs', refs);
     t = await play(t, 60);
-    t = (await call('POST', '/api/tournaments/' + t.id + '/groups/close')).tournament;
     await call('PATCH', '/api/tournaments/' + t.id + '/refs', { auto: true });
     t = await play(t, 2);
     // двойное выбывание — наполовину сыгран
