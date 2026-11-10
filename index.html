@@ -652,6 +652,18 @@ a.mini { text-decoration: none; }
 .qtbl .tie { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--red); border: 1px solid currentColor; white-space: nowrap; }
 .qtbl .tie.ok { color: var(--green); }
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
+.bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.bzones { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; align-items: start; }
+@media (max-width: 700px) { .bzones { grid-template-columns: minmax(0, 1fr); } }
+.bcol { background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: grid; gap: 8px; align-content: start; min-height: 96px; min-width: 0; }
+.bcol.tgt { cursor: pointer; border-style: dashed; border-color: var(--brass); }
+.bcol.over { outline: 2px dashed var(--brass); outline-offset: -3px; }
+.bhead { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-weight: 700; font-size: 13.5px; }
+.bempty { color: var(--muted); font-size: 12.5px; padding: 6px 2px; }
+.bcard { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line-bright); border-radius: 9px; padding: 8px 10px; display: grid; gap: 3px; font-size: 13px; cursor: grab; min-width: 0; overflow-wrap: anywhere; }
+.bcard.on { border-left-color: var(--brass); } .bcard.live { border-left-color: var(--green); } .bcard.done { cursor: default; opacity: .75; border-left-color: var(--green); }
+.bcard.sel { outline: 2px solid var(--brass); }
+.bcard .pill2 { justify-self: start; font-size: 11.5px; padding: 1px 7px; border-radius: 99px; background: var(--surface2); color: var(--muted); }
 .boards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .boards .num { min-width: 1.6em; text-align: center; font-size: 18px; }
 .boards .bnames { flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 6px 10px; font-size: 14px; }
@@ -2727,6 +2739,8 @@ function tourView(id) {
     : (isBracket(t) ? [['grid', 'Сетка'], ['games', 'Матчи'], ['places', 'Места']].concat(t.groups && t.groups.done ? [['groups', 'Группы']] : []) : [['table', t.stage === 'groups' ? 'Группы' : 'Таблица'], ['games', 'Матчи']])
       .concat(streamsOf(t).length || canDo(t, 'org') ? [['stream', 'Трансляция']] : [], t.qual ? [['qual', 'Квалификация']] : [], [['people', 'Участники']], (t.photos && t.photos.length) || (t.links && t.links.length) || canDo(t, 'org') ? [['media', 'Фото и ссылки']] : [], SRV ? [['time', 'Время']] : [], fees);
   if (SRV && (canDo(t, 'org') || t.refs)) tabs.push(['refs', 'Судьи']);
+  // управление мишенями — команде турнира, когда мишени заданы и идут матчи
+  if (st === 'live' && t.stage !== 'qual' && t.boards && t.boards.n && canDo(t, 'staff')) tabs.splice(Math.min(2, tabs.length), 0, ['boards', 'Мишени']);
   const rv = resolver(t), ready = st === 'live' ? t.games.filter(g => gameState(t, g, rv).st === 'ready').length : 0;
   if (S.tdef !== t.id) {
     // по умолчанию: есть готовые матчи — фильтр «Можно играть», на телефоне сразу список матчей
@@ -2793,6 +2807,7 @@ function tourView(id) {
   else if (tab === 'fees') h += feesView(t);
   else if (tab === 'time') h += timeView(t);
   else if (tab === 'refs') h += refsView(t);
+  else if (tab === 'boards') h += boardsView(t);
   else if (st !== 'reg') h += addPartBox(t) + cardsBtn(t) + numsView(t);
   else {
     h += addPartBox(t) + cardsBtn(t) + '<div class="card" style="padding:4px 14px">' + (t.players.length ? t.players.filter(x => P[x]).sort((a, b) => rt(b) - rt(a)).map(id => '<div class="prow" style="grid-template-columns:auto minmax(0,1fr) auto">' + avatar(id) + '<div style="min-width:0;display:grid">' + pid(id) + '<span class="meta">' + esc(P[id].city) + (P[id].club ? ' · ' + esc(P[id].club) : '') + '</span></div><span class="meta">' + (qrOneBtn(t, id) || (RANK[id] ? 'рейтинг ' + RATING[id].r : 'нет в рейтинге')) + '</span></div>').join('') : '<p class="meta" style="padding:10px 0">Пока никто не записался.</p>') + '</div>';
@@ -3060,7 +3075,7 @@ function boardsCtl(t) {
   const n = t.boards ? t.boards.n : 0;
   return '<div class="boards"><span class="label">Мишени</span><button class="mini" data-act="boards" data-v="' + t.id + '|-1"' + (n ? '' : ' disabled') + ' aria-label="Меньше мишеней">−</button><span class="num">' + n + '</span><button class="mini" data-act="boards" data-v="' + t.id + '|1" aria-label="Больше мишеней">+</button>' +
     '<input class="inp bnames" id="bn-' + esc(t.id) + '" value="' + esc(t.boards && t.boards.names ? t.boards.names.join(', ') : '') + '" placeholder="' + (n ? 'номера по порядку 1–' + n + ' — или свои: 3, 5, 7' : 'свои номера: 3, 5, 7') + '" aria-label="Номера мишеней, если не по порядку" inputmode="numeric"><button class="mini" data-act="bnames" data-v="' + esc(t.id) + '">Сохранить номера</button>' +
-    '<span class="meta" style="flex-basis:100%">' + (n ? (t.stage === 'qual' ? 'Квалификация идёт по двое на мишень' : 'Готовые матчи получают свободные мишени') + ' — игрокам приходит, куда пройти.' : 'Укажите мишени — сайт сам разведёт игроков по ним.') + '</span></div>';
+    '<span class="meta" style="flex-basis:100%">' + (n ? (t.stage === 'qual' ? 'Квалификация идёт по двое на мишень' : t.boards.manual ? 'Матчи на мишени ставите вы — вкладка «Мишени»' : 'Готовые матчи получают свободные мишени') + ' — игрокам приходит, куда пройти.' : 'Укажите мишени — сайт сам разведёт игроков по ним.') + '</span></div>';
 }
 function saveBoards(t, names) {
   if (SRV) return svDo(Api.patch('/api/tournaments/' + t.id + '/boards', { names }), r => { svTourSet(r); toast(names.length ? 'Мишени: ' + names.join(', ') : 'Мишени убраны'); });
@@ -3084,9 +3099,58 @@ function setBoard(tid, r, i, b) {
   if (SRV) return svDo(Api.patch('/api/tournaments/' + tid + '/boards', { r, i, board: b }), svTourSet);
   const at = t.boards.at, k = r + ':' + i;
   Object.keys(at).forEach(x => { if (at[x] === b) delete at[x]; });
-  at[k] = b;
+  if (b == null) { delete at[k]; t.boards.manual = true; } else at[k] = b;
   Bracket.assignBoards(t);
   saveDb(); render();
+}
+function setBoardsMode(tid, manual) {
+  const t = TBY[tid];
+  if (!t || !t.boards) return;
+  if (SRV) return svDo(Api.patch('/api/tournaments/' + tid + '/boards', { manual }), r => { svTourSet(r); toast(manual ? 'Мишени расставляете вы.' : 'Мишени расставляются сами.'); });
+  if (manual) t.boards.manual = true; else delete t.boards.manual;
+  Bracket.assignBoards(t);
+  saveDb(); render();
+}
+/* Управление мишенями: карточку матча перетаскивают на мишень, обратно в «Готовы играть» или в «Завершены» (откроется счёт).
+   На телефоне — нажать карточку, затем мишень. Автоматическая расстановка остаётся; «Вручную» — мишени сами не занимаются */
+function boardsView(t) {
+  const bd = t.boards, rv = resolver(t), nums = gameNums(t, rv), sel = S.bsel && S.bsel.tid === t.id ? S.bsel.k : null;
+  const nm = id => P[id] ? P[id].name : '—';
+  const card = (g, kind) => {
+    const k = g.r + ':' + g.i, gs = gameState(t, g, rv), n = nums.get(k), live = liveCtxIs(t.id, g.r, g.i) || otherLive(t, g), b = boardOf(t, g.r, g.i);
+    const st = kind === 'done' ? (g.res.la != null ? g.res.la + ':' + g.res.lb : 'сыгран') : live ? 'Идёт' + (b ? ' · мишень ' + b : '') : b ? 'У мишени ' + b : 'Ожидает';
+    const a = kind === 'done' ? g.res && rv.players(g.r, g.i) : [gs.a, gs.b];
+    return '<div class="bcard ' + (kind === 'done' ? 'done' : live ? 'live' : b ? 'on' : '') + (sel === k ? ' sel' : '') + '"' + (kind === 'done' ? '' : ' draggable="true" role="button" tabindex="0" data-act="bsel" data-v="' + t.id + '|' + k + '"') + ' data-bcard="' + k + '">' +
+      '<b>' + esc(gName(t, g, n) || 'Матч') + ' <span class="meta">' + gameLabel(t, g) + '</span></b><span>' + esc(nm(a[0])) + ' — ' + esc(nm(a[1])) + '</span><span class="pill2">' + st + '</span>' +
+      (kind !== 'done' && sel === k ? '<span class="row"><button class="mini" data-act="qscore" data-v="' + gref(t, g) + '">Счёт</button>' + (b ? '<button class="mini" data-act="bdrop" data-v="' + t.id + '|free">Снять с мишени</button>' : '') + '</span>' : '') + '</div>';
+  };
+  const ready = t.games.filter(g => gameState(t, g, rv).st === 'ready'), no = g => nums.get(g.r + ':' + g.i) || 0;
+  const wait = ready.filter(g => !boardIdx(t, g.r, g.i)).sort((x, y) => no(x) - no(y));
+  const done = t.games.filter(g => g.res).sort((x, y) => no(y) - no(x)).slice(0, 12);
+  let h = '<div class="tstat"><span class="meta">Перетащите матч на мишень, обратно в «Готовы играть» или в «Завершены» — откроется счёт. На телефоне: нажмите матч, затем мишень.</span></div>';
+  h += '<div class="field"><span class="label">Расстановка по мишеням</span><div class="chips">' + [['0', 'Автоматически'], ['1', 'Вручную']].map(([v, l]) => '<button class="chip txt' + ((bd.manual ? '1' : '0') === v ? ' on' : '') + '" data-act="bmode" data-v="' + t.id + '|' + v + '" aria-pressed="' + ((bd.manual ? '1' : '0') === v) + '">' + l + '</button>').join('') + '</div><span class="meta">' + (bd.manual ? 'Свободные мишени сами не занимаются — матчи ставите вы.' : 'Готовые матчи сами получают свободные мишени; любой можно переставить.') + '</span></div>';
+  h += '<div class="bgrid">' + Array.from({ length: bd.n }, (_, x) => {
+    const b = x + 1, g = ready.find(y => boardIdx(t, y.r, y.i) === b);
+    return '<div class="bcol' + (sel ? ' tgt' : '') + '" data-bdrop="' + b + '"' + (sel ? ' role="button" tabindex="0" data-act="bdrop" data-v="' + t.id + '|' + b + '"' : '') + '><div class="bhead"><span>Мишень ' + boardNo(t, b) + '</span><span class="meta">' + (g ? 'занята' : 'свободна') + '</span></div>' + (g ? card(g, 'on') : '<div class="bempty">' + (sel ? 'поставить сюда' : '—') + '</div>') + '</div>';
+  }).join('') + '</div>';
+  h += '<div class="bzones"><div class="bcol wide" data-bdrop="free"><div class="bhead"><span>Готовы играть</span><span class="meta">' + wait.length + '</span></div>' + (wait.length ? wait.map(g => card(g, 'wait')).join('') : '<div class="bempty">Все готовые матчи у мишеней.</div>') + '</div>';
+  h += '<div class="bcol wide" data-bdrop="done"><div class="bhead"><span>Завершены</span><span class="meta">' + t.games.filter(g => g.res).length + '</span></div>' + (done.length ? done.map(g => card(g, 'done')).join('') : '<div class="bempty">Перетащите сюда матч, чтобы внести счёт.</div>') + '</div></div>';
+  return h;
+}
+// карточку матча k («r:i») — на мишень, в «Готовы играть» или в «Завершены»
+function boardDrop(tid, k, to) {
+  const t = TBY[tid], [r, i] = k.split(':').map(Number);
+  S.bsel = null;
+  if (!t || !t.boards || !gameAt(t, r, i)) return render();
+  if (to === 'done') {
+    if (liveCtxIs(tid, r, i)) { toast('Этот матч сейчас идёт в счётчике — доиграйте его там.'); return render(); }
+    if (!readyGame(tid, r, i)) return render();
+    S.quickModal = { tid, r, i, la: null, lb: null, err: '' }; return render();
+  }
+  if (to === 'free') { if (!boardIdx(t, r, i)) return render(); return setBoard(tid, r, i, null); }
+  const b = +to;
+  if (boardIdx(t, r, i) === b) return render();
+  setBoard(tid, r, i, b);
 }
 
 /* Номера игроков: организатор нумерует участников, номер видно в сетке, квалификации и списках */
@@ -5877,7 +5941,7 @@ function admCardModal() {
   if (Api.perm('block') && p.id !== ME && (!high || tech)) acts.push('<button class="mini' + (p.blocked ? ' go' : ' dng') + '" data-act="adm-block" data-v="' + p.id + '|' + (p.blocked ? 0 : 1) + '">' + (p.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>');
   if (acts.length) h += '<div class="ac-sec"><span class="label">Роль и доступ</span><div class="gacts wrap" style="justify-content:flex-start;max-width:none;align-items:end">' + acts.join('') + '</div></div>';
   // логин и пароль игрока — выдаёт администратор или ведущий, который завёл аккаунт
-  if (!high && (full || (mine && Api.perm('accounts')))) h += admLoginSec(p);
+  if (!high && (full || (mine && Api.perm('accounts') && !p.phone && !p.vk && !p.email))) h += admLoginSec(p);
   // логин и пароль администратора — выдаёт тех. администратор
   if (tech && high) h += '<div class="ac-sec"><span class="label">Вход по логину и паролю</span><p class="meta">Вход: ' + esc(location.origin) + '/#admin — логин, пароль и код из Google Authenticator. Пароль передайте лично, в чатах не пересылайте.</p><div class="nrow"><input class="inp" id="ac-login" maxlength="32" placeholder="Логин" value="' + esc(p.login || '') + '" autocomplete="off" aria-label="Логин"><input class="inp" id="ac-pass" type="password" maxlength="200" placeholder="Новый пароль, от 10 символов" autocomplete="new-password" aria-label="Пароль"></div><div class="gacts wrap" style="justify-content:flex-start;max-width:none"><button class="btn sm" data-act="ac-login" data-v="' + p.id + '">' + (p.login ? 'Сменить логин и пароль' : 'Выдать логин и пароль') + '</button>' + (p.login ? '<button class="ghost sm dng" data-act="ac-login-off" data-v="' + p.id + '">Убрать вход по паролю</button>' : '') + '</div><p class="meta">Двухфакторный вход: ' + (p.twofa ? 'включён <button class="lnk dng" data-act="ac-2fa-off" data-v="' + p.id + '">сбросить (потерян телефон)</button>' : 'привяжет при следующем входе') + '</p></div>';
 
@@ -6738,6 +6802,9 @@ document.addEventListener('click', e => {
     case 'tfa-new-ask': S.tfaNew = !S.tfaNew; render(); break;
     case 'ac-2fa-off': svDo(Api.del('/api/admin/players/' + v + '/2fa'), () => { svStale('acard:'); svStale('admin:'); toast('Двухфакторный вход сброшен — при входе приложение привяжут заново.'); }); break;
     case 'boards': { const [tid, d] = v.split('|'); setBoards(tid, +d); break; }
+    case 'bmode': { const [tid, m] = v.split('|'); setBoardsMode(tid, m === '1'); break; }
+    case 'bsel': { const [tid, k] = v.split('|'); S.bsel = S.bsel && S.bsel.k === k ? null : { tid, k }; render(); break; }
+    case 'bdrop': { const [tid, to] = v.split('|'); if (S.bsel && S.bsel.tid === tid) boardDrop(tid, S.bsel.k, to); break; }
     case 'gready': gameReady(v); break;
     case 'notify-on': try { Notification.requestPermission().then(() => render()); } catch (e) {} break;
     case 'bnames': {
@@ -7511,6 +7578,7 @@ const HELP = [
     ['Больше 64 игроков', 'С квалификацией (или группами) — до 128 участников. «Игроков в основной сетке» — 8, 16, 32 или 64: остальные после квалификации сами уходят в «Кубок B» — отдельную сетку с теми же мишенями, места продолжаются (65-е, 66-е…). Больше 64 участников — основная сетка 64 сама. «Кубок B» не нужен — «Выбывают»: места по квалификации.'],
     ['Сел телефон посреди матча', 'Счёт уже на сервере. С другого телефона откройте матч и нажмите «Забрать ведение счёта» — игра продолжится с того же места. Без сети подходы копятся на телефоне и уходят сами; доиграли без сети — «Покажите ведущему», он внесёт итог кнопкой «Счёт».'],
     ['Начать и вести', 'Когда все записались — «Начать турнир». На вкладке «Матчи» фильтр «Можно играть» показывает, кого звать к мишеням; число мишеней задаётся кнопками +/−, матчи раскладываются по ним сами. Счёт вводят сами игроки со своих телефонов, судья по QR или вы — кнопкой «Счёт».'],
+    ['Мишени вручную', 'Вкладка «Мишени» у идущего турнира: все мишени, матчи «Готовы играть» и «Завершены». Перетащите матч на мишень или обратно; в «Завершены» — откроется счёт. На телефоне: нажмите матч, затем мишень. «Автоматически» — свободные мишени занимаются сами, «Вручную» — только вы; игрокам приходит, куда пройти.'],
     ['Что происходит само', 'Квалификация закрывается сама, когда все сдали попытки (при равенстве — после перестрелки, её результат вносите кнопкой «Перестрелка»). Групповой этап закрывается сам после последнего матча — сетка строится автоматически. Мишени, «Ваш матч», места и рейтинг — тоже сами. «Закончить сейчас» — если нужно раньше.'],
     ['Судьи', 'Вкладка «Судьи»: главный судья (в протокол) и список судей. Галочка «Расставлять судей автоматически» — на каждый матч, который можно играть, встаёт судья, у кого меньше матчей. Судья без аккаунта: «Счёт» у матча → «QR для судьи» — судья наводит камеру, вводит имя и ведёт счёт этого матча; имя попадёт в сетку и протокол.'],
     ['Табло и экран организатора', '«Табло для ТВ» — на телевизор в зале: идущие матчи, вспышки 180 и закрытий, вызовы к мишеням, по желанию QR и озвучка. «Экран организатора» — всё управление на одном экране, «Слежка за матчами» — все матчи сразу.'],
@@ -7608,6 +7676,13 @@ async function boot() {
   if (lg) loginLink(lg);
   if (rk) refOpen(rk);
 }
+// мишени: перетаскивание карточек матчей
+let bdrag = null;
+document.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('.bcard[draggable]'); if (!c) return; const a = (c.dataset.v || '').split('|'); bdrag = { tid: a[0], k: c.dataset.bcard }; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', bdrag.k); } catch (x) {} });
+document.addEventListener('dragover', e => { const z = bdrag && e.target.closest && e.target.closest('[data-bdrop]'); if (!z) return; e.preventDefault(); document.querySelectorAll('.bcol.over').forEach(x => x !== z && x.classList.remove('over')); z.classList.add('over'); });
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('[data-bdrop]'); if (z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
+document.addEventListener('drop', e => { const z = bdrag && e.target.closest && e.target.closest('[data-bdrop]'); document.querySelectorAll('.bcol.over').forEach(x => x.classList.remove('over')); if (!z) return; e.preventDefault(); const d = bdrag; bdrag = null; boardDrop(d.tid, d.k, z.dataset.bdrop); });
+document.addEventListener('dragend', () => { bdrag = null; });
 boot();
 </script>
 </body>

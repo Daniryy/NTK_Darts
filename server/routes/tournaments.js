@@ -592,7 +592,8 @@ module.exports = async function (app) {
   });
 
   // мишени (организатор или помощник, можно и до старта): { n } — сколько их (номера 1…n), { names: [3, 5, 7] } —
-  // свои номера мишеней в зале, { r, i, board } — поставить игре мишень (board — порядковый 1…n)
+  // свои номера мишеней в зале, { r, i, board } — поставить игре мишень (board — порядковый 1…n; null — снять с мишени),
+  // { manual: true } — ручное управление: свободные мишени сами не занимаются, матчи расставляет организатор
   app.patch('/api/tournaments/:id/boards', async req => {
     const me = needPlayer(req), b = req.body || {};
     return tx(async c => {
@@ -607,13 +608,24 @@ module.exports = async function (app) {
         // номера 1…n подряд — обычный случай, отдельный список не нужен
         if (names.every((x, k) => x === k + 1)) delete bd.names; else bd.names = names;
       } else if (b.n !== undefined) { bd.n = V.int(b.n, 'n', 0, 64); delete bd.names; }
+      if (b.manual !== undefined) { if (V.bool(b.manual, 'manual')) bd.manual = true; else delete bd.manual; }
       if (b.board !== undefined) {
         if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени играм — после старта');
-        const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63), no = V.int(b.board, 'board', 1, Math.max(1, bd.n));
+        const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63);
         const g = B.gameAt(t, r, i);
         if (!g || B.gameState(t, g).st !== 'ready') throw E.conflict('bad_state', 'Мишень ставится только готовой к игре паре');
-        Object.keys(bd.at).forEach(k => { if (bd.at[k] === no) delete bd.at[k]; });
-        bd.at[r + ':' + i] = no;
+        if (b.board === null) {
+          // снять с мишени: дальше мишени расставляет организатор, иначе матч тут же получил бы её снова
+          delete bd.at[r + ':' + i];
+          bd.manual = true;
+        } else {
+          const no = V.int(b.board, 'board', 1, Math.max(1, bd.n));
+          // на мишени уже идёт матч в счётчике — его не сгоняем
+          const busy = Object.keys(bd.at).find(k => bd.at[k] === no && k !== r + ':' + i);
+          if (busy && t.live[busy]) throw E.conflict('board_busy', 'На этой мишени сейчас идёт матч — дождитесь конца или выберите другую');
+          Object.keys(bd.at).forEach(k => { if (bd.at[k] === no) delete bd.at[k]; });
+          bd.at[r + ':' + i] = no;
+        }
       }
       t.boards = bd.n ? bd : null;
       if (t.boards && t.status !== 'reg') B.assignBoards(t);

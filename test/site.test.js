@@ -84,6 +84,11 @@ test('ведущий выдаёт логин своему аккаунту, но
   // тёзка получает следующий номер
   const q = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Пётр Щукин' }), 201).player;
   assert.equal(ok(await call(HOST, 'PUT', '/api/admin/players/' + q.id + '/login', {})).login, 'schukin2');
+  // игрок привязал свою почту — аккаунт уже его: ведущий новый пароль не выдаст, администратор — да
+  await pool.query(`UPDATE players SET email = 'schukin@mail.ru' WHERE id = $1`, [q.id]);
+  err(await call(HOST, 'PUT', '/api/admin/players/' + q.id + '/login', {}), 403);
+  err(await call(HOST, 'DELETE', '/api/admin/players/' + q.id + '/login'), 403);
+  ok(await call(ADMIN, 'PUT', '/api/admin/players/' + q.id + '/login', {}));
 });
 
 test('настройки сайта меняет тех. администратор: открыть регистрацию и правку профиля', async () => {

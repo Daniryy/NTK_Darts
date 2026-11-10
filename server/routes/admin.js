@@ -16,7 +16,10 @@ const { hashPassword, passwordProblem, LOGIN_RE, normLogin } = require('../passw
 // или ведущий своему аккаунту (право accounts)
 function loginRight(me, cur) {
   if (RANK[cur.role] >= RANK.admin) { if (me.role !== 'tech' || me.blocked) throw E.forbidden('Логин администратора выдаёт тех. администратор'); return; }
-  if (!can(me, 'players') && !(can(me, 'accounts') && cur.owner_id === me.id)) throw E.forbidden('Логин и пароль игроку выдаёт администратор или ведущий, заведший аккаунт');
+  if (can(me, 'players')) return;
+  if (!(can(me, 'accounts') && cur.owner_id === me.id)) throw E.forbidden('Логин и пароль игроку выдаёт администратор или ведущий, заведший аккаунт');
+  // игрок уже привязал свой вход (телефон, VK, почта) — аккаунт его: ведущий не может забрать его новым паролем
+  if (cur.phone || cur.vk_id != null || cur.email) throw E.forbidden('Игрок привязал свой вход — пароль ему меняет администратор');
 }
 // пароль для игрока: 12 знаков без похожих букв, например k7mq-x9pd-4f
 function newPassword() {
