@@ -144,3 +144,33 @@ test('темп турнира: средняя длительность матч�
     SELECT 'gpace0000001', $1, 0, 1, 'done', 501, 1, true, '[{"id":"p8"},{"id":"p9"}]', '[1,0]', 0, 'p4', 1000, 1000 + 9 * 6e4`, [t.id]);
   assert.equal((await tourOf(A, t.id)).pace.match, 9 * 6e4);
 });
+
+test('ручное управление мишенями: снять матч, поставить на другую, занятую идущим матчем не отдать, вернуть «автоматически»', async () => {
+  let t = ok(await call(A, 'POST', '/api/tournaments', { name: 'Мишени вручную', format: 'ko', mode: 501, ltw: 1, players: ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'], boards: [1, 2] }), 201).tournament;
+  const url = '/api/tournaments/' + t.id + '/boards', at = x => x.boards.at;
+  // автоматически: две первые игры на двух мишенях
+  assert.deepEqual(Object.keys(at(t)).length, 2);
+  const [k1, k2] = Object.keys(at(t)).sort(), free = ['0:0', '0:1', '0:2', '0:3'].filter(k => !at(t)[k]), i = k => +k.split(':')[1];
+  err(await call(PL, 'PATCH', url, { manual: true }), 403);
+  // сняли матч с мишени — режим стал ручным, мишень осталась свободной
+  t = ok(await call(A, 'PATCH', url, { r: 0, i: i(k1), board: null })).tournament;
+  assert.equal(t.boards.manual, true); assert.equal(at(t)[k1], undefined); assert.equal(Object.keys(at(t)).length, 1);
+  // результат в ручном режиме не занимает освободившуюся мишень сам
+  t = ok(await call(A, 'POST', '/api/tournaments/' + t.id + '/games/0/' + i(k2) + '/result', { la: 1, lb: 0 })).tournament;
+  assert.deepEqual(at(t), {});
+  // поставили ждущий матч на мишень 2
+  t = ok(await call(A, 'PATCH', url, { r: 0, i: i(free[0]), board: 2 })).tournament;
+  assert.equal(at(t)[free[0]], 2);
+  // на мишени идёт матч в счётчике — другой туда не поставить
+  const mid = 'g' + Math.random().toString(36).slice(2, 14).padEnd(12, '0');
+  ok(await call(A, 'PUT', '/api/matches/' + mid, { tournamentId: t.id, r: 0, i: i(free[0]) }), 201);
+  err(await call(A, 'PATCH', url, { r: 0, i: i(free[1]), board: 2 }), 409, 'board_busy');
+  t = ok(await call(A, 'PATCH', url, { r: 0, i: i(free[1]), board: 1 })).tournament;
+  assert.equal(at(t)[free[1]], 1);
+  err(await call(A, 'PATCH', url, { r: 0, i: i(free[1]), board: 3 }), 400);
+  // вернули «автоматически» — ждущий матч получает свободную мишень
+  ok(await call(A, 'PATCH', url, { r: 0, i: i(free[1]), board: null }));
+  t = ok(await call(A, 'PATCH', url, { manual: false })).tournament;
+  assert.equal(t.boards.manual, undefined);
+  assert.equal(Object.values(at(t)).sort().join(), '1,2');
+});

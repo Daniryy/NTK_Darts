@@ -124,12 +124,19 @@ async function autoStage(c, tid) {
   let t = await getTour(c, tid, true);
   if (t.status !== 'live') return;
   const idle = !Object.keys(t.live).length;
-  if (t.stage === 'qual' && idle && T.qualDone(t) >= 2 && t.players.every(id => (t.qual.res[id] || []).filter(Boolean).length >= t.qual.tries) && !T.qualTies(t, true).length) {
-    await closeQual(c, t);
+  // автозакрытие не должно ронять сам результат: не вышло (например, в «Кубок B» уходит больше 64) —
+  // стадия остаётся открытой, организатор увидит причину, нажав «Закончить»
+  const safely = async fn => {
+    await c.query('SAVEPOINT auto_stage');
+    try { await fn(); await c.query('RELEASE SAVEPOINT auto_stage'); }
+    catch (e) { await c.query('ROLLBACK TO SAVEPOINT auto_stage'); if (!e || !e.status || e.status >= 500) throw e; }
     t = await getTour(c, tid, true);
+  };
+  if (t.stage === 'qual' && idle && T.qualDone(t) >= 2 && t.players.every(id => (t.qual.res[id] || []).filter(Boolean).length >= t.qual.tries) && !T.qualTies(t, true).length) {
+    await safely(() => closeQual(c, t));
   } else if (t.stage === 'groups' && idle) {
     const pr = B.tProgress(t);
-    if (pr.total && pr.done >= pr.total) { await closeGroups(c, t); t = await getTour(c, tid, true); }
+    if (pr.total && pr.done >= pr.total) await safely(() => closeGroups(c, t));
   }
   if (t.refs && t.refs.auto && (t.refs.pool || []).length && t.games.length) {
     const rf = Object.assign({}, t.refs, { at: Object.assign({}, t.refs.at) });

@@ -445,6 +445,8 @@
       if (!g || gameState(t, g, rv).st !== 'ready' || !(Number.isInteger(b) && b >= 1 && b <= bd.n) || used.has(b)) delete at[k];
       else used.add(b);
     });
+    // ручное управление: организатор сам ставит матчи на мишени — свободные сами не занимаются
+    if (bd.manual) return JSON.stringify(at) !== before || wasQ;
     const nums = gameNums(t, rv), no = g => nums.get(g.r + ':' + g.i) || 0;
     const wait = t.games.filter(g => !at[g.r + ':' + g.i] && gameState(t, g, rv).st === 'ready').sort((x, y) => no(x) - no(y));
     let b = 1;

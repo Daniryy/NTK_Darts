@@ -108,3 +108,13 @@ test('100 участников без «Кубка B»: сетка 32, оста�
   assert.deepEqual(B.placeRange(t, pl[32]), [33, 33]);
   assert.deepEqual(B.placeRange(t, pl[99]), [100, 100]);
 });
+
+test('автозакрытие не роняет результат: в «Кубок B» больше 64 — квалификация остаётся открытой, кнопка объясняет', async () => {
+  const pl = ids.slice(0, 80);
+  let t = ok(await call(TECH, 'POST', '/api/tournaments', { name: 'Не закроется сама', format: 'ko', mode: 501, ltw: 1, players: pl, qual: Object.assign({ main: 16 }, QUAL) }), 201).tournament;
+  await pool.query(`UPDATE tournaments SET qual = jsonb_set(qual, '{main}', '8') WHERE id = $1`, [t.id]);
+  for (const [k, id] of pl.entries()) t = ok(await call(TECH, 'PUT', '/api/tournaments/' + t.id + '/qual/' + id + '/0', { v: 1700 - k })).tournament;
+  assert.equal(t.stage, 'qual');
+  assert.equal(Object.keys(t.qual.res).length, 80, 'последний результат сохранён');
+  err(await call(TECH, 'POST', '/api/tournaments/' + t.id + '/qual/close'), 409);
+});
