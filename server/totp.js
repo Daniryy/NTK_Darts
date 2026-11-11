@@ -33,7 +33,7 @@ function check(secret, code, last, now = Date.now()) {
   }
   return 0;
 }
-const otpauth = (label, secret) => 'otpauth://totp/' + encodeURIComponent('Oche:' + label) + '?secret=' + secret + '&issuer=Oche&digits=6&period=' + STEP;
+const otpauth = (label, secret) => 'otpauth://totp/' + encodeURIComponent('NDL:' + label) + '?secret=' + secret + '&issuer=NDL&digits=6&period=' + STEP;
 
 // шифрование секрета: AES-256-GCM, ключ из COOKIE_SECRET
 const key = () => crypto.createHash('sha256').update(config.cookieSecret + ':totp').digest();

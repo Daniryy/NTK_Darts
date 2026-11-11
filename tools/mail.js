@@ -31,7 +31,7 @@ const port = (p) => new Promise(ok => {
     if (/auth|535|534|Invalid login|password/i.test(e.message)) console.log('Похоже, неверный пароль. Для Яндекса и Mail.ru нужен пароль приложения (не обычный пароль от почты), а в настройках ящика должен быть разрешён доступ по протоколу IMAP/SMTP.');
     process.exit(1);
   }
-  await sendMail(to, 'Oche: проверка почты', 'Если вы видите это письмо — почта на сервере Oche настроена правильно.\n\n' + config.publicUrl + '/', console);
+  await sendMail(to, 'NDL: проверка почты', 'Если вы видите это письмо — почта на сервере NDL настроена правильно.\n\n' + config.publicUrl + '/', console);
   console.log('Тестовое письмо отправлено на ' + to + ' — проверьте входящие и «Спам».');
   process.exit(0);
 })().catch(e => { console.log('Ошибка: ' + e.message); process.exit(1); });

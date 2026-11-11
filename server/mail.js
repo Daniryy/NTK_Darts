@@ -12,7 +12,7 @@ function smtp() {
   });
   return transport;
 }
-const fromAddr = () => ({ name: 'Oche', address: config.mail.from });
+const fromAddr = () => ({ name: 'NDL', address: config.mail.from });
 
 // отправить письмо; ошибка SMTP — исключение (вызывающий отвечает 502)
 async function sendMail(to, subject, text, log) {

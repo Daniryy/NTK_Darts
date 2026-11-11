@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Oche Дартс — Клубная экосистема и счётчик</title>
-<meta name="description" content="Oche — дартс-турниры онлайн: регистрация игроков, сетки и квалификация, счёт с телефона, табло для ТВ, рейтинг и статистика клубов.">
+<title>NDL — Новоуральская Дартс Лига</title>
+<meta name="description" content="NDL, Новоуральская Дартс Лига — дартс-турниры онлайн: регистрация игроков, сетки и квалификация, счёт с телефона, табло для ТВ, рейтинг и статистика клубов.">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Oche">
-<meta property="og:title" content="Oche Дартс — турниры, счёт и рейтинг">
+<meta property="og:site_name" content="NDL">
+<meta property="og:title" content="NDL — Новоуральская Дартс Лига">
 <meta property="og:description" content="Сетки и квалификация, счёт с телефона, табло для ТВ, рейтинг игроков и клубов.">
 <meta property="og:image" content="icons/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -16,7 +16,7 @@
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Oche">
+<meta name="apple-mobile-web-app-title" content="NDL">
 <!-- шрифты — с нашего сервера: адрес посетителя не уходит в Google -->
 <link rel="preload" href="/fonts/golos-text-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link href="/fonts/fonts.css" rel="stylesheet">
@@ -315,7 +315,10 @@ h1, h2, h3, p { margin: 0; }
 }
 .top { max-width: 1140px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 10px; }
 .brand { display: flex; align-items: center; gap: 9px; font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; }
-.brand svg { width: 29px; height: 29px; flex: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+.brand img { width: 38px; height: 38px; flex: none; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+.brand-t { display: grid; text-align: left; line-height: 1; gap: 3px; }
+.brand-t small { font-family: var(--body, inherit); font-size: 9.5px; font-weight: 600; letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+@media (max-width: 380px) { .brand-t small { font-size: 8.5px; letter-spacing: .02em; } }
 .top-actions { display: flex; align-items: center; gap: 6px; }
 .icon-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; }
 .icon-btn:hover { color: var(--fg); border-color: var(--line-bright); background: var(--surface2); }
@@ -1556,7 +1559,7 @@ const I = {
   shield: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   gear: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
-const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#161922" stroke="var(--line-bright)" stroke-width="1"/><circle cx="16" cy="16" r="11.8" fill="#f0ead8"/><circle cx="16" cy="16" r="8.8" fill="var(--green)"/><circle cx="16" cy="16" r="5.6" fill="#f0ead8"/><circle cx="16" cy="16" r="3.2" fill="var(--red)"/><path d="M20 12 L29 3" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const LOGO = '<img src="icons/logo-96.png" alt="" width="38" height="38">';
 
 // acc: акцент в тёмной и светлой теме (как --green в CSS)
 const PALETTES = [
@@ -1575,13 +1578,13 @@ const SEED_PLAYERS = [
   ['p3', 'Марина Соколова', 'sokolova_m', 'OCH-1003', 'Казань', '«Бычий глаз»', 80, 1],
   ['p4', 'Денис Карпов', 'karpov_d', 'OCH-1004', 'Москва', '«Тройная двадцатка»', 76, 1],
   ['p5', 'Олег Ткаченко', 'tkachenko_o', 'OCH-1005', 'Екатеринбург', '«Уральский сектор»', 74, 1],
-  ['p6', 'Ксения Лебедева', 'lebedeva_k', 'OCH-1006', 'Москва', '«Оче-бар»', 71, 0],
+  ['p6', 'Ксения Лебедева', 'lebedeva_k', 'OCH-1006', 'Москва', '«Булл-бар»', 71, 0],
   ['p7', 'Руслан Гаврилов', 'gavrilov_r', 'OCH-1007', 'Новосибирск', '«Сибирский дубль»', 69, 1],
   ['p8', 'Павел Зуев', 'zuev_pavel', 'OCH-1008', 'Санкт-Петербург', '«Северный дубль»', 67, 0],
-  ['p9', 'Анна Мельникова', 'melnikova_a', 'OCH-1009', 'Москва', '«Оче-бар»', 64, 0],
+  ['p9', 'Анна Мельникова', 'melnikova_a', 'OCH-1009', 'Москва', '«Булл-бар»', 64, 0],
   ['p10', 'Тимур Ахметов', 'akhmetov_t', 'OCH-1010', 'Казань', '«Бычий глаз»', 62, 0],
   ['p11', 'Сергей Орлов', 'orlov_nn', 'OCH-1011', 'Нижний Новгород', '', 60, 0],
-  ['p12', 'Дмитрий Фомин', 'fomin_d', 'OCH-1012', 'Москва', '«Оче-бар»', 57, 0],
+  ['p12', 'Дмитрий Фомин', 'fomin_d', 'OCH-1012', 'Москва', '«Булл-бар»', 57, 0],
   ['p13', 'Елена Савина', 'savina_spb', 'OCH-1013', 'Санкт-Петербург', '', 55, 0],
   ['p14', 'Никита Рябов', 'ryabov_ekb', 'OCH-1014', 'Екатеринбург', '«Уральский сектор»', 52, 0],
   ['p15', 'Вадим Крылов', 'krylov_v', 'OCH-1015', 'Москва', '', 49, 0],
@@ -1609,12 +1612,12 @@ const MORE_PLAYERS = [
   ['p32', 'Ольга Новикова', 'novikova_32', 'OCH-1032', 'Нижний Новгород', '', 60, 0],
   ['p33', 'Константин Морозов', 'morozov_33', 'OCH-1033', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
   ['p34', 'Степан Семёнов', 'semenov_34', 'OCH-1034', 'Москва', '«Тройная двадцатка»', 61, 0],
-  ['p35', 'Фёдор Беляев', 'belyaev_35', 'OCH-1035', 'Москва', '«Оче-бар»', 54, 0],
+  ['p35', 'Фёдор Беляев', 'belyaev_35', 'OCH-1035', 'Москва', '«Булл-бар»', 54, 0],
   ['p36', 'Мария Морозова', 'morozova_36', 'OCH-1036', 'Самара', '«Волжская стрела»', 59, 0],
   ['p37', 'Борис Михайлов', 'mikhailov_37', 'OCH-1037', 'Краснодар', '', 59, 0],
   ['p38', 'Пётр Петров', 'petrov_38', 'OCH-1038', 'Краснодар', '', 57, 0],
   ['p39', 'Арсений Зайцев', 'zaitsev_39', 'OCH-1039', 'Москва', '«Тройная двадцатка»', 53, 0],
-  ['p40', 'Полина Макарова', 'makarova_40', 'OCH-1040', 'Москва', '«Оче-бар»', 55, 0],
+  ['p40', 'Полина Макарова', 'makarova_40', 'OCH-1040', 'Москва', '«Булл-бар»', 55, 0],
   ['p41', 'Александр Петров', 'petrov_41', 'OCH-1041', 'Казань', '«Бычий глаз»', 51, 0],
   ['p42', 'Максим Зайцев', 'zaitsev_42', 'OCH-1042', 'Самара', '«Волжская стрела»', 51, 0],
   ['p43', 'Иван Фёдоров', 'fedorov_43', 'OCH-1043', 'Краснодар', '', 52, 0],
@@ -1629,7 +1632,7 @@ const MORE_PLAYERS = [
   ['p52', 'Софья Волкова', 'volkova_52', 'OCH-1052', 'Екатеринбург', '«Уральский сектор»', 43, 0],
   ['p53', 'Константин Козлов', 'kozlov_53', 'OCH-1053', 'Екатеринбург', '«Уральский сектор»', 41, 0],
   ['p54', 'Степан Голубев', 'golubev_54', 'OCH-1054', 'Самара', '«Волжская стрела»', 41, 0],
-  ['p55', 'Фёдор Тарасов', 'tarasov_55', 'OCH-1055', 'Москва', '«Оче-бар»', 45, 0],
+  ['p55', 'Фёдор Тарасов', 'tarasov_55', 'OCH-1055', 'Москва', '«Булл-бар»', 45, 0],
   ['p56', 'Светлана Кузнецова', 'kuznetsova_56', 'OCH-1056', 'Нижний Новгород', '', 43, 0],
   ['p57', 'Лев Семёнов', 'semenov_57', 'OCH-1057', 'Новоуральск', '«Новоуральская Дартс Лига»', 39, 0],
   ['p58', 'Борис Беляев', 'belyaev_58', 'OCH-1058', 'Екатеринбург', '«Уральский сектор»', 39, 0],
@@ -1705,7 +1708,7 @@ function makeSeed() {
   const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   const pick = a => a[Math.floor(R() * a.length)];
   const players = SEED_PLAYERS.map(([id, name, handle, code, city, club, base, ver]) => ({ id, name, handle, code, city, club, base, ver: !!ver }));
-  players.push({ id: 'me', name: 'Вы', handle: 'player_me', code: 'OCH-7749', city: 'Москва', club: '«Оче-бар»', base: 58, ver: false });
+  players.push({ id: 'me', name: 'Вы', handle: 'player_me', code: 'OCH-7749', city: 'Москва', club: '«Булл-бар»', base: 58, ver: false });
   const byId = Object.fromEntries(players.map(p => [p.id, p]));
   const matches = [], tours = [];
 
@@ -1755,7 +1758,7 @@ function makeSeed() {
     });
   };
   const ALL16 = SEED_PLAYERS.map(p => p[0]);
-  const LEAGUE = { name: 'Лига Oche', ver: true };
+  const LEAGUE = { name: 'Лига дартса', ver: true };
   NDL_PLAYERS.concat(MORE_PLAYERS).forEach(([id, name, handle, code, city, club, base, ver]) => { const p = { id, name, handle, code, city, club, base, ver: !!ver }; players.push(p); byId[id] = p; });
   const SCORE = { k: 'score', lim: 10 };
   const total = p => Math.max(150, Math.min(1500, Math.round(p.base * 10 + gauss() * 55)));
@@ -1774,23 +1777,23 @@ function makeSeed() {
   };
   const ALL64 = ALL16.concat(['me'], NDL_PLAYERS.map(p => p[0]), MORE_PLAYERS.map(p => p[0]));
   // большая сетка: 64 игрока, 8 сеток по 8 мест
-  qualTour({ name: 'Гран-при Oche · финал сезона', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 92 * DAY, ltw: 2 }, ALL64, 4 * MIN);
+  qualTour({ name: 'Гран-при NDL · финал сезона', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 92 * DAY, ltw: 2 }, ALL64, 4 * MIN);
   // средняя: 24 игрока, 3 сетки
-  qualTour({ name: 'Кубок Лиги Oche · этап 2', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 61 * DAY, ltw: 2 }, ALL16.concat(['p21', 'p22', 'p23', 'p24', 'p25', 'p29', 'p30', 'p33']), 7 * MIN);
-  qualTour({ name: 'Кубок Лиги Oche · этап 3', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 31 * DAY, ltw: 3 }, ALL16, 12 * MIN);
+  qualTour({ name: 'Кубок Лиги · этап 2', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 61 * DAY, ltw: 2 }, ALL16.concat(['p21', 'p22', 'p23', 'p24', 'p25', 'p29', 'p30', 'p33']), 7 * MIN);
+  qualTour({ name: 'Кубок Лиги · этап 3', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 31 * DAY, ltw: 3 }, ALL16, 12 * MIN);
   // маленькая: 8 игроков, одна сетка
   qualTour({ name: 'Открытый чемпионат Петербурга', official: true, org: { name: 'Клуб «Северный дубль»', ver: true }, city: 'Санкт-Петербург', venue: 'Клуб «Северный дубль»', start: NOW - 24 * DAY, ltw: 3 }, ['p2', 'p8', 'p13', 'p1', 'p4', 'p5', 'p3', 'p7'], 25 * MIN);
   const fr = T({ name: 'Дартс и пицца у Анны', official: false, org: { name: 'Анна Мельникова', ver: false }, city: 'Москва', venue: 'Квартирник', start: NOW - 10 * DAY, ltw: 2, cap: 5 });
   bracket(fr, 'pl', ['me', 'p9', 'p12', 'p15', 'p6'], null, 30 * MIN);
   // мишени в зале с разрывами в номерах: игры получают их сами, игрокам пишет «пройдите к мишени 7»
-  const live = T({ name: 'Кубок Лиги Oche · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3, boards: { n: 4, at: {}, names: [3, 4, 7, 8] } });
+  const live = T({ name: 'Кубок Лиги · этап 4', official: true, org: LEAGUE, city: 'Москва', venue: 'Клуб «Тройная двадцатка»', start: NOW - 6 * HOUR, ltw: 3, boards: { n: 4, at: {}, names: [3, 4, 7, 8] } });
   bracket(live, 'pl', ALL16, 18, 15 * MIN);
-  const rr = T({ name: 'Пятничная лига «Оче-бара»', official: false, org: { name: 'Денис Карпов', ver: false }, city: 'Москва', venue: '«Оче-бар»', start: NOW - 14 * DAY - 3 * HOUR, ltw: 2, cap: 6, format: 'rr' });
+  const rr = T({ name: 'Пятничная лига «Булл-бара»', official: false, org: { name: 'Денис Карпов', ver: false }, city: 'Москва', venue: '«Булл-бар»', start: NOW - 14 * DAY - 3 * HOUR, ltw: 2, cap: 6, format: 'rr' });
   rr.players = ['me', 'p6', 'p9', 'p12', 'p15', 'p4'];
   rr.games = rrGames(rr.players);
   rr.games.forEach(g => { if (g.r < 3) play(rr, g, rr.start + g.r * 7 * DAY + g.i * 30 * MIN); });
   T({ name: 'Осенний кубок Казани', official: true, org: { name: 'Клуб «Бычий глаз»', ver: true }, city: 'Казань', venue: 'Клуб «Бычий глаз»', start: NOW + 25 * DAY, regUntil: NOW + 22 * DAY, status: 'reg', format: 'pl', ltw: 3, cap: 8, players: ['p3', 'p10', 'p5', 'p7', 'p11', 'p1', 'p2'], games: [] });
-  T({ name: 'Ночной турнир в «Оче-баре»', official: false, org: { name: 'Ксения Лебедева', ver: false }, city: 'Москва', venue: '«Оче-бар»', start: NOW + 3 * DAY, regUntil: NOW + 2 * DAY, status: 'reg', format: 'rr', ltw: 2, cap: 6, players: ['p6', 'p12', 'p9', 'p4'], games: [] });
+  T({ name: 'Ночной турнир в «Булл-баре»', official: false, org: { name: 'Ксения Лебедева', ver: false }, city: 'Москва', venue: '«Булл-бар»', start: NOW + 3 * DAY, regUntil: NOW + 2 * DAY, status: 'reg', format: 'rr', ltw: 2, cap: 6, players: ['p6', 'p12', 'p9', 'p4'], games: [] });
 
   const others = ALL16;
   for (let k = 0; k < 36; k++) {
@@ -2116,7 +2119,7 @@ window.addEventListener('storage', e => {
   if (k === null || /^oche2\.(db|game|undo)$/.test(k)) render();
 });
 function validRoute(h) {
-  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'title', 'clubs', 'help', 'privacy'].includes(h)) return true;
+  if (['feed', 'tours', 'new', 'play', 'rating', 'admin', 'clubs', 'help', 'privacy'].includes(h)) return true;
   // на сервере турнир, игрок, матч или клуб загрузятся при показе
   if (SRV) return /^(t|p|m|tv|desk|watch|club)\.[\w-]+$/.test(h);
   if (/^(tv|desk|watch)\./.test(h)) return !!TBY[h.slice(h.indexOf('.') + 1)];
@@ -2322,7 +2325,7 @@ const hasLiveGame = () => !!(G && G.over !== 'match');
 function topView() {
   const c = curTab();
   const resume = hasLiveGame() && !(R === 'play' && S.inGame);
-  return '<button class="brand" data-act="go" data-v="feed" aria-label="Oche — лента">' + LOGO + 'Oche</button>' +
+  return '<button class="brand" data-act="go" data-v="feed" aria-label="NDL — лента">' + LOGO + '<span class="brand-t"><b>NDL</b><small>Новоуральская Дартс Лига</small></span></button>' +
     '<nav class="nav" aria-label="Разделы">' + TABS.map(([r, l]) => '<button class="' + (r === 'play' ? 'cta ' : '') + (c === r ? 'on' : '') + '" data-act="go" data-v="' + tabTo(r) + '"' + (c === r ? ' aria-current="page"' : '') + '>' + l + (r === 'p.me' && SRV && Api.confirms ? '<span class="ndot" title="Матчи на подтверждение">' + Api.confirms + '</span>' : '') + '</button>').join('') + '</nav>' +
     '<div class="top-actions">' +
     (resume ? '<button class="go-chip" data-act="cont" title="Вернуться к незаконченной игре"><i></i>Игра идёт</button>' : '') +
@@ -2455,7 +2458,7 @@ function callAlert(msg) {
   try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([250, 120, 250, 120, 400]); } catch (e) {}
   playSfx('call');
   setTimeout(() => toast(msg), 0);
-  try { if (document.hidden && window.Notification && Notification.permission === 'granted') new Notification('Oche', { body: msg, tag: 'oche-call' }); } catch (e) {}
+  try { if (document.hidden && window.Notification && Notification.permission === 'granted') new Notification('NDL', { body: msg, tag: 'oche-call' }); } catch (e) {}
 }
 const notifyAsk = () => window.isSecureContext && window.Notification && Notification.permission === 'default' ? '<button class="lnk meta" data-act="notify-on">Уведомлять, когда вызовут</button>' : '';
 // квалификация: моя следующая попытка (номер) или null — всё сдано
@@ -3637,7 +3640,7 @@ function profileForm(p) {
   let h = '<div class="pedit"><label class="label" for="me-name">Имя и фамилия</label><input class="inp" id="me-name" maxlength="32" value="' + esc(p.name) + '" placeholder="Имя и фамилия" autocomplete="name">';
   h += '<div class="nrow"><div class="field"><label class="label" for="me-city">Город</label><input class="inp" id="me-city" maxlength="40" list="city-list" value="' + esc(p.city || '') + '" placeholder="Например, Новоуральск" autocomplete="address-level2"></div>';
   h += '<div class="field"><label class="label" for="me-club">Клуб</label>' + club + '</div></div><datalist id="city-list">' + cities.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
-  if (SRV) h += '<span class="meta">Клуб — из зарегистрированных в Oche. Нет вашего — его ведущий регистрирует клуб в профиле. Звание подтверждается по документу — <button class="lnk" data-act="go" data-v="title">подать заявку</button>.</span>';
+  if (SRV) h += '<span class="meta">Клуб — из зарегистрированных в NDL. Нет вашего — его ведущий регистрирует клуб в профиле. Звание вписывает администратор клуба.</span>';
   if (SRV && Api.me) h += infoForm(Api.me, 'me');
   return h + '<div class="row"><button class="btn sm" data-act="savename">Сохранить</button><button class="ghost sm" data-act="cancelname">Отмена</button></div></div>';
 }
@@ -3649,7 +3652,7 @@ function profileHTML(p, s, all, tours, ax) {
     h += '<h1>' + esc(p.name) + '</h1>';
     const where = placeTxt(p.city, regionOf(p.city));
     if (where || p.club) h += '<div class="meta">' + [where, p.club ? (/клуб/i.test(p.club) ? p.club : 'клуб ' + p.club) : ''].filter(Boolean).map(esc).join(' · ') + '</div>';
-    if (p.title) h += '<div class="ptitle" title="Звание подтверждено по документу">' + esc(TITLE_FULL[p.title] || p.title) + ' <span class="tchip">✓ подтверждено</span></div>';
+    if (p.title) h += '<div class="ptitle" title="Спортивное звание или разряд">' + esc(TITLE_FULL[p.title] || p.title) + '</div>';
     if (p.walkon) h += '<div class="meta walkon" title="Выходная музыка — играет на табло, когда игрок выходит на матч">♪ ' + esc(p.walkon) + '</div>';
     if (p.code) h += '<div class="row"><button class="idchip" data-act="copy-id" data-v="' + esc(p.code) + '" title="Уникальный ID игрока: по нему находят в поиске и добавляют в турнир. Нажмите, чтобы скопировать.">ID <b class="sel">' + esc(p.code) + '</b></button>' + roleChip(p.role) + '</div>';
     const rated = RATING[id] && RATING[id].n;
@@ -3970,7 +3973,7 @@ function refQrModal() {
 // судья открыл ссылку с QR
 function refOpen(key) {
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-  if (!SRV) { toast('QR судьи работает на сервере Oche.'); return; }
+  if (!SRV) { toast('QR судьи работает на сервере NDL.'); return; }
   closeModals();
   let name = '';
   try { name = localStorage.getItem('oche.refName') || ''; } catch (e) {}
@@ -4453,7 +4456,7 @@ async function invitePoll() {
 setInterval(invitePoll, 1500);
 // соперник открыл ссылку с QR: подтвердить участие и войти в игру
 async function mjoinIn(mid) {
-  if (!SRV) { toast('Это ссылка для сервера Oche.'); return; }
+  if (!SRV) { toast('Это ссылка для сервера NDL.'); return; }
   if (!ME) { S.mjoinPending = mid; toast('Войдите в свой аккаунт — и участие подтвердится.'); return svLogin(); }
   S.mjoinPending = null;
   try {
@@ -4524,7 +4527,7 @@ function handoffCard(t) {
 }
 // ведущий открыл ссылку с экрана игрока: счёт этой игры — в окно быстрого ввода
 async function mresIn(a) {
-  if (!SRV) { toast('Это ссылка для сервера Oche.'); return; }
+  if (!SRV) { toast('Это ссылка для сервера NDL.'); return; }
   try {
     const r = await Api.get('/api/tournaments/' + encodeURIComponent(a.tid));
     svTourSet(r); go('t.' + a.tid, true);
@@ -4929,13 +4932,13 @@ function printCards(list, title) {
   if (!window.qrcode) { loadQr(); toast('QR-коды загружаются — нажмите ещё раз.'); return; }
   const w = window.open('', '_blank');
   if (!w) { toast('Браузер не дал открыть окно печати — разрешите всплывающие окна.'); return; }
-  const card = c => '<div class="c"><div class="q">' + qrHTML(qrLoginUrl(c.claim, c.t)) + '</div><div class="t"><b>' + esc(c.name) + '</b>' + (title ? '<span>' + esc(title) + '</span>' : '') + '<span>Наведите камеру телефона на QR — вход в Oche без пароля.</span><span>Код: <code>' + esc(c.claim) + '</code></span></div></div>';
+  const card = c => '<div class="c"><div class="q">' + qrHTML(qrLoginUrl(c.claim, c.t)) + '</div><div class="t"><b>' + esc(c.name) + '</b>' + (title ? '<span>' + esc(title) + '</span>' : '') + '<span>Наведите камеру телефона на QR — вход в NDL без пароля.</span><span>Код: <code>' + esc(c.claim) + '</code></span></div></div>';
   w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>QR-карточки' + (title ? ' — ' + esc(title) : '') + '</title><style>body{font:13px/1.35 system-ui,sans-serif;margin:10mm;color:#000;background:#fff}.g{display:grid;grid-template-columns:1fr 1fr;gap:6mm}.c{display:flex;gap:4mm;border:1px dashed #888;border-radius:3mm;padding:4mm;break-inside:avoid}.q{width:34mm;flex:none}.q svg{width:100%;height:auto;display:block}.t{display:grid;gap:1.5mm;align-content:start}.t b{font-size:15px}code{font-size:14px;letter-spacing:.08em}</style></head><body><div class="g">' + list.map(card).join('') + '</div><script>onload=()=>print()<\/script></body></html>');
   w.document.close();
 }
 // открыли ссылку с QR-карточки: не вошли или вошли лайт-профилем — входим сразу; вошли своим аккаунтом — спрашиваем
 function qrIn(a) {
-  if (!SRV) { toast('QR-карточка работает на сервере Oche.'); return; }
+  if (!SRV) { toast('QR-карточка работает на сервере NDL.'); return; }
   if (Api.me && !Api.me.lite) { closeModals(); S.qrAsk = a; render(); return; }
   svDo(Api.codeLogin(a.code), () => { loggedIn(); if (a.t) go('t.' + a.t); });
 }
@@ -5014,7 +5017,7 @@ function loginModal() {
   const L = S.login, c = Api.config || {};
   if (Api.demo && !L.link) return demoLoginModal();
   const tabs = [['pass', 'Логин', !L.link], ['email', 'Почта', true], ['phone', 'Телефон', c.phone], ['vk', 'VK ID', c.vk], ['code', 'QR / код', true]].filter(x => x[2] && (!L.link || x[0] === (L.link === 'email' ? 'email' : 'phone')));
-  const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в Oche';
+  const title = L.link === 'email' ? 'Привязать почту' : L.link ? 'Привязать телефон' : L.tab === 'email' && L.mode === 'reg' ? 'Регистрация' : L.tab === 'email' && L.mode === 'reset' ? 'Новый пароль' : 'Вход в NDL';
   let h = '<div class="over" role="dialog" aria-modal="true" aria-label="' + title + '"><div class="ocard login"><div class="ohead"><h2>' + title + '</h2><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
   if (!tabs.length) return h + '<div class="note-box">Вход по телефону на сервере не настроен.</div></div></div>';
   if (!tabs.some(x => x[0] === L.tab)) L.tab = tabs[0][0];
@@ -5078,7 +5081,7 @@ function mailForm(L, c, dis) {
   if (L.mode === 'reset') return h + '<p class="meta">Пришлём на почту код — с ним зададите новый пароль.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>' + linkBtn('login', '← Назад ко входу');
   h += mailInp + inp('mail-pass', 'pass', 'password', 'Пароль', ' autocomplete="current-password"') + '<button class="btn" data-act="mail-login"' + dis + '>Войти</button>';
   if (c.email) h += '<button class="lnk meta" data-act="mail-mode" data-v="reset" style="justify-self:end">Забыли пароль?</button>';
-  if (siteCfg().signup) h += '<div class="reg-cta"><span class="meta">Впервые в Oche?</span><button class="btn alt" data-act="mail-mode" data-v="reg">Зарегистрироваться</button></div>';
+  if (siteCfg().signup) h += '<div class="reg-cta"><span class="meta">Впервые в NDL?</span><button class="btn alt" data-act="mail-mode" data-v="reg">Зарегистрироваться</button></div>';
   return h;
 }
 function mailAct(a) {
@@ -5140,7 +5143,7 @@ function tfaModal() {
     return head('Защита входа') + '<p class="meta">Для администраторов вход — пароль и код из приложения на телефоне. Привяжите его один раз:</p><ol class="tfa-steps meta"><li>Установите <b>Google Authenticator</b> (подойдёт и Яндекс Ключ).</li><li>В приложении «Добавить» → отсканируйте QR-код.</li><li>Введите 6 цифр, которые оно покажет.</li></ol>' + qrHTML(F.otpauth) +
       '<details class="meta"><summary>Не сканируется — ввести ключ вручную</summary><p class="tfa-key">' + esc(F.secret.replace(/(.{4})/g, '$1 ').trim()) + '</p></details>' + inp + err + '<button class="btn" data-act="tfa-go"' + dis + '>Включить и войти</button></div></div>';
   }
-  return head('Код из приложения') + '<p class="meta">Откройте Google Authenticator и введите 6 цифр для Oche. Нет телефона — введите резервный код вида abcd-efgh.</p>' + inp + err + '<button class="btn" data-act="tfa-go"' + dis + '>Войти</button></div></div>';
+  return head('Код из приложения') + '<p class="meta">Откройте Google Authenticator и введите 6 цифр для NDL. Нет телефона — введите резервный код вида abcd-efgh.</p>' + inp + err + '<button class="btn" data-act="tfa-go"' + dis + '>Войти</button></div></div>';
 }
 async function tfaGo() {
   const F = S.tfa, el = $('tfa-code');
@@ -5225,7 +5228,7 @@ function meCard() {
   else if (!ways(0)) h += '<p class="meta">Привяжите почту и задайте пароль — тогда сможете входить сами на любом устройстве.</p>';
   if (Api.role === 'tech' && (!c.vk || !c.email)) h += '<p class="meta">На сервере пока не подключены: ' + [!c.email ? 'письма с кодами' : '', !c.vk ? 'вход через VK' : ''].filter(Boolean).join(', ') + '.</p>';
   h += '</div>';
-  return '<div class="acc-grid">' + h + titleCard() + clubCard() + dataCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
+  return '<div class="acc-grid">' + h + clubCard() + dataCard() + (anyAdm() ? '<button class="btn alt acc-adm" data-act="go" data-v="admin">Панель управления</button>' : '') + '</div>';
 }
 // личные данные: выгрузка всего о себе и удаление аккаунта
 function dataCard() {
@@ -5233,7 +5236,7 @@ function dataCard() {
   let h = '<div class="card sec"><span class="label">Мои данные</span><p class="meta">Что о вас хранится и зачем — в <button class="lnk" data-act="go" data-v="privacy">политике обработки данных</button>.</p>';
   h += '<div class="row"><a class="mini" href="' + esc(Api.base) + '/api/me/export" download>Скачать мои данные</a>' + (adm || S.meDel ? '' : '<button class="mini dng" data-act="me-del-ask">Удалить аккаунт</button>') + '</div>';
   if (adm) h += '<p class="meta">Аккаунт администратора удаляет тех. администратор.</p>';
-  else if (S.meDel) h += '<p class="meta">Аккаунт удалится без возврата: профиль, входы, фото и заявки на звание. Если вы играли в турнирах — вместо удаления имя заменится на «Удалённый игрок», а результаты останутся в сетках, чтобы не сломать турниры соперникам.</p><div class="ac-btns"><button class="btn sm dng-btn" data-act="me-del">Да, удалить</button><button class="ghost sm" data-act="me-del-no">Отмена</button></div>';
+  else if (S.meDel) h += '<p class="meta">Аккаунт удалится без возврата: профиль, входы и фото. Если вы играли в турнирах — вместо удаления имя заменится на «Удалённый игрок», а результаты останутся в сетках, чтобы не сломать турниры соперникам.</p><div class="ac-btns"><button class="btn sm dng-btn" data-act="me-del">Да, удалить</button><button class="ghost sm" data-act="me-del-no">Отмена</button></div>';
   return h + '</div>';
 }
 function clubCard() {
@@ -5251,93 +5254,9 @@ function clubCard() {
 }
 
 /* ===== Панель управления: вкладки по роли ===== */
-/* ===== Звания: только по заявке с документом. Стадии: подача → автопроверка → проверка администратором → подтверждено ===== */
+/* ===== Звания: вписывает администратор в карточке игрока ===== */
 const TITLE_FULL = { 'ЗМС': 'Заслуженный мастер спорта России', 'МСМК': 'Мастер спорта России международного класса', 'МС': 'Мастер спорта России', 'КМС': 'Кандидат в мастера спорта', '1 разряд': '1 спортивный разряд', '2 разряд': '2 спортивный разряд', '3 разряд': '3 спортивный разряд', '1 юн. разряд': '1 юношеский разряд', '2 юн. разряд': '2 юношеский разряд', '3 юн. разряд': '3 юношеский разряд' };
-const titleChip = t => t ? '<span class="tchip" title="Звание подтверждено по документу">' + esc(t) + ' ✓</span>' : '';
-const TSTEP = ['Подача', 'Автопроверка', 'Ручная проверка', 'Подтверждено'];
-// стадии заявки: [состояние каждой: done | cur | wait | fail]
-function titleSteps(r) {
-  const st = r.status === 'draft' ? ['cur', 'wait', 'wait', 'wait'] : r.status === 'approved' ? ['done', 'done', 'done', 'done'] : r.status === 'rejected' ? ['done', 'done', 'fail', 'wait'] : ['done', r.autoAt ? 'done' : 'cur', r.autoAt ? 'cur' : 'wait', 'wait'];
-  return '<ol class="tsteps">' + TSTEP.map((l, k) => '<li class="ts-' + st[k] + '"><i>' + (st[k] === 'done' ? (k === 3 ? '✅' : '✓') : st[k] === 'fail' ? '✕' : k + 1) + '</i><span>' + (st[k] === 'fail' ? 'Отклонено' : l) + '</span></li>').join('') + '</ol>';
-}
-const AUTO_ICON = { ok: '✓', warn: '⚠', info: 'ℹ' };
-function autoList(list, admin) {
-  return '<div class="auto">' + list.filter(x => admin || x.k !== 'minsport').map(x => '<div class="au-' + x.st + '"><i>' + AUTO_ICON[x.st] + '</i><b>' + esc(x.label || '') + '</b><span>' + (x.k === 'minsport' ? '<a href="' + esc(x.text) + '" target="_blank" rel="noopener noreferrer">найти приказ на сайте Минспорта</a>' : esc(x.text)) + '</span></div>').join('') + '</div>';
-}
-// ссылки https в тексте — кликабельные
-function docThumbs(docs, rm) {
-  return '<div class="tdocs">' + docs.map(d => '<div class="tdoc">' + (d.mime === 'application/pdf' ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="tpdf">PDF</a>' : '<img src="' + esc(d.url) + '" alt="Документ" data-act="lbox" data-v="' + esc(d.url) + '">') + (rm ? '<button class="x" data-act="tdoc-rm" data-v="' + esc(d.id) + '" aria-label="Убрать файл">×</button>' : '') + '</div>').join('') + '</div>';
-}
-// страница «Подтверждение звания»
-function titleView() {
-  let h = '<button class="back" data-act="go" data-v="p.me">' + I.back + 'Профиль</button><div class="narrow"><h1 class="h1">Подтверждение звания</h1>';
-  if (!SRV) return h + '<div class="note-box">Звания подтверждаются на сервере: в демо-режиме заявку подать нельзя.</div></div>';
-  if (!ME) return h + '<div class="note-box">Войдите, чтобы подать заявку.</div><button class="btn" data-act="login">Войти</button></div>';
-  const e = lz('titles:mine', () => Api.get('/api/titles/mine'), 15000), k = lz('titles:kinds', () => Api.get('/api/titles/kinds'), 3600e3);
-  const st = svState(e, 'заявок') || svState(k, 'званий');
-  if (st) return h + st + '</div>';
-  const cur = e.data.requests[0], kinds = k.data.kinds;
-  // решение пришло — профиль показывает новое звание
-  if (P[ME] && (P[ME].title || '') !== e.data.title) { P[ME].title = e.data.title; svStale('player:'); }
-  if (e.data.title) h += '<div class="note-box">Подтверждённое звание: ' + titleChip(e.data.title) + '</div>';
-  if (cur && cur.status !== 'cancelled' && !S.tNew) {
-    h += '<div class="panel">' + titleSteps(cur) + '<div><b>' + esc(cur.full) + '</b><div class="meta">' + esc(cur.fullName) + ' · приказ № ' + esc(cur.orderNo) + (cur.orderDate ? ' от ' + new Date(cur.orderDate).toLocaleDateString('ru-RU') : '') + ' · ' + esc(cur.issuer) + '</div></div>';
-    if (cur.status === 'review') h += '<div class="note-box">Автоматическая проверка пройдена — заявка ждёт администратора. Обычно это занимает до нескольких дней.</div>' + autoList(cur.auto) + docThumbs(cur.docs) + '<button class="ghost sm dng" data-act="title-cancel" data-v="' + cur.id + '">Отозвать заявку</button>';
-    else if (cur.status === 'approved') h += '<div class="note-box ok">Звание подтверждено ✅' + (cur.note ? ' — ' + esc(cur.note) : '') + '. Оно видно в профиле, рейтинге, сетке и на табло.</div><button class="ghost sm" data-act="title-new">Подать заявку на другое звание</button>';
-    else h += '<div class="err">Отклонено: ' + esc(cur.note) + '</div><button class="btn sm" data-act="title-new">Подать заново</button>';
-    return h + '</div></div>';
-  }
-  // форма
-  const F = S.tForm || (S.tForm = { fullName: meP().name || '', title: '', orderNo: '', orderDate: '', issuer: '', comment: '', docs: [] });
-  const kd = kinds.find(x => x.k === F.title);
-  h += '<p class="meta">Звание в профиле показывается только после проверки документа. Заполните заявку — автоматическая проверка пройдёт сразу, затем решение примет администратор. Документы видят только вы и проверяющие.</p>';
-  h += '<div class="panel">' + titleSteps({ status: 'draft' });
-  h += '<div class="field"><label class="label" for="tf-fullName">ФИО — как в документе</label><input class="inp" id="tf-fullName" data-tf="fullName" maxlength="100" value="' + esc(F.fullName) + '" placeholder="Фамилия Имя Отчество"></div>';
-  h += '<div class="field"><span class="label">Звание или разряд</span><div class="chips">' + kinds.map(x => '<button class="chip txt' + (F.title === x.k ? ' on' : '') + '" data-act="tf-kind" data-v="' + x.k + '" title="' + esc(x.full) + '">' + esc(x.short) + '</button>').join('') + '</div>' + (kd ? '<span class="meta">' + esc(kd.full) + '. Присваивает: ' + esc(kd.issuer) + '.</span>' : '') + '</div>';
-  h += '<div class="nrow"><div class="field" style="flex:1"><label class="label" for="tf-orderNo">Номер приказа</label><input class="inp" id="tf-orderNo" data-tf="orderNo" maxlength="40" value="' + esc(F.orderNo) + '" placeholder="например, 45 нг"></div><div class="field" style="flex:1"><label class="label" for="tf-orderDate">Дата приказа</label>' + dateSel('tf', F.orderDate) + '</div></div>';
-  h += '<div class="field"><label class="label" for="tf-issuer">Кто присвоил</label><input class="inp" id="tf-issuer" data-tf="issuer" maxlength="120" list="tf-issuers" value="' + esc(F.issuer) + '" placeholder="' + esc(kd ? kd.issuer : 'Минспорт России, министерство спорта региона…') + '"><datalist id="tf-issuers"><option value="Минспорт России"><option value="Министерство спорта Свердловской области"><option value="Федерация дартса России"></datalist></div>';
-  h += '<div class="field"><span class="label">Документ: удостоверение, зачётная книжка или выписка из приказа</span>' + docThumbs(F.docs, true) + '<label class="ghost addp" style="cursor:pointer;display:inline-flex">+ Фото или PDF<input type="file" id="tf-file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden></label><span class="meta">До 5 файлов, каждый до 8 МБ. На фото должны читаться ФИО, звание и номер приказа.</span></div>';
-  h += '<div class="field"><label class="label" for="tf-comment">Комментарий (необязательно)</label><textarea class="inp" id="tf-comment" data-tf="comment" maxlength="500" rows="2">' + esc(F.comment) + '</textarea></div>';
-  if (S.tErr) h += '<div class="err">' + esc(S.tErr) + '</div>';
-  h += '<button class="btn" data-act="title-send"' + (S.tBusy ? ' disabled' : '') + '>Отправить на проверку</button>' + (cur && S.tNew ? '<button class="ghost sm" data-act="title-back">Назад к заявке</button>' : '') + '</div>';
-  return h + '</div>';
-}
-async function titleUpload(files) {
-  const F = S.tForm;
-  for (const f of files) {
-    if (F.docs.length >= 5) { toast('Не больше 5 файлов.'); break; }
-    if (f.size > 8 * 1024 * 1024) { toast('Файл «' + f.name + '» больше 8 МБ.'); continue; }
-    try { const r = await Api.upload('/api/titles/docs', f); F.docs.push(r.doc); }
-    catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.message); }
-    render();
-  }
-}
-// профиль: звание и состояние заявки
-function titleCard() {
-  const e = lz('titles:mine', () => Api.get('/api/titles/mine'), 30000);
-  if (!e.data) return '';
-  if (P[ME] && (P[ME].title || '') !== e.data.title) { P[ME].title = e.data.title; svStale('player:'); }
-  const cur = e.data.requests.find(r => r.status !== 'cancelled'), stage = cur && cur.status === 'review' ? 'Заявка «' + cur.short + '»: ждёт проверки администратором (3 из 4)' : cur && cur.status === 'rejected' ? 'Заявка «' + cur.short + '» отклонена: ' + cur.note : '';
-  return '<div class="card sec"><span class="label">Звание</span>' + (e.data.title ? '<div>' + titleChip(e.data.title) + '</div>' : '<p class="meta">Мастер спорта, КМС, разряд — покажем в профиле, рейтинге и на табло после проверки документа.</p>') + (stage ? '<p class="meta">' + esc(stage) + '</p>' : '') + '<button class="mini" data-act="go" data-v="title">' + (cur && cur.status === 'review' ? 'Посмотреть заявку' : 'Подтвердить звание') + '</button></div>';
-}
-// админка: заявки на звания
-function admTitles() {
-  const f = S.ttF || 'review', e = lz('atitles:' + f, () => Api.get('/api/admin/titles?status=' + f), 20000);
-  let h = '<div class="seg2">' + [['review', 'Ждут проверки'], ['approved', 'Подтверждены'], ['rejected', 'Отклонены'], ['all', 'Все']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="tt-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
-  const st = svState(e, 'заявок');
-  if (st) return h + st;
-  if (!e.data.requests.length) return h + '<div class="note-box">' + (f === 'review' ? 'Новых заявок нет.' : 'Заявок нет.') + '</div>';
-  return h + e.data.requests.map(r => {
-    let x = '<div class="card sec treq"><div class="tstat"><span><b>' + esc(r.full) + '</b> · <button class="lnk" data-act="adm-open" data-v="' + esc(r.player.id) + '">' + esc(r.player.name) + '</button> <span class="meta">' + esc(r.player.code) + '</span></span><span class="meta">' + fmtDate(r.created) + '</span></div>';
-    x += '<div class="meta">ФИО в документе: <b>' + esc(r.fullName) + '</b> · приказ № ' + esc(r.orderNo) + (r.orderDate ? ' от ' + new Date(r.orderDate).toLocaleDateString('ru-RU') : '') + ' · ' + esc(r.issuer) + (r.player.title ? ' · сейчас: ' + esc(r.player.title) : '') + '</div>';
-    if (r.comment) x += '<div class="meta">Комментарий: ' + esc(r.comment) + '</div>';
-    x += autoList(r.auto, true) + docThumbs(r.docs);
-    if (r.status === 'review') x += '<input class="inp" id="tt-note-' + r.id + '" maxlength="300" placeholder="Комментарий игроку (при отказе обязателен)" aria-label="Комментарий"><div class="gacts"><button class="mini go" data-act="tt-dec" data-v="' + r.id + '|approved">Подтвердить ✅</button><button class="mini dng" data-act="tt-dec" data-v="' + r.id + '|rejected">Отклонить</button>' + (r.search ? '<a class="mini" href="' + esc(r.search) + '" target="_blank" rel="noopener noreferrer">Найти приказ на сайте Минспорта</a>' : '') + '</div>';
-    else x += '<div class="meta">' + (r.status === 'approved' ? '✅ Подтвердил' : r.status === 'rejected' ? '✕ Отклонил' : 'Отозвана') + (r.decidedBy ? ' ' + esc(r.decidedBy) : '') + (r.decided ? ', ' + fmtDate(r.decided) : '') + (r.note ? ' — ' + esc(r.note) : '') + '</div>';
-    return x + '</div>';
-  }).join('');
-}
-
+const titleChip = t => t ? '<span class="tchip" title="Спортивное звание или разряд">' + esc(t) + '</span>' : '';
 /* ===== Тарифы: цена со скидкой за звание, заявка, подключает администратор (онлайн-оплаты пока нет) ===== */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
 const daysTxt = d => d % 365 === 0 ? (d / 365 === 1 ? 'год' : d / 365 + ' ' + pl(d / 365, 'год', 'года', 'лет')) : d % 30 === 0 ? (d / 30 === 1 ? 'месяц' : d / 30 + ' ' + pl(d / 30, 'месяц', 'месяца', 'месяцев')) : d + ' ' + pl(d, 'день', 'дня', 'дней');
@@ -5498,7 +5417,7 @@ async function resultsImage(tid) {
   });
   x.textAlign = 'center'; x.fillStyle = '#9aa0ad'; x.font = '400 32px ' + body;
   x.fillText(t.players.length + ' ' + pl(t.players.length, 'участник', 'участника', 'участников') + ' · ' + Games.label(exOf(t)) + ' · ' + ltwTxt(t.ltw), W / 2, y + 40);
-  x.textAlign = 'center'; x.fillStyle = '#6b7180'; x.font = '400 30px ' + body; x.fillText('Сетка, статистика и рейтинг — в Oche', W / 2, H - 60);
+  x.textAlign = 'center'; x.fillStyle = '#6b7180'; x.font = '400 30px ' + body; x.fillText('Сетка, статистика и рейтинг — в NDL', W / 2, H - 60);
   const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
   const file = new File([blob], 'itogi-' + t.id + '.png', { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: t.name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
@@ -5550,7 +5469,7 @@ function resData(t) {
 function resultsPost(t) {
   const d = resData(t), medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
   const top = d.places.filter(p => p.lo <= 8).map(p => (medal[p.lo] || '▫️') + ' ' + p.place + '. ' + p.name).join('\n');
-  return '🏆 Итоги турнира «' + d.title + '»\n📅 ' + d.meta + '\n🎯 ' + d.line + '\n\n' + top + (d.final ? '\n\nФинал: ' + d.final : '') + (d.best.length ? '\n\n' + d.best.map(x => '⭐ ' + x).join('\n') : '') + (d.url ? '\n\nСетка и статистика: ' + d.url : '') + '\n\n#дартс #Oche';
+  return '🏆 Итоги турнира «' + d.title + '»\n📅 ' + d.meta + '\n🎯 ' + d.line + '\n\n' + top + (d.final ? '\n\nФинал: ' + d.final : '') + (d.best.length ? '\n\n' + d.best.map(x => '⭐ ' + x).join('\n') : '') + (d.url ? '\n\nСетка и статистика: ' + d.url : '') + '\n\n#дартс #NDL';
 }
 // документ Word (.docx): ZIP без сжатия с минимальным набором частей
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -5579,7 +5498,7 @@ function resultsDocx(t) {
   const table = '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/>' + border + '</w:tblPr><w:tblGrid><w:gridCol w:w="1300"/><w:gridCol w:w="4900"/><w:gridCol w:w="2800"/></w:tblGrid>' +
     '<w:tr>' + cell('Место', 1300, true) + cell('Игрок', 4900, true) + cell('Город', 2800, true) + '</w:tr>' + d.places.map(r => '<w:tr>' + cell(r.place, 1300, r.lo <= 3) + cell(r.name, 4900, r.lo <= 3) + cell(r.city, 2800) + '</w:tr>').join('') + '</w:tbl>';
   const body = p('Итоги турнира', { center: true, color: 'C77700', b: true }) + p(d.title, { center: true, b: true, sz: 40 }) + p(d.meta, { center: true, color: '666666' }) + p(d.line, { center: true, color: '666666' }) + p('') +
-    table + p('') + (d.final ? p('Финал: ' + d.final, { b: true }) : '') + d.best.map(s => p(s)).join('') + (d.url ? p('Сетка и статистика: ' + d.url, { color: '666666' }) : '') + p('Oche — турниры, сетка и рейтинг по дартсу', { color: '999999', sz: 18 });
+    table + p('') + (d.final ? p('Финал: ' + d.final, { b: true }) : '') + d.best.map(s => p(s)).join('') + (d.url ? p('Сетка и статистика: ' + d.url, { color: '666666' }) : '') + p('NDL — турниры, сетка и рейтинг по дартсу', { color: '999999', sz: 18 });
   const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   return zipStore([
     ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
@@ -5598,7 +5517,7 @@ function saveBlob(blob, name) {
 function tourIcs(t) {
   const d = new Date(t.start), ymd = x => x.getFullYear() + String(x.getMonth() + 1).padStart(2, '0') + String(x.getDate()).padStart(2, '0');
   const e = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Oche//RU', 'BEGIN:VEVENT', 'UID:' + t.id + '@oche', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]|\.\d+/g, ''),
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//NDL//RU', 'BEGIN:VEVENT', 'UID:' + t.id + '@oche', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]|\.\d+/g, ''),
     'DTSTART;VALUE=DATE:' + ymd(d), 'DTEND;VALUE=DATE:' + ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)), 'SUMMARY:' + e('Дартс: ' + t.name),
     'LOCATION:' + e([t.city, venueOf(t)].filter(Boolean).join(', ')), 'DESCRIPTION:' + e(fmtLine(t) + '\n' + tourUrl(t.id)), 'URL:' + tourUrl(t.id), 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
 }
@@ -5823,7 +5742,7 @@ function adminView() {
     : staffForm() + '<p class="meta">Ведущий клуба? <button class="lnk" data-act="login">Войти по почте, телефону или коду</button></p>') + '</div>';
   const P2 = Api.perm;
   const tabs = [].concat(P2('players') || P2('accounts') ? [['acc', P2('players') ? 'Игроки' : 'Мои аккаунты']] : [], P2('host_nums') ? [['nums', 'Мои номера']] : [],
-    P2('titles') ? [['titles', 'Звания']] : [], P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
+    P2('clubs') ? [['clubs', 'Клубы']] : [], P2('stats') ? [['stats', 'Сводка']] : [], P2('audit') ? [['audit', 'Журнал']] : [],
     Api.role === 'tech' ? [['perms', 'Права ролей']] : [], P2('cleanup') ? [['srv', 'Сервер']] : [], Api.me.login && Api.can('admin') ? [['me', 'Мой вход']] : []);
   if (!tabs.some(x => x[0] === S.admTab)) S.admTab = tabs[0][0];
   let h = '<div class="narrow wide-adm"><div class="tstat">' + head + roleChip(Api.role) + '</div>';
@@ -5832,7 +5751,7 @@ function adminView() {
   if (Api.can('admin') && !hasContact) h += '<div class="note-box warn"><b>' + (cf.email ? 'Подтвердите почту или телефон.' : 'Привяжите почту.') + '</b> ' + (cf.email ? 'Если забудете пароль, доступ восстановится только через подтверждённый контакт.' : 'По ней войдёте, если забудете логин; подтвердить кодом можно будет, когда на сервере включат письма.') + '<div class="warn-a"><button class="btn sm" data-act="link-email">' + (cf.email ? 'Подтвердить почту' : 'Привязать почту') + '</button>' + (cf.phone ? '<button class="btn sm alt" data-act="link-phone">Привязать телефон</button>' : '') + '</div></div>';
   h += '<div class="seg2 wrap" role="tablist">' + tabs.map(([v, l]) => '<button role="tab" aria-selected="' + (S.admTab === v) + '" class="' + (S.admTab === v ? 'on' : '') + '" data-act="adm-tab" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
   const T = S.admTab;
-  h += T === 'titles' ? admTitles() : T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : T === 'srv' ? admServer() : admAccounts();
+  h += T === 'nums' ? admNums() : T === 'clubs' ? admClubs() : T === 'stats' ? admStats() : T === 'perms' ? admPerms() : T === 'audit' ? admAudit() : T === 'me' ? admMe() : T === 'srv' ? admServer() : admAccounts();
   return h + '</div>';
 }
 const codeNote = p => {
@@ -5847,7 +5766,7 @@ function admAccounts() {
   let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Получите QR-карточку: игрок наводит на неё камеру и сразу играет со своего телефона, участвует в турнирах. Это лайт-профиль — в общий рейтинг не входит, пока игрок не привяжет свой телефон, почту или VK; матчи при этом сохранятся.</p>';
   h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
   h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
-  h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
+  h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Звание или разряд (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
   if (S.admNew) h += codeNote(S.admNew) + admLoginSec(S.admNew);
   h += '</details>';
   if (full) h += '<div class="seg2">' + [['', 'Все'], ['mine', 'Мои'], ['host', 'Ведущие'], ['admin', 'Админы'], ['tech', 'Тех.'], ['blocked', 'Заблокированы']].map(([v, l]) => '<button class="' + (f === v ? 'on' : '') + '" data-act="adm-f" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
@@ -5904,7 +5823,7 @@ function printLogin(x) {
   const w = window.open('', '_blank');
   if (!w) { toast('Браузер не дал открыть окно печати — разрешите всплывающие окна.'); return; }
   const site = location.origin + location.pathname;
-  w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Вход в Oche — ' + esc(x.name) + '</title><style>body{font:14px/1.4 system-ui,sans-serif;margin:12mm;color:#000;background:#fff}.c{display:flex;gap:6mm;border:1px dashed #888;border-radius:3mm;padding:5mm;max-width:120mm}.q{width:34mm;flex:none}.q svg{width:100%;height:auto;display:block}.t{display:grid;gap:2mm;align-content:start}code{font:600 16px ui-monospace,monospace;letter-spacing:.04em}span{color:#333}</style></head><body><div class="c"><div class="q">' + qrHTML(site + '#login=' + encodeURIComponent(x.login)) + '</div><div class="t"><b>' + esc(x.name) + '</b><span>Сайт: ' + esc(site) + '</span><span>Логин: <code>' + esc(x.login) + '</code></span><span>Пароль: <code>' + esc(x.password) + '</code></span><span>Наведите камеру на QR — откроется вход с вашим логином, останется ввести пароль.</span></div></div><script>onload=function(){print()}<\/script></body></html>');
+  w.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Вход в NDL — ' + esc(x.name) + '</title><style>body{font:14px/1.4 system-ui,sans-serif;margin:12mm;color:#000;background:#fff}.c{display:flex;gap:6mm;border:1px dashed #888;border-radius:3mm;padding:5mm;max-width:120mm}.q{width:34mm;flex:none}.q svg{width:100%;height:auto;display:block}.t{display:grid;gap:2mm;align-content:start}code{font:600 16px ui-monospace,monospace;letter-spacing:.04em}span{color:#333}</style></head><body><div class="c"><div class="q">' + qrHTML(site + '#login=' + encodeURIComponent(x.login)) + '</div><div class="t"><b>' + esc(x.name) + '</b><span>Сайт: ' + esc(site) + '</span><span>Логин: <code>' + esc(x.login) + '</code></span><span>Пароль: <code>' + esc(x.password) + '</code></span><span>Наведите камеру на QR — откроется вход с вашим логином, останется ввести пароль.</span></div></div><script>onload=function(){print()}<\/script></body></html>');
   w.document.close();
 }
 function admCardModal() {
@@ -5926,14 +5845,13 @@ function admCardModal() {
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
-  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Подтверждённое звание (МС, КМС…)" aria-label="Звание">' : '') + (p.contacts ? infoForm(p, 'ac') + '<textarea class="inp" id="ac-note" maxlength="500" rows="2" placeholder="Заметки ведущего — видят только ведущие и администраторы" aria-label="Заметки">' + esc(p.note || '') + '</textarea>' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Звание или разряд (МС, КМС…)" aria-label="Звание">' : '') + (p.contacts ? infoForm(p, 'ac') + '<textarea class="inp" id="ac-note" maxlength="500" rows="2" placeholder="Заметки ведущего — видят только ведущие и администраторы" aria-label="Заметки">' + esc(p.note || '') + '</textarea>' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
   // роль и доступ
   // пока список ролей грузится — хотя бы текущая роль, без пустого выбора
   const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [{ key: p.role, rank: RANKS_UI[p.role] != null ? RANKS_UI[p.role] : 1 }] }).roles;
   const roles = tech ? allRoles.map(r => r.key) : Api.perm('give_host') && !high ? allRoles.filter(r => r.rank < 2).map(r => r.key) : null;
   const acts = [];
   if (roles && p.id !== ME) acts.push('<label class="ac-role"><span class="label">Роль</span><select class="inp sm" data-role-of="' + p.id + '">' + roles.map(r => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + esc(roleName(r)) + '</option>').join('') + '</select></label>');
-  if (p.title && Api.perm('titles')) acts.push('<button class="mini dng" data-act="ac-untitle" data-v="' + p.id + '">Снять звание ' + esc(p.title) + '</button>');
   if (full) acts.push('<button class="mini' + (p.ver ? ' go' : '') + '" data-act="adm-ver" data-v="' + p.id + '|' + (p.ver ? 0 : 1) + '">' + (p.ver ? '✓ подтверждён' : 'Подтвердить') + '</button>');
   // аккаунту с телефоном новый код выдаёт только администратор (игрок входит по номеру)
   if (!p.vk && (full || mine && !p.phone && !p.login) && (!high || tech)) acts.push('<button class="mini" data-act="adm-code" data-v="' + p.id + '">' + (p.claim ? 'Новая QR-карточка' : 'QR-карточка') + '</button>');
@@ -6044,7 +5962,7 @@ function admStats() {
   const st = svState(e, 'сводки');
   if (st) return st;
   const d = e.data, t = (l, v, s) => '<div class="tile"><span class="label">' + l + '</span><span class="v">' + v + '</span>' + (s ? '<span class="s">' + s + '</span>' : '') + '</div>';
-  return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('Заявки на звания', d.titlesPending || 0, d.titlesPending ? '<button class="lnk" data-act="adm-tab" data-v="titles">проверить</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
+  return '<div class="tiles">' + t('Игроков', d.players, '+' + d.newWeek + ' за неделю') + t('Ведущих', d.roles.host, 'админов ' + (d.roles.admin + d.roles.tech)) + t('Турниров идёт', d.tours.live || 0, 'запись ' + (d.tours.reg || 0) + ' · сыграно ' + (d.tours.done || 0)) + t('Матчей сейчас', d.liveMatches, d.matchesDay + ' за сутки') + t('Заявки клубов', d.clubsPending, d.clubsPending ? '<button class="lnk" data-act="adm-tab" data-v="clubs">открыть</button>' : '') + t('SMS за сутки', d.smsDay, d.blocked ? 'заблокировано игроков: ' + d.blocked : '') + '</div>';
 }
 const BN_PLACE = { feed: 'Лента', tour: 'Страница турнира', tv: 'Табло' };
 
@@ -6706,7 +6624,6 @@ function render() {
     : R.startsWith('m.') && SRV ? matchView(R.slice(2))
     : R.startsWith('tv.') ? tvView(R.slice(3))
     : R === 'admin' ? adminView()
-    : R === 'title' ? titleView()
     : R === 'clubs' ? clubsView()
     : R === 'help' ? helpView()
     : R === 'privacy' ? privacyView()
@@ -6922,20 +6839,6 @@ document.addEventListener('click', e => {
       break;
     }
     case 'adm-tab': S.admTab = v; render(); break;
-    case 'tf-kind': if (S.tForm) { S.tForm.title = v; const kd = SVC['titles:kinds'] && SVC['titles:kinds'].data.kinds.find(x => x.k === v); if (kd && kd.fed && !S.tForm.issuer) S.tForm.issuer = 'Минспорт России'; render(); } break;
-    case 'tdoc-rm': if (S.tForm) { S.tForm.docs = S.tForm.docs.filter(d => d.id !== v); render(); } break;
-    case 'title-new': S.tNew = true; S.tForm = null; S.tErr = ''; render(); break;
-    case 'title-back': S.tNew = false; render(); break;
-    case 'title-cancel': svDo(Api.del('/api/titles/' + v), () => { svStale('titles:mine'); toast('Заявка отозвана.'); }); break;
-    case 'title-send': {
-      const F = S.tForm;
-      if (!F) break;
-      S.tErr = !F.title ? 'Выберите звание или разряд.' : F.fullName.trim().split(/\s+/).length < 2 ? 'Укажите фамилию и имя, как в документе.' : !F.orderNo.trim() ? 'Укажите номер приказа.' : !F.orderDate ? 'Укажите дату приказа.' : !F.issuer.trim() ? 'Укажите, кто присвоил.' : !F.docs.length ? 'Приложите фото или скан документа.' : '';
-      if (S.tErr) { render(); break; }
-      S.tBusy = true; render();
-      svDo(Api.post('/api/titles', { fullName: F.fullName.trim(), title: F.title, orderNo: F.orderNo.trim(), orderDate: Date.parse(F.orderDate + 'T12:00:00Z'), issuer: F.issuer.trim(), comment: F.comment.trim(), docs: F.docs.map(d => d.id) }).then(() => { S.tForm = null; S.tNew = false; svStale('titles:mine'); toast('Заявка отправлена: автоматическая проверка пройдена, ждёт администратора.'); }).catch(e => { S.tErr = e.net ? 'Нет связи с сервером.' : e.message; }).finally(() => { S.tBusy = false; }));
-      break;
-    }
     case 'pro-p': S.proP = v; render(); break;
     case 'res-img': resultsImage(v).catch(() => toast('Не удалось сделать картинку.')); break;
     case 'ics': if (TBY[v]) saveBlob(new Blob([tourIcs(TBY[v])], { type: 'text/calendar' }), 'Turnir-' + (latin(TBY[v].name) || 'oche') + '.ics'); break;
@@ -6987,21 +6890,6 @@ document.addEventListener('click', e => {
     case 'role-add': { const el = $('role-new'); svDo(Api.post('/api/admin/roles', { name: el ? el.value.trim() : '' }), () => { svStale('aperms'); svStale('roles'); S.permEd = null; toast('Роль добавлена.'); }); break; }
     case 'role-ren': { const el = $('role-name-' + v); svDo(Api.patch('/api/admin/roles/' + v, { name: el ? el.value.trim() : '' }), () => { delete ROLE_NAME[v]; svStale('aperms'); svStale('roles'); toast('Роль переименована.'); }); break; }
     case 'role-del': if (confirm('Удалить роль?')) svDo(Api.del('/api/admin/roles/' + v), () => { svStale('aperms'); svStale('roles'); S.permEd = null; toast('Роль удалена.'); }); break;
-    case 'tt-f': S.ttF = v; render(); break;
-    case 'tt-dec': {
-      const [id, st] = v.split('|'), el = $('tt-note-' + id), note = el ? el.value.trim() : '';
-      if (st === 'rejected' && !note) { toast('Напишите причину отказа — игрок её увидит.'); if (el) el.focus(); break; }
-      svDo(Api.patch('/api/admin/titles/' + id, { status: st, note }), () => { svStale('atitles:'); svStale('acard:'); svStale('admin:'); svStale('astats'); toast(st === 'approved' ? 'Звание подтверждено.' : 'Заявка отклонена.'); });
-      break;
-    }
-    case 'ac-untitle': {
-      const note = prompt('Почему снимаете звание? (запишется в журнал)');
-      if (note == null) break;
-      svDo(Api.req('DELETE', '/api/admin/players/' + v + '/title', { note }), () => { svStale('acard:'); svStale('admin:'); svStale('player:'); toast('Звание снято.'); });
-      break;
-    }
-    case 'adm-new-tg': S.admNewOpen = !S.admNewOpen; render(); break;
-    case 'adm-open': closeModals(); S.admOpen = v; svStale('acard:'); render(); break;
     case 'ac-save': {
       const val = k => { const el = $('ac-' + k); return el ? el.value.trim() : ''; };
       if (val('name').length < 2) { toast('Имя — от 2 символов.'); break; }
@@ -7015,7 +6903,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'ac-issue': svDo(Api.put('/api/admin/players/' + v + '/login', {}), r => { S.issued = { id: v, name: r.player.name, login: r.login, password: r.password }; if (S.admNew && S.admNew.id === v) S.admNew.login = r.login; svPlayer(r.player); svStale('acard:'); svStale('admin:'); }); break;
-    case 'iss-copy': if (S.issued) copyText('Oche: ' + location.origin + location.pathname + '\nЛогин: ' + S.issued.login + '\nПароль: ' + S.issued.password, 'Логин и пароль скопированы.'); break;
+    case 'iss-copy': if (S.issued) copyText('NDL: ' + location.origin + location.pathname + '\nЛогин: ' + S.issued.login + '\nПароль: ' + S.issued.password, 'Логин и пароль скопированы.'); break;
     case 'iss-print': if (S.issued) printLogin(S.issued); break;
     case 'ac-login-off': svDo(Api.del('/api/admin/players/' + v + '/login'), () => { svStale('acard:'); svStale('admin:'); toast('Вход по паролю убран.'); }); break;
     case 'perm-save': {
@@ -7381,7 +7269,6 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
   if (t.id === 'num-n') { S.numN = t.value; return; }
   if (t.id === 'st-login') { S.staffLogin = t.value; return; }
-  if (t.dataset && t.dataset.tf && S.tForm) { S.tForm[t.dataset.tf] = t.value; return; }
   if (t.dataset && t.dataset.numq) { S.numQ = t.value; clearTimeout(S.numT); S.numT = setTimeout(() => { S.numQQ = S.numQ; render(); const el = $('num-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 300); return; }
   if (t.dataset && t.dataset.admq) { S.admQ = t.value; clearTimeout(S.admT); S.admT = setTimeout(render, 300); return; }
   if (t.dataset && t.dataset.rsearch && SRV) {
@@ -7415,10 +7302,8 @@ document.addEventListener('change', e => {
   if (t.dataset && t.dataset.dsel) {
     const [pre] = t.dataset.dsel.split('|'), box = t.closest('.dsel'), g = k => (box.querySelector('[data-dsel="' + pre + '|' + k + '"]') || {}).value || '';
     const y = g('y'), m = g('m'), d = g('d');
-    if (pre === 'tf' && S.tForm) S.tForm.orderDate = y && m && d ? y + '-' + String(m).padStart(2, '0') + '-' + String(Math.min(+d, new Date(+y, +m, 0).getDate())).padStart(2, '0') : '';
     return;
   }
-  if (t.id === 'tf-file') { titleUpload([...(t.files || [])]); t.value = ''; return; }
   // что игроки делают сами: сохраняется сразу
   if (SRV && t.dataset && t.dataset.site) {
     const k = t.dataset.site, on = t.checked;
@@ -7559,13 +7444,13 @@ window.addEventListener('online', () => { netBar(); if (SRV) { Object.keys(SVC).
 window.addEventListener('offline', netBar);
 let installEv = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; });
-window.addEventListener('appinstalled', () => { installEv = null; toast('Oche на экране телефона.'); });
+window.addEventListener('appinstalled', () => { installEv = null; toast('NDL на экране телефона.'); });
 /* ===== Как пользоваться: коротко для игроков и ведущих ===== */
 const HELP = [
   ['Игроку', [
     ['Вход', 'Логин и пароль выдаёт администратор клуба или ведущий — на карточке или в сообщении. Нажмите «Войти» → «Логин», введите их. С карточки удобнее: наведите камеру на QR — откроется вход с вашим логином, останется ввести пароль. Есть QR-карточка без пароля — наведите камеру, и вы уже внутри. Забыли пароль — попросите администратора выдать новый.'],
     ['Регистрация', 'Если клуб открыл регистрацию на сайте: «Войти» → «Почта» → «Зарегистрироваться» — имя, город, почта и пароль, на почту придёт код из 6 цифр. Если регистрации нет — аккаунт заводит администратор клуба.'],
-    ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу. Пока турнир идёт, вкладка «Турниры» и запуск Oche возвращают прямо в него, а на «Играть» видно ваш матч и ход турнира.'],
+    ['Как попасть в турнир', 'Откройте «Турниры» → «Регистрация», выберите турнир и нажмите «Записаться». На месте ведущий может показать QR-код — наведите камеру, и турнир откроется сразу. Пока турнир идёт, вкладка «Турниры» и запуск NDL возвращают прямо в него, а на «Играть» видно ваш матч и ход турнира.'],
     ['Когда мой матч', 'Как только ваш матч можно играть, в ленте и в турнире появится яркая плашка «Ваш матч»: соперник и мишень, телефон коротко завибрирует. Кнопка «Играть» открывает счётчик уже с этим матчем.'],
     ['Как вести счёт', '«Сумма» — набираете очки за подход и жмёте ввод, это быстрее всего. «По дротикам» — каждый дротик отдельно (Дубль/Трипл перед числом), тогда считаются попытки на дубль. Ошиблись — «Отмена» снимает последний бросок, можно отменять подряд.'],
     ['Подсказки закрытия и озвучка', 'Когда остаётся 170 и меньше, счётчик показывает, как закрыть. В настройках (шестерёнка) можно включить «Озвучка счёта»: телефон проговорит набор, перебор и сколько осталось — не нужно смотреть на экран.'],
@@ -7590,7 +7475,7 @@ const HELP = [
     ['Выдать логин и пароль', '«Управление» (щит вверху) → «Игроки» → игрок → «Выдать логин и пароль»: логин по фамилии, пароль случайный. Пароль виден один раз — «Скопировать» или «Печать карточки» (логин, пароль и QR на вход). Забыл пароль — «Новый пароль», старый перестанет работать. Новый игрок: «+ Новый аккаунт» и сразу «Выдать логин и пароль» — или QR-карточка без пароля.'],
     ['Профиль игрока', 'Имя, город, клуб, звание, данные для протокола — в карточке игрока («Профиль» → «Сохранить»). Там же средний набор, матчи, турниры, роль, блокировка и удаление.'],
     ['Что игроки делают сами', 'Тех. администратор: «Управление» → «Права ролей» → «Что игроки делают сами»: регистрация на сайте, правка своего профиля, смена своего пароля. По умолчанию всё выключено — аккаунты и пароли выдаёт администратор. Ведущих и администраторов это не касается.'],
-    ['Роли и права', 'Ведущий — проводит турниры и заводит игроков; администратор — всё о игроках, клубах и званиях; тех. администратор — ещё права ролей и сервер. Роль меняется в карточке игрока, права ролей — в «Права ролей».'],
+    ['Роли и права', 'Ведущий — проводит турниры и заводит игроков; администратор — всё об игроках и клубах; тех. администратор — ещё права ролей и сервер. Роль меняется в карточке игрока, права ролей — в «Права ролей».'],
     ['Протокол и итоги', 'После турнира в карточке итогов: «Протокол (PDF)» — по форме для федерации (Печать → «Сохранить как PDF»), с главным судьёй и судьями матчей; рядом «Картинка итогов» и «Текст для поста».'],
   ]]
 ];
@@ -7608,13 +7493,13 @@ function privacyView() {
   const c = (Api.config && Api.config.contact) || '';
   const li = a => '<ul>' + a.map(x => '<li>' + x + '</li>').join('') + '</ul>';
   let h = '<div class="narrow policy"><div class="phead"><h1 class="h1">Политика обработки персональных данных</h1></div><div class="card sec">';
-  h += '<p>Oche — сервис для дартс-турниров: регистрация игроков, сетки, счёт, рейтинг и статистика. Здесь — какие данные мы храним, зачем и как вы можете ими управлять.</p>';
-  h += '<h2>Какие данные храним</h2>' + li(['имя, город и клуб, которые вы указали;', 'почту, телефон или привязку VK — для входа;', 'фото профиля, если загрузили;', 'результаты матчей и турниров, рейтинг и статистику;', 'заявки на подтверждение звания и приложенные документы — их видят только вы и проверяющие администраторы;', 'служебные данные входа: сеанс, устройство, IP-адрес — для защиты от подбора пароля.']);
-  h += '<h2>Зачем</h2>' + li(['чтобы вы могли войти и участвовать в турнирах;', 'чтобы показывать сетки, результаты, рейтинг и ленту турниров;', 'чтобы подтвердить спортивное звание;', 'чтобы защитить аккаунты от взлома.']);
+  h += '<p>NDL — сервис для дартс-турниров: регистрация игроков, сетки, счёт, рейтинг и статистика. Здесь — какие данные мы храним, зачем и как вы можете ими управлять.</p>';
+  h += '<h2>Какие данные храним</h2>' + li(['имя, город и клуб, которые вы указали;', 'почту, телефон или привязку VK — для входа;', 'фото профиля, если загрузили;', 'результаты матчей и турниров, рейтинг и статистику;', 'служебные данные входа: сеанс, устройство, IP-адрес — для защиты от подбора пароля.']);
+  h += '<h2>Зачем</h2>' + li(['чтобы вы могли войти и участвовать в турнирах;', 'чтобы показывать сетки, результаты, рейтинг и ленту турниров;', 'чтобы защитить аккаунты от взлома.']);
   h += '<h2>Что видно всем</h2><p>Имя, город, клуб, фото, звание, результаты турниров, рейтинг и статистика — это публичная часть профиля, как в протоколах соревнований. Почта, телефон, документы и платёжные сведения не показываются никому, кроме вас и администраторов сервиса.</p>';
   h += '<h2>Сколько храним</h2><p>Пока у вас есть аккаунт. Коды подтверждения — до истечения, журналы SMS — 2 суток, журнал действий администраторов — год. Резервные копии базы хранятся несколько недель и затем удаляются.</p>';
   h += '<h2>Ваши права</h2><p>В профиле, в разделе «Мои данные», можно скачать всё, что о вас хранится, и удалить аккаунт. Если вы играли в турнирах, вместо полного удаления имя заменяется на «Удалённый игрок», контакты, входы, фото и документы стираются, а результаты остаются в сетках — иначе сломались бы турниры других игроков. Исправить имя, город и клуб можно в профиле.</p>';
-  h += '<h2>Согласие</h2><p>Регистрируясь или входя в Oche, вы даёте согласие на обработку перечисленных данных для этих целей. Отозвать согласие — удалить аккаунт в профиле' + (c ? ' или написать на <a class="lnk" href="mailto:' + esc(c) + '">' + esc(c) + '</a>' : '') + '.</p>';
+  h += '<h2>Согласие</h2><p>Регистрируясь или входя в NDL, вы даёте согласие на обработку перечисленных данных для этих целей. Отозвать согласие — удалить аккаунт в профиле' + (c ? ' или написать на <a class="lnk" href="mailto:' + esc(c) + '">' + esc(c) + '</a>' : '') + '.</p>';
   h += '<h2>Передача третьим лицам</h2><p>Данные не продаются и не передаются для рекламы. Для входа и писем используются VK ID, сервис звонков/SMS и почтовый сервис — только в объёме, нужном для входа и отправки кода.</p>';
   if (c) h += '<h2>Связаться</h2><p>Вопросы о персональных данных: <a class="lnk" href="mailto:' + esc(c) + '">' + esc(c) + '</a></p>';
   return h + '</div></div>';

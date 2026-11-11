@@ -27,7 +27,7 @@ rollback() {
   as npm ci --omit=dev --no-audit --no-fund >/dev/null
   systemctl restart oche
   if health; then echo "откат выполнен, работает прежняя версия" >&2; else echo "после отката сервер тоже не отвечает: journalctl -u oche -n 50" >&2; fi
-  "$APP/deploy/notify.sh" "Oche: обновление $(git -C "$APP" log --oneline -1 "$new" 2>/dev/null || echo "$new") не встало ($1), откат на прежнюю версию" || true
+  "$APP/deploy/notify.sh" "NDL: обновление $(git -C "$APP" log --oneline -1 "$new" 2>/dev/null || echo "$new") не встало ($1), откат на прежнюю версию" || true
   exit 1
 }
 

@@ -27,7 +27,7 @@ async function sendCode(phone, ip, log) {
     if (d.status !== 'OK' || !/^\d{4}$/.test(String(d.code))) throw new Error('sms.ru call: ' + (d.status_text || res.status));
     return String(d.code);
   }
-  const code = randomCode(DIGITS.sms), params = { to, msg: 'Oche: код входа ' + code + '. Никому его не сообщайте.' };
+  const code = randomCode(DIGITS.sms), params = { to, msg: 'NDL: код входа ' + code + '. Никому его не сообщайте.' };
   if (s.from) params.from = s.from;
   const { res, d } = await smsru('/sms/send', params);
   const one = d.sms && Object.values(d.sms)[0];

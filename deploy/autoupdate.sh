@@ -14,7 +14,7 @@ case "${1:-status}" in
 on)
   cat > /etc/systemd/system/oche-update.service <<UNIT
 [Unit]
-Description=Oche: обновление с GitHub
+Description=NDL: обновление с GitHub
 After=network-online.target
 
 [Service]
@@ -23,7 +23,7 @@ ExecStart=/bin/bash $APP/deploy/autoupdate.sh run
 UNIT
   cat > /etc/systemd/system/oche-update.timer <<UNIT
 [Unit]
-Description=Oche: проверка обновлений раз в 5 минут
+Description=NDL: проверка обновлений раз в 5 минут
 
 [Timer]
 OnBootSec=2min
@@ -66,7 +66,7 @@ run)
   [[ -f /srv/oche/update-bad && $(cat /srv/oche/update-bad) == "$new" ]] && exit 0
   echo "обновление: $(sudo -u oche git log --oneline -1 "$new")"
   if ! bash "$APP/deploy/deploy.sh"; then
-    "$APP/deploy/notify.sh" "Oche: автообновление не удалось — journalctl -u oche-update -n 50"
+    "$APP/deploy/notify.sh" "NDL: автообновление не удалось — journalctl -u oche-update -n 50"
     exit 1
   fi
   ;;
