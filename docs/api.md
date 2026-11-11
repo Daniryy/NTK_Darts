@@ -1,4 +1,4 @@
-# Oche API
+# NDL API
 
 Договор между страницей и сервером. Сначала меняем здесь, потом в коде.
 
@@ -159,7 +159,7 @@
 `{ "ok": true }` — «да, я играл»: матч засчитывается в статистику игрока; `{ "ok": false }` — «это не я»: не засчитывается и больше не спрашивается. Ответ `{ "ok": true, "left": 3 }` — сколько ещё ждут. `404` — матча нет на подтверждении (уже ответил, свой матч, турнирный). Если матч потом переоткрыть и завершить заново, подтверждение спрашивается снова.
 
 ### `GET /api/me/export` — мои данные
-Всё, что хранится об игроке, одним JSON-файлом (`Content-Disposition: attachment`): `profile` (без хэша пароля), `sessions`, `guests` (заведённые им игроки), `tournaments` (свои и где участвовал), `matches` (строки его матчей), `plans`, `title_requests`, `title_docs` (без файлов), `photos`.
+Всё, что хранится об игроке, одним JSON-файлом (`Content-Disposition: attachment`): `profile` (без хэша пароля), `sessions`, `guests` (заведённые им игроки), `tournaments` (свои и где участвовал), `matches` (строки его матчей), `plans`), `photos`.
 
 ### `DELETE /api/me` — удалить свой аккаунт
 `{ "confirm": true }` (без него `400`). Администраторам — `403` (их удаляет тех. администратор). Игрок без идущих и сыгранных турниров удаляется целиком (как `DELETE /api/admin/players/:id`). Иначе аккаунт **обезличивается**: имя «Удалённый игрок», город, клуб, почта, телефон, VK, логин, пароль, фото, звание, заявки и документы стираются, сеансы закрываются, аккаунт блокируется и выпадает из рейтинга, а его матчи остаются в сетках соперников. Файлы фото и документов удаляются с диска. Ответ `{ "ok": true }`, cookie сеанса стирается.
@@ -255,38 +255,7 @@
 Журнал: `{ items: [{ id, t, actor: { id, name } | null, action, target: { id, name } | null, data }] }`, новые сверху. `actor: null` — команда с сервера. Действия: `login.password`, `login.email`, `email.link`, `email.set`, `password.change`, `password.reset`, `player.create`, `player.edit`, `player.role`, `player.block`, `player.delete`, `cleanup`, `player.logout`, `player.login`, `player.login_off`, `perms`, `club.active|rejected|closed|edit`, `club.host_add`, `club.host_rm`, `club.helper_add|helper_rm`, `title.*`, `role.create|rename|delete`, `cli.*`.
 
 ## Звания
-
-Спортивное звание или разряд в профиле — только после проверки документа; самому вписать нельзя (`PATCH /api/me` с другим `title` — `400`). Стадии для игрока: **1 подача → 2 автопроверка → 3 ручная проверка → 4 подтверждено ✅** (или отклонено с причиной). Подтверждённое звание — поле `title` игрока (`МС`, `КМС`, `1 разряд`…) во всех карточках.
-
-Звания (`k`): `zms` ЗМС, `msmk` МСМК, `ms` МС (присваивает Минспорт России), `kms` КМС, `r1` 1 разряд (орган власти субъекта РФ), `r2`, `r3`, `y1`–`y3` — разряды и юношеские разряды.
-
-### `GET /api/titles/kinds`
-`{ kinds: [{ k, short, full, issuer, fed }] }`.
-
-### `POST /api/titles/docs` — нужен вход
-Файл документа телом запроса: JPEG, PNG, WebP или PDF до 8 МБ (тип определяется по содержимому). Ответ `201 { doc: { id, mime, url } }`. Файлы лежат в закрытой папке (`PRIVATE_DIR`), не через `/uploads/`.
-
-### `GET /api/titles/docs/:id`
-Файл — только владельцу и тем, у кого право `titles`; остальным `404`. `Cache-Control: private, no-store`.
-
-### `POST /api/titles` — заявка
-`{ fullName, title, orderNo, orderDate, issuer, comment?, docs: [id] }` (ФИО как в документе, 1–5 файлов). Сразу проходит автоматическая проверка, заявка получает `status: "review"`. Ответ `201 { request: TitleRequest }`; `409` — заявка уже на проверке.
-
-**TitleRequest:** `{ id, title, short, full, fullName, orderNo, orderDate, issuer, comment, status: review | approved | rejected | cancelled, auto: [{ k, st: ok | warn | info, label, text }], autoAt, note, created, decided, docs: [{ id, mime, url }] }`.
-
-Автопроверка (`auto`): документ приложен; ФИО совпадает с именем в профиле; номер и дата приказа указаны и правдоподобны; кто присвоил (МС, МСМК, ЗМС — только Минспорт России); тот же приказ с тем же ФИО уже подтверждён у другого аккаунта; уже есть звание выше; для федеральных званий — ссылка на поиск приказа на сайте Минспорта (только администратору). `label` — короткая подпись пункта («Документ», «ФИО», «Приказ», «Присвоил», «Повторы», «Сейчас», «Минспорт»), `text` — коротко итог («1 файл», «совпадает с профилем», «№ 45 нг от 10.03.2025»); у `minsport` в `text` ссылка поиска. `warn` — на что администратору обратить внимание; решение всегда за ним.
-
-### `GET /api/titles/mine`, `DELETE /api/titles/:id`
-Мои заявки (новые сверху) и подтверждённое звание `title`; отозвать заявку, пока она на проверке.
-
-### `GET /api/admin/titles?status=review|approved|rejected|cancelled|all` — право `titles`
-Заявки с игроком (`player: { id, name, code, title }`), ссылкой `search` и `decidedBy`.
-
-### `PATCH /api/admin/titles/:id` — право `titles`
-`{ status: "approved" | "rejected", note }` — при отказе `note` обязателен (игрок его видит). Подтверждение ставит игроку `title`.
-
-### `DELETE /api/admin/players/:id/title` — право `titles`
-Снять подтверждённое звание: `{ note }` пишется в журнал. Администратор с правом `titles` может и сразу задать звание в карточке игрока (`PATCH /api/admin/players/:id` с `title`).
+Звание или разряд (`title` игрока: `МС`, `КМС`, `1 разряд`…) вписывает администратор с правом `titles` в карточке игрока (`PATCH /api/admin/players/:id`, поле `title`; пустая строка — снять). Сам игрок его не меняет (`PATCH /api/me` с другим `title` — `400`). Заявок и проверки документов нет.
 
 ## Роли
 
@@ -486,7 +455,7 @@
 ```json
 {
   "id": "t4", "name": "Кубок Лиги · этап 4", "official": true,
-  "org": { "id": "p1", "name": "Лига Oche", "ver": true },
+  "org": { "id": "p1", "name": "Лига NDL", "ver": true },
   "city": "Москва", "venue": "Клуб «Тройная двадцатка»",
   "start": 1760000000000, "regUntil": null, "status": "live",
   "format": "pl", "mode": 501, "ltw": 3, "dbl": true, "cap": 16,

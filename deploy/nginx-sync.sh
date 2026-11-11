@@ -11,7 +11,7 @@ fresh=0
 if ! grep -q 'nginx-app.conf' "$SITE"; then
   if grep -q 'ssl_certificate' "$SITE"; then
     echo "nginx: в конфиге HTTPS от certbot — пересоберите сайт: bash $APP/deploy/setup.sh (сертификат останется)" >&2
-    "$APP/deploy/notify.sh" "Oche: обновите конфиг nginx — bash $APP/deploy/setup.sh" || true
+    "$APP/deploy/notify.sh" "NDL: обновите конфиг nginx — bash $APP/deploy/setup.sh" || true
     exit 0
   fi
   name=$(awk '$1 == "server_name" { sub(";", "", $2); print $2; exit }' "$SITE")
@@ -28,6 +28,6 @@ if nginx -t -q 2>/dev/null; then
 else
   nginx -t 2>&1 | tail -3 >&2 || true
   if [[ $fresh == 1 ]]; then cp "$SITE.bak" "$SITE"; echo "nginx: возвращён прежний конфиг" >&2; fi
-  "$APP/deploy/notify.sh" "Oche: nginx -t не прошёл после обновления — сайт работает на прежних настройках" || true
+  "$APP/deploy/notify.sh" "NDL: nginx -t не прошёл после обновления — сайт работает на прежних настройках" || true
   exit 1
 fi

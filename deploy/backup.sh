@@ -28,6 +28,6 @@ if pg_dump -Fc -f "$FILE" "$DATABASE_URL"; then
   echo "$(date '+%F %T') ok $FILE $(du -h "$FILE" | cut -f1)$([[ $FULL == 1 ]] && echo ' + фото и документы')"
 else
   rm -f "$FILE"
-  "$(dirname "$0")/notify.sh" "Oche: резервная копия базы не создана"
+  "$(dirname "$0")/notify.sh" "NDL: резервная копия базы не создана"
   exit 1
 fi

@@ -12,7 +12,7 @@ disk=$(df --output=pcent / | tail -1 | tr -dc '0-9')
 now="${problems[*]:-ok}"
 prev=$(cat "$STATE" 2>/dev/null || echo ok)
 if [[ "$now" != "$prev" ]]; then
-  if [[ "$now" == ok ]]; then msg="Oche: всё снова в порядке"; else msg="Oche: ${now}"; fi
+  if [[ "$now" == ok ]]; then msg="NDL: всё снова в порядке"; else msg="NDL: ${now}"; fi
   "$(dirname "$0")/notify.sh" "$msg"
   echo "$now" > "$STATE"
 fi

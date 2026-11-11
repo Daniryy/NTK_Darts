@@ -291,7 +291,7 @@ test('двухфакторный вход администраторов: при
   const s = ok(await call(u, 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' }));
   assert.equal(s.need2fa, 'setup');
   assert.match(s.secret, /^[A-Z2-7]{32}$/);
-  assert.match(s.otpauth, /^otpauth:\/\/totp\/Oche%3Atwofa\?secret=/);
+  assert.match(s.otpauth, /^otpauth:\/\/totp\/NDL%3Atwofa\?secret=/);
   assert.equal(s.player, undefined);
   assert.equal(ok(await call(u, 'GET', '/api/me')).player, null);
   err(await call(u, 'POST', '/api/auth/2fa', { ticket: s.ticket, code: '000000' === T.codeAt(s.secret, nowStep()) ? '111111' : '000000' }), 409, 'bad_code');

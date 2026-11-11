@@ -28,7 +28,7 @@ function playerPassProblem(pw) {
 const needPass = pw => { const bad = playerPassProblem(pw); if (bad) throw E.bad(bad, 'password'); return pw; };
 const codeHash = (email, purpose, code) => A.sha(email + ':' + purpose + ':' + code);
 const SUBJ = { reg: 'код для регистрации', link: 'код подтверждения почты', reset: 'код для нового пароля' };
-const WHY = { reg: 'регистрации в Oche', link: 'подтверждения почты в Oche', reset: 'нового пароля в Oche' };
+const WHY = { reg: 'регистрации в NDL', link: 'подтверждения почты в NDL', reset: 'нового пароля в NDL' };
 
 // письмо с кодом: лимиты — раз в минуту и 5 в час на адрес, 10 в час с устройства, MAIL_DAY_MAX в сутки на сервер
 async function sendCode(req, email, purpose, extra) {
@@ -45,7 +45,7 @@ async function sendCode(req, email, purpose, extra) {
   });
   const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
   try {
-    await sendMail(email, 'Oche: ' + SUBJ[purpose] + ' ' + code,
+    await sendMail(email, 'NDL: ' + SUBJ[purpose] + ' ' + code,
       'Ваш код для ' + WHY[purpose] + ': ' + code + '\n\nКод действует 30 минут. Никому его не сообщайте.\nЕсли вы ничего не запрашивали — просто удалите это письмо.\n\n' + config.publicUrl + '/', req.log);
   } catch (e) {
     req.log.error({ err: e.message }, 'mail failed');
