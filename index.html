@@ -2091,8 +2091,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.tEdit = null; S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.tEdit || S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.bpick = null; S.tEdit = null; S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.bpick || S.tEdit || S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2300,6 +2300,21 @@ function renderModals() {
     if (err) h += '<div class="err">' + esc(err) + '</div>';
     h += '<button class="btn" data-act="tb-save">Сохранить</button>';
     if (had != null) h += '<button class="ghost dng sm" data-act="tb-del">Убрать результат перестрелки</button>';
+    return h + '</div></div>';
+  }
+  if (S.bpick) {
+    const { tid, kind, key, sel } = S.bpick, t = TBY[tid];
+    if (!t || !t.boards || !t.boards.n) { S.bpick = null; return ''; }
+    const bd = t.boards, cnt = {};
+    Object.keys(bd.q || {}).forEach(id => { if (id !== key) cnt[bd.q[id]] = (cnt[bd.q[id]] || 0) + 1; });
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Мишени"><div class="ocard"><div class="ohead"><span class="label">' + (kind === 'q' ? 'Мишень в квалификации' : 'Мишени группы ' + Bracket.groupName(+key)) + '</span>' + closeBtn + '</div>';
+    h += '<div class="qm-names">' + (kind === 'q' ? noBadge(t, key) + esc(P[key] ? P[key].name : '') : 'Матчи группы идут только на эти мишени, другие матчи их не занимают') + '</div>';
+    h += '<div class="chips">' + Array.from({ length: bd.n }, (_, j) => {
+      const b = j + 1, on = kind === 'q' ? bd.q && bd.q[key] === b : sel.includes(b), full = false;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-act="bp-pick" data-v="' + b + '" aria-pressed="' + on + '"' + (full ? ' disabled title="У мишени уже двое"' : '') + '>' + boardNo(t, b) + (kind === 'q' && cnt[b] ? ' <small>(' + cnt[b] + ')</small>' : '') + '</button>';
+    }).join('') + '</div>';
+    if (kind === 'q') h += '<div class="row2"><button class="ghost sm" data-act="bp-pick" data-v="0">Снять с мишени</button>' + (bd.manual ? '<button class="ghost sm" data-act="bp-auto">Расставлять автоматически</button>' : '') + '</div><p class="meta">' + (bd.manual ? 'Сейчас мишени ставите вы.' : 'Остальных сайт расставит сам — по двое на мишень.') + ' Если у мишени уже двое, уступит тот, кто ещё не бросает.</p>';
+    else h += '<button class="btn" data-act="bp-save">' + (sel.length ? 'Закрепить: ' + sel.map(x => boardNo(t, x)).join(', ') : 'Без закрепления') + '</button>';
     return h + '</div></div>';
   }
   if (S.qualModal) {
@@ -2919,7 +2934,8 @@ function groupsView(t) {
   }
   h += '<div class="grp-grid">' + G.ids.map((ids, k) => {
     const gg = games.filter(g => g.grp === k), tb = Bracket.table(ids, gg), left = gg.filter(g => !g.res).length;
-    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + '<span class="meta">' + (gg.length - left) + ' из ' + gg.length + ' · ' + (gg.length ? Math.round((gg.length - left) / gg.length * 100) : 0) + '%</span></div><div class="gbar"><i style="width:' + (gg.length ? (gg.length - left) / gg.length * 100 : 0) + '%"></i></div>' + crossTable(ids, gg, tb, G.adv, !left) + '</div>';
+    const gbs = t.boards && t.boards.grp && t.boards.grp[k], gbBtn = open && SRV && t.boards && t.boards.n && canDo(t, 'staff') ? '<button class="mini" data-act="bp-open" data-v="' + t.id + '|g|' + k + '" title="Закрепить мишени за группой">' + (gbs ? 'мишени ' + gbs.map(x => boardNo(t, x)).join(', ') : 'мишени: любые') + '</button>' : gbs ? '<span class="meta">мишени ' + gbs.map(x => boardNo(t, x)).join(', ') + '</span>' : '';
+    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + gbBtn + '<span class="meta">' + (gg.length - left) + ' из ' + gg.length + ' · ' + (gg.length ? Math.round((gg.length - left) / gg.length * 100) : 0) + '%</span></div><div class="gbar"><i style="width:' + (gg.length ? (gg.length - left) / gg.length * 100 : 0) + '%"></i></div>' + crossTable(ids, gg, tb, G.adv, !left) + '</div>';
   }).join('') + '</div>';
   return h;
 }
@@ -3318,7 +3334,8 @@ function qualView(t) {
     const tbv = t.qual.tb && t.qual.tb[id], tied = tiedIds.has(id);
     const tieTag = tied ? '<span class="tie" title="Равенство: нужна перестрелка">⚑ равенство</span>' : tbv != null ? '<span class="tie ok" title="Результат перестрелки">перестр. ' + tbv + '</span>' : '';
     const tbBtn = open && canDo(t, 'staff') && (tied || tbv != null) ? ' <button class="mini" data-act="qtb" data-v="' + t.id + '|' + id + '">Перестрелка</button>' : '';
-    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + tieTag + tbBtn + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td>' + (tries > 1 ? '<td>' + meanTxt + '</td>' : '') + '</tr>';
+    const qb = open && SRV && t.boards && t.boards.n && canDo(t, 'staff') && qRes(t, id).filter(Boolean).length < tries ? ' <button class="mini" data-act="bp-open" data-v="' + t.id + '|q|' + id + '" title="К какой мишени">' + (t.boards.q && t.boards.q[id] ? 'мишень ' + boardNo(t, t.boards.q[id]) : 'мишень —') + '</button>' : '';
+    h += '<tr class="' + (id === ME ? 'me' : '') + '"><td>' + (best != null ? plcBadge(k + 1, k + 1, !open) : '<span class="muted">—</span>') + '</td><td><div class="who">' + noBadge(t, id) + pid(id) + tieTag + tbBtn + qb + '</div></td>' + cells + '<td class="num" style="font-size:18px;font-weight:600">' + (best != null ? best : '—') + '</td>' + (tries > 1 ? '<td>' + meanTxt + '</td>' : '') + '</tr>';
   });
   return h + '</tbody></table></div>';
 }
@@ -6286,6 +6303,7 @@ function watchView(id) {
 function deskPanels(t) {
   const out = [['live', 'Идущие матчи'], ['calls', 'К мишеням'], ['stages', 'Ход турнира']];
   if (t.qual) out.push(['qual', 'Квалификация']);
+  if (t.groups) out.push(['groups', 'Все группы']);
   if (t.games && t.games.length && isBracket(t)) {
     if (t.block) for (let k = 0; k < bParts(t); k++) out.push(['part' + k, 'Сетка ' + (k * t.block + 1) + '–' + Math.min(t.players.length, (k + 1) * t.block)]);
     else out.push(['grid', 'Сетка']);
@@ -6300,7 +6318,7 @@ function deskView(id) {
   if (!t) return wait || '<div class="note-box">Турнир не найден.</div>';
   const key = 'oche.desk.' + id, all = deskPanels(t);
   let on = lsGet(key);
-  if (!Array.isArray(on)) on = ['live', 'calls', 'stages'].concat(t.stage === 'qual' ? ['qual'] : []);
+  if (!Array.isArray(on)) on = ['live', 'calls', 'stages'].concat(t.stage === 'qual' ? ['qual'] : t.stage === 'groups' ? ['groups'] : []);
   on = on.filter(k => all.some(x => x[0] === k));
   let h = '<div class="thead"><button class="back" data-act="go" data-v="t.' + t.id + '">' + I.back + esc(t.name) + '</button><h1 class="h1">Экран организатора</h1><p class="meta">Выберите окна — набор запоминается на этом устройстве. Обновляется само.</p></div>';
   h += tvoPanel();
@@ -6314,6 +6332,7 @@ function deskView(id) {
     else if (k === 'calls') body = callsHTML(t, 64) + (canDo(t, 'org') ? boardsCtl(t) : '');
     else if (k === 'stages') body = stagesView(t, resolver(t)) || '<p class="meta">Турнир ещё не начался.</p>';
     else if (k === 'qual') { body = qualView(t); wide = true; }
+    else if (k === 'groups') { body = groupsView(t); wide = true; }
     else if (k === 'grid') { body = bracketView(t); wide = true; }
     else if (k.startsWith('part')) { body = plGridHTML(t, cx, +k.slice(4)); wide = true; }
     else if (k === 'recent') body = recentHTML(t, 12);
@@ -6850,6 +6869,18 @@ document.addEventListener('click', e => {
       saveBoards(t, names);
       break;
     }
+    case 'bp-open': {
+      const [tid, kind, key] = v.split('|'), t = TBY[tid];
+      closeModals(); S.bpick = { tid, kind, key, sel: kind === 'g' && t && t.boards && t.boards.grp && t.boards.grp[key] ? t.boards.grp[key].slice() : [] }; render(); break;
+    }
+    case 'bp-pick': {
+      const b = S.bpick; if (!b) break;
+      if (b.kind === 'g') { const n = +v; b.sel = b.sel.includes(n) ? b.sel.filter(x => x !== n) : b.sel.concat(n).sort((x, y) => x - y); render(); break; }
+      svDo(Api.patch('/api/tournaments/' + b.tid + '/boards', { player: b.key, board: +v || null }), r => { svTourSet(r); S.bpick = null; toast(+v ? 'Игрок поставлен к мишени.' : 'Игрок снят с мишени.'); });
+      break;
+    }
+    case 'bp-save': { const b = S.bpick; if (b) svDo(Api.patch('/api/tournaments/' + b.tid + '/boards', { grp: +b.key, boards: b.sel }), r => { svTourSet(r); S.bpick = null; toast(b.sel.length ? 'Мишени закреплены за группой.' : 'Закрепление снято.'); }); break; }
+    case 'bp-auto': { const b = S.bpick; if (b) svDo(Api.patch('/api/tournaments/' + b.tid + '/boards', { manual: false }), r => { svTourSet(r); S.bpick = null; toast('Мишени расставляются автоматически.'); }); break; }
     case 'qm-board': if (S.quickModal) setBoard(S.quickModal.tid, S.quickModal.r, S.quickModal.i, +v); break;
     case 'nums-reset': {
       const t = TBY[v];

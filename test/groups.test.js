@@ -212,3 +212,29 @@ test('группы: выходят все — 4 группы по 2, в сетк
   assert.equal(t.groups.done, true);
   assert.deepEqual(t.slots.filter(Boolean).sort(), ids.slice().sort());
 });
+
+test('мишени: закреплены за группой; в квалификации игрока к мишени ставит организатор', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Мишени групп', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 201).tournament;
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { n: 4 })).tournament;
+  err(await call(PL, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [3] }), 403);
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [9] }), 400);
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [3] })).tournament;
+  assert.deepEqual(t.boards.grp, { 0: [3] });
+  const at = t.boards.at, byKey = k => t.games.find(g => g.r + ':' + g.i === k);
+  assert.ok(Object.keys(at).length >= 2);
+  Object.keys(at).forEach(k => { const g = byKey(k); assert.equal(g.grp === 0, at[k] === 3, k + ' → ' + at[k]); });
+  // квалификация: ручная мишень
+  let q = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Квал мишени', format: 'ko', mode: 501, ltw: 1, qual: { ex: { k: 'score', lim: 3 }, tries: 1 }, players: ids }), 201).tournament;
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { n: 2 })).tournament;
+  const n2 = qq => Object.values(qq.boards.q).filter(x => x === 2).length;
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p13', board: 2 })).tournament;
+  assert.equal(q.boards.q.p13, 2);
+  assert.equal(q.boards.manual, true);
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p12', board: 2 })).tournament;
+  assert.equal(q.boards.q.p12, 2);
+  assert.ok(n2(q) <= 2, 'у мишени не больше двоих');
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p13', board: null })).tournament;
+  assert.equal(q.boards.q.p13, undefined);
+  assert.equal(q.boards.manual, true);
+});
