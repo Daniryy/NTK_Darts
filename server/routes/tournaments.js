@@ -578,6 +578,44 @@ module.exports = async function (app) {
     });
   });
 
+  // ручная расстановка в сетке (организатор): { a, b } — поменять игроков местами. b может быть и не в сетке
+  // (не вышел из группы или квалификации) — тогда он встаёт вместо a. Только пока их матчи не начаты.
+  app.patch('/api/tournaments/:id/slots', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      await c.query('SELECT id FROM matches WHERE tournament_id = $1 ORDER BY id FOR UPDATE', [req.params.id]);
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      if (t.status !== 'live' || t.stage || !t.slots || !B.isBracket(t)) throw E.conflict('bad_state', 'Расставлять можно, когда сетка построена и турнир идёт');
+      const pa = V.str(b.a, 'a', 1, 40), pb = V.str(b.b, 'b', 1, 40);
+      if (pa === pb) throw E.bad('Выберите двух разных игроков');
+      const ia = t.slots.indexOf(pa), ib = t.slots.indexOf(pb);
+      if (ia < 0) throw E.bad('Первый игрок должен быть в сетке', 'a');
+      if (!t.players.includes(pb)) throw E.notFound('Игрок не в турнире');
+      if (ib < 0) {
+        const cup = await one(c, 'SELECT id FROM tournaments WHERE parent = $1', [t.id]);
+        if (cup) throw E.conflict('bad_state', 'Не попавшие в сетку уже играют «Кубок B» — менять состав сетки нельзя');
+      }
+      const rv = B.resolver(t), used = [];
+      for (const g of t.games) {
+        const ps = rv.players(g.r, g.i);
+        if (!ps.includes(pa) && !(ib >= 0 && ps.includes(pb))) continue;
+        if (g.res || t.live[g.r + ':' + g.i]) throw E.conflict('bad_state', 'Матч этого игрока уже начат или сыгран');
+        used.push(g.r + ':' + g.i);
+      }
+      const slots = t.slots.slice();
+      slots[ia] = pb;
+      if (ib >= 0) slots[ib] = pa;
+      // «Готов» у затронутых матчей сбрасывается: пары поменялись
+      const ready = t._row.ready ? Object.assign({}, t._row.ready) : null;
+      if (ready) used.forEach(k => { delete ready[k]; });
+      await c.query('UPDATE tournaments SET slots = $2, ready = $3 WHERE id = $1', [t.id, JSON.stringify(slots), ready && JSON.stringify(ready)]);
+      await S.autoStage(c, t.id);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
   // общее фото игроков (организатор): { photoId } — одно из фото турнира, null — убрать
   app.patch('/api/tournaments/:id/cover', async req => {
     const me = needPlayer(req), b = req.body || {};

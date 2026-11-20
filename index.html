@@ -656,6 +656,8 @@ a.mini { text-decoration: none; }
 .qtbl .tie.ok { color: var(--green); }
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
 .pick.in { opacity: .55; cursor: default; }
+.pick.sel { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset; }
+.pick:disabled { opacity: .45; cursor: default; }
 .tp-sug { display: grid; gap: 6px; margin-top: 8px; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .bzones { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; align-items: start; }
@@ -2091,8 +2093,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.bpick = null; S.tEdit = null; S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.bpick || S.tEdit || S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.swapM = null; S.bpick = null; S.tEdit = null; S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.swapM || S.bpick || S.tEdit || S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2300,6 +2302,20 @@ function renderModals() {
     if (err) h += '<div class="err">' + esc(err) + '</div>';
     h += '<button class="btn" data-act="tb-save">Сохранить</button>';
     if (had != null) h += '<button class="ghost dng sm" data-act="tb-del">Убрать результат перестрелки</button>';
+    return h + '</div></div>';
+  }
+  if (S.swapM) {
+    const { tid, a } = S.swapM, t = TBY[tid];
+    if (!t || !t.slots) { S.swapM = null; return ''; }
+    const rv = resolver(t), started = new Set();
+    (t.games || []).forEach(g => { if (g.res || (t.live && t.live[g.r + ':' + g.i])) rv.players(g.r, g.i).forEach(x => x && started.add(x)); });
+    const inGrid = t.slots.filter(x => x && P[x]), out = t.players.filter(x => P[x] && !t.slots.includes(x));
+    const btn = (id, extra) => '<button class="pick' + (a === id ? ' sel' : '') + '" data-act="sw-pick" data-v="' + id + '"' + (started.has(id) ? ' disabled title="Матч уже начат или сыгран"' : '') + '>' + noBadge(t, id) + esc(P[id].name) + (extra ? ' <small class="meta">' + extra + '</small>' : '') + '</button>';
+    let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Расставить вручную"><div class="ocard"><div class="ohead"><span class="label">Расставить вручную</span>' + closeBtn + '</div>';
+    h += '<p class="meta">' + (a ? 'Теперь — с кем поменять <b>' + esc(P[a].name) + '</b>. Игрок не из сетки встанет на его место.' : 'Выберите игрока в сетке. Можно менять, пока их матчи не начаты.') + '</p>';
+    h += '<div class="label">В сетке</div><div class="picks">' + inGrid.map((id, k) => btn(id, 'место ' + (t.slots.indexOf(id) + 1))).join('') + '</div>';
+    if (a && out.length) h += '<div class="label" style="margin-top:8px">Не в сетке</div><div class="picks">' + out.map(id => btn(id)).join('') + '</div>';
+    if (a) h += '<button class="ghost sm" data-act="sw-pick" data-v="">Выбрать другого</button>';
     return h + '</div></div>';
   }
   if (S.bpick) {
@@ -2707,7 +2723,7 @@ function partProgress(t, rv, k) {
 // выбор игрока, чей путь подсветить в сетке (на телефоне наведения нет)
 function hpPicker(t) {
   const ids = t.players.filter(x => P[x]).sort((a, b) => P[a].name.localeCompare(P[b].name, 'ru'));
-  return '<div class="hp-row"><label class="label" for="hp-sel">Путь игрока</label><select class="inp" id="hp-sel" data-hp="' + t.id + '"><option value="">— никого —</option>' + ids.map(id => '<option value="' + id + '"' + (S.hp === id ? ' selected' : '') + '>' + numOf(t, id) + '. ' + esc(P[id].name) + '</option>').join('') + '</select></div>';
+  return '<div class="hp-row"><label class="label" for="hp-sel">Путь игрока</label><select class="inp" id="hp-sel" data-hp="' + t.id + '"><option value="">— никого —</option>' + ids.map(id => '<option value="' + id + '"' + (S.hp === id ? ' selected' : '') + '>' + numOf(t, id) + '. ' + esc(P[id].name) + '</option>').join('') + '</select>' + (SRV && canDo(t, 'org') && tStatus(t) === 'live' && !t.stage && t.slots ? '<button class="mini" data-act="sw-open" data-v="' + t.id + '" title="Поменять игроков местами или поставить в сетку другого — пока их матчи не начаты">Расставить вручную</button>' : '') + '</div>';
 }
 function gameRow(t, g, cx) {
   const { a, b, st } = gameState(t, g, cx.rv);
@@ -6867,6 +6883,14 @@ document.addEventListener('click', e => {
       const names = raw ? parseBoards(raw) : Array.from({ length: t.boards ? t.boards.n : 0 }, (_, k) => k + 1);
       if (!names) { toast('Номера мишеней: например 3, 5, 7 или 1-4, 9 (до 64, числа до 999)'); break; }
       saveBoards(t, names);
+      break;
+    }
+    case 'sw-open': closeModals(); S.swapM = { tid: v, a: null }; render(); break;
+    case 'sw-pick': {
+      const m = S.swapM; if (!m) break;
+      if (!v || !m.a || m.a === v) { m.a = v && m.a !== v ? v : null; render(); break; }
+      if (!TBY[m.tid].slots.includes(m.a)) { m.a = v; render(); break; }
+      svDo(Api.patch('/api/tournaments/' + m.tid + '/slots', { a: m.a, b: v }), r => { svTourSet(r); S.swapM = null; toast('Игроки переставлены.'); });
       break;
     }
     case 'bp-open': {

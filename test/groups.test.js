@@ -238,3 +238,20 @@ test('мишени: закреплены за группой; в квалифи�
   assert.equal(q.boards.q.p13, undefined);
   assert.equal(q.boards.manual, true);
 });
+
+test('ручная расстановка: обмен в сетке и ввод невышедшего из группы, пока матчи не начаты', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Ручная сетка', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 201).tournament;
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: 'p6', b: 'p7' }), 409);
+  t = await playAll(t, HOST);
+  const [s0, s1, s2] = t.slots, out = ids.find(id => !t.slots.includes(id));
+  err(await call(PL, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s0, b: s2 }), 403);
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s0, b: s2 })).tournament;
+  assert.equal(t.slots[0], s2); assert.equal(t.slots[2], s0);
+  // невышедший встаёт вместо игрока сетки
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s1, b: out })).tournament;
+  assert.equal(t.slots[1], out); assert.ok(!t.slots.includes(s1));
+  // матч сыгран — менять его игроков нельзя
+  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 1, lb: 0 })).tournament;
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s2, b: s1 }), 409);
+});
