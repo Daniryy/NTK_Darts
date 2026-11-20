@@ -19,10 +19,10 @@ async function reseed(c, id, order) {
   await c.query('DELETE FROM entries WHERE tournament_id = $1', [id]);
   await c.query('INSERT INTO entries (tournament_id, player_id, seed_no, paid) SELECT $1, x.id, x.n, x.id = ANY($3) FROM unnest($2::text[]) WITH ORDINALITY AS x(id, n)', [id, order, paid]);
 }
-// групповой этап: в каждой группе должно быть больше игроков, чем из неё выходит
+// групповой этап: в группе хотя бы двое и не меньше, чем из неё выходит (выйти могут и все)
 function groupsCheck(G, n) {
   if (G.n * G.adv > T.BR_MAX) throw E.bad('Из групп в сетку выходят не больше ' + T.BR_MAX, 'groups');
-  if (Math.floor(n / G.n) < Math.max(2, G.adv + 1)) throw E.conflict('bad_state', 'Мало участников для ' + G.n + ' ' + (G.n === 1 ? 'группы' : 'групп') + ': в каждой нужно больше, чем выходит из неё (' + G.adv + ')');
+  if (Math.floor(n / G.n) < Math.max(2, G.adv)) throw E.conflict('bad_state', 'Мало участников для ' + G.n + ' ' + (G.n === 1 ? 'группы' : 'групп') + ': в каждой нужно не меньше ' + Math.max(2, G.adv));
 }
 const BRK = ['ko', 'pl', 'de'];
 // «Кубок B»: отдельный турнир с той же игрой для не попавших в основную сетку; off — сколько мест до него

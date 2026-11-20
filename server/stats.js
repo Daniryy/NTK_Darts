@@ -17,17 +17,18 @@ async function eloAdd(c, a, b, aWon) {
 // полный пересчёт: после отмены результата или удаления турнира (как recalc() на странице).
 // В рейтинг идут только официальные турниры (клубные — тоже официальные)
 async function eloAll(c) {
+  const base = new Map((await all(c, 'SELECT id, rating_base FROM players WHERE rating_base <> 1500')).map(x => [x.id, x.rating_base]));
   const ms = await all(c, `SELECT m.w, a.player_id AS a, b.player_id AS b FROM matches m JOIN tournaments t ON t.id = m.tournament_id AND t.official
     JOIN match_lines a ON a.match_id = m.id AND a.idx = 0 JOIN match_lines b ON b.match_id = m.id AND b.idx = 1
     WHERE m.status = 'done' AND a.player_id IS NOT NULL AND b.player_id IS NOT NULL
     ORDER BY m.finished, m.id`);
-  const r = new Map(), n = new Map(), get = id => r.has(id) ? r.get(id) : 1500;
+  const r = new Map(), n = new Map(), get = id => r.has(id) ? r.get(id) : base.has(id) ? base.get(id) : 1500;
   ms.forEach(m => {
     const d = K * ((m.w === 0 ? 1 : 0) - expect(get(m.a), get(m.b)));
     r.set(m.a, get(m.a) + d); r.set(m.b, get(m.b) - d);
     n.set(m.a, (n.get(m.a) || 0) + 1); n.set(m.b, (n.get(m.b) || 0) + 1);
   });
-  await c.query('UPDATE players SET rating = 1500, rated = 0 WHERE rated <> 0 OR rating <> 1500');
+  await c.query('UPDATE players SET rating = rating_base, rated = 0 WHERE rated <> 0 OR rating <> rating_base');
   const ids = [...r.keys()];
   if (ids.length) await c.query(`UPDATE players p SET rating = x.r, rated = x.n FROM unnest($1::text[], $2::float8[], $3::int[]) AS x(id, r, n) WHERE p.id = x.id`,
     [ids, ids.map(id => r.get(id)), ids.map(id => n.get(id))]);

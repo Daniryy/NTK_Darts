@@ -212,7 +212,7 @@ test('закрытие квалификации: посев по лучшему 
   // подписи можно сменить и после старта, остальное — нет
   assert.equal(ok(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'num' })).tournament.labels, 'num');
   ok(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'ab' }));
-  err(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'ab', name: 'Новое' }), 409, 'bad_state');
+  err(await call(A, 'PATCH', '/api/tournaments/' + tid, { labels: 'ab', mode: 301 }), 409, 'bad_state');
   err(await call(X, 'PATCH', '/api/tournaments/' + tid, { labels: 'num' }), 403);
   err(await call(A, 'POST', '/api/tournaments/' + tid + '/qual/close'), 409, 'bad_state');
   err(await call(A, 'PUT', '/api/tournaments/' + tid + '/qual/p9/0', { v: 500 }), 409, 'bad_state');

@@ -63,7 +63,7 @@ async function playAll(t, u) {
 test('«Стандарт»: 2 группы по 4, выходят по двое, сетка ko, места невышедших', async () => {
   const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
   err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'rr', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 400);
-  err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 2 } }), 409); // по 2 в группе, выходят 2
+  err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 3 } }), 409); // по 2 в группе, выходят 3
   let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Стандарт', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 }, ltwBy: { groups: 1, f: 2 } }), 201).tournament;
   assert.equal(t.stage, 'groups');
   assert.equal(t.status, 'live');
@@ -201,4 +201,57 @@ test('ручной посев: при создании — в порядке с�
   t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { seed: 'm', order: ['p8', 'p9', 'p6', 'x404'] })).tournament;
   assert.deepEqual(t.players, ['p8', 'p9', 'p6', 'p7']);
   assert.deepEqual(B.resolver(t).players(0, 0), ['p8', 'p7'], 'первый против последнего');
+});
+
+test('группы: выходят все — 4 группы по 2, в сетку 8', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Все выходят', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 2 } }), 201).tournament;
+  assert.equal(t.groups.ids.length, 4);
+  assert.ok(t.groups.ids.every(g => g.length === 2));
+  t = await playAll(t, HOST);
+  assert.equal(t.groups.done, true);
+  assert.deepEqual(t.slots.filter(Boolean).sort(), ids.slice().sort());
+});
+
+test('мишени: закреплены за группой; в квалификации игрока к мишени ставит организатор', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Мишени групп', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 201).tournament;
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { n: 4 })).tournament;
+  err(await call(PL, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [3] }), 403);
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [9] }), 400);
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/boards', { grp: 0, boards: [3] })).tournament;
+  assert.deepEqual(t.boards.grp, { 0: [3] });
+  const at = t.boards.at, byKey = k => t.games.find(g => g.r + ':' + g.i === k);
+  assert.ok(Object.keys(at).length >= 2);
+  Object.keys(at).forEach(k => { const g = byKey(k); assert.equal(g.grp === 0, at[k] === 3, k + ' → ' + at[k]); });
+  // квалификация: ручная мишень
+  let q = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Квал мишени', format: 'ko', mode: 501, ltw: 1, qual: { ex: { k: 'score', lim: 3 }, tries: 1 }, players: ids }), 201).tournament;
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { n: 2 })).tournament;
+  const n2 = qq => Object.values(qq.boards.q).filter(x => x === 2).length;
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p13', board: 2 })).tournament;
+  assert.equal(q.boards.q.p13, 2);
+  assert.equal(q.boards.manual, true);
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p12', board: 2 })).tournament;
+  assert.equal(q.boards.q.p12, 2);
+  assert.ok(n2(q) <= 2, 'у мишени не больше двоих');
+  q = ok(await call(HOST, 'PATCH', '/api/tournaments/' + q.id + '/boards', { player: 'p13', board: null })).tournament;
+  assert.equal(q.boards.q.p13, undefined);
+  assert.equal(q.boards.manual, true);
+});
+
+test('ручная расстановка: обмен в сетке и ввод невышедшего из группы, пока матчи не начаты', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Ручная сетка', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 201).tournament;
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: 'p6', b: 'p7' }), 409);
+  t = await playAll(t, HOST);
+  const [s0, s1, s2] = t.slots, out = ids.find(id => !t.slots.includes(id));
+  err(await call(PL, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s0, b: s2 }), 403);
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s0, b: s2 })).tournament;
+  assert.equal(t.slots[0], s2); assert.equal(t.slots[2], s0);
+  // невышедший встаёт вместо игрока сетки
+  t = ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s1, b: out })).tournament;
+  assert.equal(t.slots[1], out); assert.ok(!t.slots.includes(s1));
+  // матч сыгран — менять его игроков нельзя
+  t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/0/0/result', { la: 1, lb: 0 })).tournament;
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id + '/slots', { a: s2, b: s1 }), 409);
 });

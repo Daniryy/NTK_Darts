@@ -1,4 +1,4 @@
-// Создание игроков: уникальные @handle и код OCH-xxxx, как на странице.
+// Создание игроков: уникальные @handle и код NDL-xxxx, как на странице.
 const crypto = require('node:crypto');
 const { one } = require('./db');
 
@@ -20,7 +20,7 @@ async function uniqueHandle(c, name) {
 async function uniqueCode(c) {
   for (let digits = 4; ; digits++) {
     for (let k = 0; k < 20; k++) {
-      const code = 'OCH-' + crypto.randomInt(10 ** (digits - 1), 10 ** digits);
+      const code = 'NDL-' + crypto.randomInt(10 ** (digits - 1), 10 ** digits);
       if (!await one(c, 'SELECT 1 FROM players WHERE code = $1', [code])) return code;
     }
   }

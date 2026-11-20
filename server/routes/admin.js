@@ -31,7 +31,7 @@ function newPassword() {
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
 async function freeLogin(c, p) {
   const words = String(p.last_name || p.name || '').trim().toLowerCase().split(/\s+/);
-  let b = [...(p.last_name ? words[0] : words[words.length - 1])].map(ch => TR[ch] != null ? TR[ch] : ch).join('').replace(/[^a-z0-9]/g, '').slice(0, 24);
+  let b = [...words[0]].map(ch => TR[ch] != null ? TR[ch] : ch).join('').replace(/[^a-z0-9]/g, '').slice(0, 24);
   if (b.length < 3) b = 'player';
   for (let n = 1; ; n++) { const l = n === 1 ? b : b + n; if (!await one(c, 'SELECT 1 FROM players WHERE login = $1', [l])) return l; }
 }
@@ -154,6 +154,12 @@ module.exports = async function (app) {
         if (!full && (cur.phone != null || cur.login || cur.email)) throw E.forbidden('Игрок входит сам (телефон или почта) — новый код выдаёт администратор');
         set.claim = await newClaim(c);
       } else if (b.claim === false) set.claim = null;
+      // рейтинг для посева задаёт администратор; дальше он меняется по матчам как обычно
+      if (b.rating !== undefined && Math.round(cur.rating) !== b.rating) {
+        if (!full) throw E.forbidden('Рейтинг задаёт администратор');
+        set.rating = V.int(b.rating, 'rating', 0, 4000);
+        set.rating_base = cur.rating_base + (set.rating - cur.rating);
+      }
       if (b.ver !== undefined) {
         if (!full) throw E.forbidden('Подтверждает администратор');
         set.ver = V.bool(b.ver, 'ver');
@@ -177,7 +183,7 @@ module.exports = async function (app) {
       // блокировка или понижение администратора — его входы закрываются
       if (set.blocked || (set.role && RANK[cur.role] >= RANK.admin && RANK[set.role] < RANK.admin)) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
-      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex'].includes(k)).map(k => [k, set[k]]));
+      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex', 'rating_base'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
       if (b.claim === true) log.code = 'новый';
       await audit(c, me, set.role ? 'player.role' : set.blocked !== undefined ? 'player.block' : 'player.edit', out, log);

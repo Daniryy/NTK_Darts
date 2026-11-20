@@ -227,7 +227,22 @@ module.exports = async function (app) {
       needOwner(t, me);
       const b = req.body || {};
       // подписи матчей, взнос и «до скольких побед» можно менять и после старта — для матчей, которые ещё не начаты
-      const LATE = ['labels', 'fee', 'ltw', 'ltwBy'];
+      const LATE = ['labels', 'fee', 'ltw', 'ltwBy', 'name', 'venue', 'city', 'qualTries'];
+      // попыток квалификации: до старта и пока квалификация идёт; меньше — только если вторых попыток ещё нет
+      if (b.qualTries !== undefined) {
+        const n = V.int(b.qualTries, 'qualTries', 1, 2);
+        if (!t._row.qual) throw E.conflict('bad_state', 'У турнира нет квалификации');
+        if (t.status !== 'reg' && t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация уже закрыта');
+        if (n < t._row.qual.tries && Object.values(t.qual.res).some(r => r[1])) throw E.conflict('bad_state', 'Вторые попытки уже сданы — сначала удалите их');
+        await c.query(`UPDATE tournaments SET qual = jsonb_set(qual, '{tries}', $2::jsonb), version = version + 1 WHERE id = $1`, [t.id, String(n)]);
+        delete b.qualTries;
+        if (!Object.keys(b).length) {
+          await T.refreshTour(c, await getTour(c, t.id, false));
+          await S.autoStage(c, t.id);
+          forget('t', t.id);
+          return tourResp(c, t.id, me);
+        }
+      }
       if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => LATE.includes(k)))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));
@@ -563,6 +578,44 @@ module.exports = async function (app) {
     });
   });
 
+  // ручная расстановка в сетке (организатор): { a, b } — поменять игроков местами. b может быть и не в сетке
+  // (не вышел из группы или квалификации) — тогда он встаёт вместо a. Только пока их матчи не начаты.
+  app.patch('/api/tournaments/:id/slots', async req => {
+    const me = needPlayer(req), b = req.body || {};
+    return tx(async c => {
+      await c.query('SELECT id FROM matches WHERE tournament_id = $1 ORDER BY id FOR UPDATE', [req.params.id]);
+      const t = await getTour(c, req.params.id, true);
+      needOwner(t, me);
+      if (t.status !== 'live' || t.stage || !t.slots || !B.isBracket(t)) throw E.conflict('bad_state', 'Расставлять можно, когда сетка построена и турнир идёт');
+      const pa = V.str(b.a, 'a', 1, 40), pb = V.str(b.b, 'b', 1, 40);
+      if (pa === pb) throw E.bad('Выберите двух разных игроков');
+      const ia = t.slots.indexOf(pa), ib = t.slots.indexOf(pb);
+      if (ia < 0) throw E.bad('Первый игрок должен быть в сетке', 'a');
+      if (!t.players.includes(pb)) throw E.notFound('Игрок не в турнире');
+      if (ib < 0) {
+        const cup = await one(c, 'SELECT id FROM tournaments WHERE parent = $1', [t.id]);
+        if (cup) throw E.conflict('bad_state', 'Не попавшие в сетку уже играют «Кубок B» — менять состав сетки нельзя');
+      }
+      const rv = B.resolver(t), used = [];
+      for (const g of t.games) {
+        const ps = rv.players(g.r, g.i);
+        if (!ps.includes(pa) && !(ib >= 0 && ps.includes(pb))) continue;
+        if (g.res || t.live[g.r + ':' + g.i]) throw E.conflict('bad_state', 'Матч этого игрока уже начат или сыгран');
+        used.push(g.r + ':' + g.i);
+      }
+      const slots = t.slots.slice();
+      slots[ia] = pb;
+      if (ib >= 0) slots[ib] = pa;
+      // «Готов» у затронутых матчей сбрасывается: пары поменялись
+      const ready = t._row.ready ? Object.assign({}, t._row.ready) : null;
+      if (ready) used.forEach(k => { delete ready[k]; });
+      await c.query('UPDATE tournaments SET slots = $2, ready = $3 WHERE id = $1', [t.id, JSON.stringify(slots), ready && JSON.stringify(ready)]);
+      await S.autoStage(c, t.id);
+      await bump(c, t.id);
+      return tourResp(c, t.id, me);
+    });
+  });
+
   // общее фото игроков (организатор): { photoId } — одно из фото турнира, null — убрать
   app.patch('/api/tournaments/:id/cover', async req => {
     const me = needPlayer(req), b = req.body || {};
@@ -609,6 +662,35 @@ module.exports = async function (app) {
         if (names.every((x, k) => x === k + 1)) delete bd.names; else bd.names = names;
       } else if (b.n !== undefined) { bd.n = V.int(b.n, 'n', 0, 64); delete bd.names; }
       if (b.manual !== undefined) { if (V.bool(b.manual, 'manual')) bd.manual = true; else delete bd.manual; }
+      // квалификация: { player, board } — поставить игрока к мишени (по двое на мишень), board: null — снять
+      if (b.player !== undefined) {
+        if (t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация не идёт');
+        if (!t.players.includes(b.player)) throw E.notFound('Игрок не в турнире');
+        const q = bd.q = Object.assign({}, bd.q);
+        if (b.board === null) { delete q[b.player]; bd.manual = true; } else {
+          const no = V.int(b.board, 'board', 1, Math.max(1, bd.n)), live = id => Object.keys(t.live || {}).some(k => k.startsWith('q:' + id + ':'));
+          const there = Object.keys(q).filter(id => id !== b.player && q[id] === no);
+          // у мишени двое: уступает тот, кто сейчас не бросает; дальше мишени ставит организатор
+          if (there.length >= 2) {
+            const out = there.find(id => !live(id));
+            if (!out) throw E.conflict('board_busy', 'У этой мишени двое бросают попытки — дождитесь конца');
+            delete q[out];
+          }
+          q[b.player] = no;
+          bd.manual = true;
+        }
+        delete b.board;
+      }
+      // группы: { grp, boards: [мишени] } — закрепить мишени за группой; [] — снять
+      if (b.grp !== undefined) {
+        if (!t.groups) throw E.conflict('bad_state', 'В турнире нет групп');
+        const k = V.int(b.grp, 'grp', 0, 15), list = b.boards == null ? [] : b.boards;
+        if (k >= t.groups.n || !Array.isArray(list) || list.length > 64 || list.some(x => !Number.isInteger(x) || x < 1 || x > Math.max(1, bd.n))) throw E.bad('Мишени группы — номера 1…' + bd.n, 'boards');
+        bd.grp = Object.assign({}, bd.grp);
+        Object.keys(bd.grp).forEach(g => { bd.grp[g] = bd.grp[g].filter(x => !list.includes(x)); if (!bd.grp[g].length) delete bd.grp[g]; });
+        if (list.length) bd.grp[k] = [...new Set(list)].sort((x, y) => x - y);
+        if (!Object.keys(bd.grp).length) delete bd.grp;
+      }
       if (b.board !== undefined) {
         if (t.status === 'reg') throw E.conflict('bad_state', 'Мишени играм — после старта');
         const r = V.int(b.r, 'r', 0, 63), i = V.int(b.i, 'i', 0, 63);

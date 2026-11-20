@@ -97,7 +97,7 @@ cd /srv/oche/app && sudo -u oche bash -c 'set -a; . /etc/oche.env; set +a; npm r
 |---|---|
 | `list` | кто может входить по паролю, кто временно заблокирован |
 | `new "Имя Фамилия" --login danil` | новый тех. администратор |
-| `set OCH-1234 --login danil [--role tech\|admin]` | дать логин существующему игроку (ID из профиля) и роль |
+| `set NDL-1234 --login danil [--role tech\|admin]` | дать логин существующему игроку (ID из профиля) и роль |
 | `password danil` | сменить пароль |
 | `unlock danil` | снять блокировку после неверных паролей |
 | `off danil` | убрать вход по паролю и закрыть его сеансы |

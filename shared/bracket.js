@@ -440,20 +440,25 @@
     if (!t.games || !t.games.length) return wasQ;
     rv = rv || resolver(t);
     const at = bd.at || (bd.at = {}), before = JSON.stringify(at), used = new Set();
+    // группе закреплены мишени (bd.grp = { номер группы: [мишени] }): её матчи идут только на них, другие матчи их не занимают
+    const gb = bd.grp || {}, fixed = new Set([].concat(...Object.values(gb)));
+    const fits = (g, b) => { const own = g.grp != null && gb[g.grp] && gb[g.grp].length ? gb[g.grp] : null; return own ? own.includes(b) : !fixed.has(b); };
     Object.keys(at).forEach(k => {
       const [r, i] = k.split(':').map(Number), g = gameAt(t, r, i), b = at[k];
-      if (!g || gameState(t, g, rv).st !== 'ready' || !(Number.isInteger(b) && b >= 1 && b <= bd.n) || used.has(b)) delete at[k];
+      // идущий в счётчике матч мишень не теряет
+      if (!g || gameState(t, g, rv).st !== 'ready' || !(Number.isInteger(b) && b >= 1 && b <= bd.n) || used.has(b) || (!fits(g, b) && !(t.live && t.live[k]))) delete at[k];
       else used.add(b);
     });
     // ручное управление: организатор сам ставит матчи на мишени — свободные сами не занимаются
     if (bd.manual) return JSON.stringify(at) !== before || wasQ;
     const nums = gameNums(t, rv), no = g => nums.get(g.r + ':' + g.i) || 0;
     const wait = t.games.filter(g => !at[g.r + ':' + g.i] && gameState(t, g, rv).st === 'ready').sort((x, y) => no(x) - no(y));
-    let b = 1;
     for (const g of wait) {
-      while (b <= bd.n && used.has(b)) b++;
-      if (b > bd.n) break;
-      at[g.r + ':' + g.i] = b; used.add(b);
+      const own = g.grp != null && gb[g.grp] && gb[g.grp].length ? gb[g.grp] : null;
+      let b = 0;
+      if (own) b = own.find(x => x >= 1 && x <= bd.n && !used.has(x)) || 0;
+      else for (let k = 1; k <= bd.n; k++) if (!used.has(k) && !fixed.has(k)) { b = k; break; }
+      if (b) { at[g.r + ':' + g.i] = b; used.add(b); }
     }
     return JSON.stringify(at) !== before || wasQ;
   }
@@ -470,6 +475,8 @@
       else cnt[b] = (cnt[b] || 0) + 1;
     });
     const no = id => (t.nums && t.nums[id]) || t.players.indexOf(id) + 1;
+    // ручное управление: игроков к мишеням ставит организатор
+    if (bd.manual) return JSON.stringify(q) !== before;
     const wait = t.players.filter(id => !q[id] && !done(id)).sort((x, y) => no(x) - no(y));
     for (const id of wait) {
       let best = 0;
