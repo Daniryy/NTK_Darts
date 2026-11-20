@@ -63,7 +63,7 @@ async function playAll(t, u) {
 test('«Стандарт»: 2 группы по 4, выходят по двое, сетка ko, места невышедших', async () => {
   const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
   err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'rr', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 } }), 400);
-  err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 2 } }), 409); // по 2 в группе, выходят 2
+  err(await call(HOST, 'POST', '/api/tournaments', { name: 'x', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 3 } }), 409); // по 2 в группе, выходят 3
   let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Стандарт', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 2, adv: 2 }, ltwBy: { groups: 1, f: 2 } }), 201).tournament;
   assert.equal(t.stage, 'groups');
   assert.equal(t.status, 'live');
@@ -201,4 +201,14 @@ test('ручной посев: при создании — в порядке с�
   t = ok(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/launch', { seed: 'm', order: ['p8', 'p9', 'p6', 'x404'] })).tournament;
   assert.deepEqual(t.players, ['p8', 'p9', 'p6', 'p7']);
   assert.deepEqual(B.resolver(t).players(0, 0), ['p8', 'p7'], 'первый против последнего');
+});
+
+test('группы: выходят все — 4 группы по 2, в сетку 8', async () => {
+  const ids = ['p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13'];
+  let t = ok(await call(HOST, 'POST', '/api/tournaments', { name: 'Все выходят', format: 'ko', mode: 501, ltw: 1, players: ids, groups: { n: 4, adv: 2 } }), 201).tournament;
+  assert.equal(t.groups.ids.length, 4);
+  assert.ok(t.groups.ids.every(g => g.length === 2));
+  t = await playAll(t, HOST);
+  assert.equal(t.groups.done, true);
+  assert.deepEqual(t.slots.filter(Boolean).sort(), ids.slice().sort());
 });

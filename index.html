@@ -893,6 +893,10 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tvbox h2 { font-family: var(--display); font-size: clamp(16px, 1.3vw, 30px); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .tvrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1vw; align-items: center; font-size: clamp(15px, 1.25vw, 28px); padding: .25vw 0; border-bottom: 1px solid var(--line); }
 .tvrow:last-child { border-bottom: 0; }
+/* длинный ТОП квалификации: на всю ширину, колонками, строки мельче */
+.tvq-many { grid-column: 1 / -1; }
+.tvq-many .tvq { columns: 3 300px; column-gap: 2vw; }
+.tvq-many .tvrow { break-inside: avoid; font-size: clamp(13px, 1vw, 22px); padding: .12vw 0; }
 /* к мишеням: крупный номер мишени, игроки — каждый своей строкой */
 .tvcalls, .tvres { display: grid; gap: .55vw; }
 .tvcall { display: grid; grid-template-columns: clamp(58px, 4.6vw, 104px) minmax(0, 1fr) auto; gap: 1vw; align-items: center; padding: .55vw .8vw .55vw .55vw; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); }
@@ -908,6 +912,16 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .tvn.rdy > span:last-child::after { content: ' ✓'; color: var(--ok, #3ecf8e); }
 .tvc-m { display: grid; gap: .2vw; justify-items: end; text-align: right; font-size: clamp(11px, .8vw, 18px); color: var(--muted); }
 .tvc-m b { font-family: var(--display); font-size: 1.35em; color: var(--fg); letter-spacing: .03em; }
+/* компактный длинный список: мишень и пара — одной строкой, видно все мишени */
+.tvcalls.cmp { gap: .3vw; }
+.cmp .tvcall { grid-template-columns: clamp(34px, 2.6vw, 60px) minmax(0, 1fr) auto; gap: .7vw; padding: .25vw .6vw .25vw .3vw; border-radius: 9px; }
+.cmp .tvc-b { aspect-ratio: auto; padding: .2em 0; border-radius: 7px; }
+.cmp .tvc-b small { display: none; }
+.cmp .tvc-b b { font-size: clamp(16px, 1.35vw, 32px); margin: 0; }
+.cmp .tvc-p { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .8vw; }
+.cmp .tvn { font-size: clamp(13px, 1.05vw, 24px); }
+.cmp .tvc-m { font-size: clamp(10px, .7vw, 15px); }
+@media (max-width: 560px) { .cmp .tvc-p { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 /* последние результаты: счёт по легам у каждого игрока, победитель ярче */
 .tvr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1vw; align-items: center; padding: .45vw .1vw; border-bottom: 1px solid var(--line); }
 .tvr:last-child { border-bottom: 0; }
@@ -2293,9 +2307,11 @@ function renderModals() {
     if (!t || !t.qual || !P[id]) { S.qualModal = null; return ''; }
     const ex = Games.norm(t.qual.ex), had = qRes(t, id)[k];
     let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Результат квалификации"><div class="ocard">';
-    h += '<div class="ohead"><span class="label">Квалификация · попытка ' + (k + 1) + '</span>' + closeBtn + '</div>';
+    const two = S.qualModal.val2 != null;
+    h += '<div class="ohead"><span class="label">Квалификация · ' + (two ? 'обе попытки' : 'попытка ' + (k + 1)) + '</span>' + closeBtn + '</div>';
     h += '<div class="qm-names">' + noBadge(t, id) + esc(P[id].name) + '</div><div class="meta">' + esc(Games.label(ex)) + ' · ' + Games.unit(ex).tot + ' за ' + qVisits(ex) + ' ' + pl(qVisits(ex), 'подход', 'подхода', 'подходов') + ', от 0 до ' + exMax(ex) + '</div>';
-    h += '<input class="inp num" id="q-val" type="number" inputmode="numeric" min="0" max="' + exMax(ex) + '" value="' + esc(val) + '" placeholder="Результат" style="font-size:28px;text-align:center" aria-label="Результат">';
+    h += '<input class="inp num" id="q-val" type="number" inputmode="numeric" min="0" max="' + exMax(ex) + '" value="' + esc(val) + '" placeholder="' + (two ? 'Попытка 1' : 'Результат') + '" style="font-size:28px;text-align:center" aria-label="' + (two ? 'Попытка 1' : 'Результат') + '">';
+    if (two) h += '<input class="inp num" id="q-val2" type="number" inputmode="numeric" min="0" max="' + exMax(ex) + '" value="' + esc(S.qualModal.val2) + '" placeholder="Попытка 2" style="font-size:28px;text-align:center;margin-top:8px" aria-label="Попытка 2"><div class="meta">Enter — к следующей попытке и сохранить. Вторую можно оставить пустой.</div>';
     const lq = SRV && t.live && t.live['q:' + id + ':' + k];
     if (had && had.mid && SRV) h += '<div class="note-box">Попытка сыграна в счётчике: <b>' + had.v + '</b>. Новый результат заменит её. <button class="lnk" data-act="minfo" data-v="' + had.mid + '">Подходы попытки</button></div>';
     else if (lq) h += '<div class="note-box">Попытка сейчас идёт в счётчике. Сохранение остановит её и запишет этот результат. <button class="lnk" data-act="mview" data-v="' + lq + '">Открыть попытку</button></div>';
@@ -3266,9 +3282,10 @@ function qualView(t) {
   const QS = S.qsort && S.qsort.tid === t.id && S.qsort.k !== 'place' ? S.qsort : null;
   const sb = (key, l, title) => '<th' + (title ? ' title="' + title + '"' : '') + '><button class="lnk sortb' + ((QS ? QS.k : 'place') === key ? ' on' : '') + '" data-act="qsort" data-v="' + t.id + '|' + key + '">' + l + ((QS ? QS.k : 'place') === key ? (QS && QS.dir < 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
   const th = Array.from({ length: tries }, (_, k) => sb('t' + k, 'Попытка ' + (k + 1))).join('');
+  if (done) h += '<div class="row" style="justify-content:flex-end"><button class="mini" data-act="res-xlsx" data-v="' + t.id + '">Таблица Excel</button></div>';
   h += '<div class="card scroll" style="padding:4px 14px"><table class="tbl qtbl"><thead><tr>' + sb('place', 'Место') + sb('name', 'Игрок') + th + sb('best', 'Лучший') + (tries > 1 ? sb('mean', 'Среднее', 'Среднее попыток: сумма, делённая на число сданных попыток') : '') + '</tr></thead><tbody>';
   const placeOf = new Map(order.map((id, k) => [id, k]));
-  const surname = id => { const n = (P[id] ? P[id].name : id).trim().split(/\s+/); return (n[n.length - 1] + ' ' + n.join(' ')).toLowerCase(); };
+  const surname = id => (P[id] ? P[id].name : id).trim().toLowerCase();
   const meanOf = id => { const a = qRes(t, id).filter(Boolean); return a.length ? a.reduce((x, r) => x + r.v, 0) / a.length : null; };
   const valOf = (id, key) => key === 'best' ? qBest(t, id) : key === 'mean' ? meanOf(id) : (qRes(t, id)[+key.slice(1)] || {}).v;
   const rows = !QS ? order : order.slice().sort((a, b) => {
@@ -3393,7 +3410,7 @@ function ntSummary(nt) {
   if (isGrpFmt(nt.fmt)) {
     if (nt.gn * nt.gadv > BR_MAX) return { ok: false, txt: 'Из групп в сетку — не больше ' + BR_MAX };
     const gs = Bracket.drawGroups(nt.sel, nt.gn), per = Math.floor(n / nt.gn);
-    if (per < Math.max(2, nt.gadv + 1)) return { ok: false, txt: 'Мало участников: в каждой группе нужно больше ' + nt.gadv + ' — выберите хотя бы ' + nt.gn * (nt.gadv + 1) };
+    if (per < Math.max(2, nt.gadv)) return { ok: false, txt: 'Мало участников: в каждой группе нужно не меньше ' + Math.max(2, nt.gadv) + ' — выберите хотя бы ' + nt.gn * Math.max(2, nt.gadv) };
     const gm = gs.reduce((a, g) => a + g.length * (g.length - 1) / 2, 0);
     return { ok: true, txt: [cnt(n, 'участник', 'участника', 'участников'), nt.qualOn ? 'квалификация' : '', nt.gn === 1 ? 'одна группа' : cnt(nt.gn, 'группа', 'группы', 'групп') + ' по ' + per + (n % nt.gn ? '–' + (per + 1) : ''), cnt(gm, 'матч', 'матча', 'матчей') + ' в группах', 'в сетку ' + nt.gn * nt.gadv].filter(Boolean).join(' · ') };
   }
@@ -5484,7 +5501,7 @@ function coverBlock(t) {
   if (org) h += '<div class="row" style="align-items:center;flex-wrap:wrap">' + (c ? '<button class="mini" data-act="photo-pick" data-v="cover|' + t.id + '">Сменить общее фото</button><button class="mini dng" data-act="cover-rm" data-v="' + t.id + '">Убрать из итогов</button>' : '<button class="mini go" data-act="photo-pick" data-v="cover|' + t.id + '">+ Общее фото игроков</button><span class="meta" style="flex-basis:100%">Покажется в итогах и в ленте</span>') + '</div>';
   return h;
 }
-const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button>' + (SRV && canDo(t, 'staff') ? '<button class="mini go" data-act="proto-open" data-v="' + t.id + '">Протокол (PDF)</button>' : '') + '</div>';
+const resBtns = t => '<div class="row"><button class="mini" data-act="res-img" data-v="' + t.id + '">Картинка итогов</button><button class="mini" data-act="res-post" data-v="' + t.id + '">Текст для поста</button><button class="mini" data-act="res-doc" data-v="' + t.id + '">Документ Word</button><button class="mini" data-act="res-xlsx" data-v="' + t.id + '">Таблица Excel</button>' + (SRV && canDo(t, 'staff') ? '<button class="mini go" data-act="proto-open" data-v="' + t.id + '">Протокол (PDF)</button>' : '') + '</div>';
 // места: [{ id, lo, hi }]
 const placesList = t => isBracket(t) ? bracketStandings(t) : standings(t).map((s, i) => ({ id: s.id, lo: i + 1, hi: i + 1, w: s.w, lf: s.lf, la: s.la }));
 // лучшее в турнире: на сервере приходит в best, в демо — из матчей
@@ -5551,6 +5568,38 @@ function resultsDocx(t) {
     ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
     ['word/document.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="' + W + '"><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>']
   ]);
+}
+// таблица Excel (.xlsx): листы итогов, квалификации и матчей; строки — простые ячейки (числа — числами)
+function xlsxBook(sheets) {
+  const x = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const col = k => { let s = ''; k++; while (k) { const m = (k - 1) % 26; s = String.fromCharCode(65 + m) + s; k = Math.floor((k - 1) / 26); } return s; };
+  const cell = (v, r, c, b) => v == null || v === '' ? '' : typeof v === 'number' && isFinite(v) ? '<c r="' + col(c) + r + '"' + (b ? ' s="1"' : '') + '><v>' + v + '</v></c>' : '<c r="' + col(c) + r + '" t="inlineStr"' + (b ? ' s="1"' : '') + '><is><t xml:space="preserve">' + x(v) + '</t></is></c>';
+  const sheet = sh => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>' + sh.w.map((w, k) => '<col min="' + (k + 1) + '" max="' + (k + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols><sheetData>' +
+    sh.rows.map((row, i) => '<row r="' + (i + 1) + '">' + row.map((v, c) => cell(v, i + 1, c, i === 0)).join('') + '</row>').join('') + '</sheetData></worksheet>';
+  const NS = 'http://schemas.openxmlformats.org/', R = NS + 'officeDocument/2006/relationships';
+  return zipStore([
+    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="' + NS + 'package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map((_, k) => '<Override PartName="/xl/worksheets/sheet' + (k + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '</Types>'],
+    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="' + NS + 'package/2006/relationships"><Relationship Id="rId1" Type="' + R + '/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="' + NS + 'spreadsheetml/2006/main" xmlns:r="' + R + '"><sheets>' + sheets.map((sh, k) => '<sheet name="' + x(sh.name.slice(0, 31)) + '" sheetId="' + (k + 1) + '" r:id="rId' + (k + 1) + '"/>').join('') + '</sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="' + NS + 'package/2006/relationships">' + sheets.map((_, k) => '<Relationship Id="rId' + (k + 1) + '" Type="' + R + '/worksheet" Target="worksheets/sheet' + (k + 1) + '.xml"/>').join('') + '<Relationship Id="rId' + (sheets.length + 1) + '" Type="' + R + '/styles" Target="styles.xml"/></Relationships>'],
+    ['xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="' + NS + 'spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>'],
+    ...sheets.map((sh, k) => ['xl/worksheets/sheet' + (k + 1) + '.xml', sheet(sh)])
+  ]);
+}
+function tourXlsx(t) {
+  const nm = id => P[id] ? P[id].name : '', city = id => P[id] ? P[id].city || '' : '', club = id => P[id] ? P[id].club || '' : '', no = id => (t.nums && t.nums[id]) || '';
+  const sheets = [];
+  const pls = t.status === 'done' ? placesList(t) : [];
+  if (pls.length) sheets.push({ name: 'Итоги', w: [8, 8, 30, 20, 24], rows: [['Место', '№', 'Игрок', 'Город', 'Клуб']].concat(pls.map(s => [s.lo === s.hi ? s.lo : s.lo + '–' + s.hi, no(s.id), nm(s.id), city(s.id), club(s.id)])) });
+  if (t.qual) {
+    const tries = t.qual.tries || 2;
+    sheets.push({ name: 'Квалификация', w: [8, 8, 30, 20].concat(Array(tries).fill(12), [12]), rows: [['Место', '№', 'Игрок', 'Город'].concat(Array.from({ length: tries }, (_, k) => 'Попытка ' + (k + 1)), ['Лучший'])]
+      .concat(qualOrder(t).map((id, k) => [qBest(t, id) != null ? k + 1 : '', no(id), nm(id), city(id)].concat(Array.from({ length: tries }, (_, j) => (qRes(t, id)[j] || {}).v), [qBest(t, id)]))) });
+  }
+  const rv = resolver(t), gs = (t.games || []).filter(g => g.res).map(g => ({ g, s: gameState(t, g, rv) })).filter(x => x.s.a && x.s.b);
+  if (gs.length) sheets.push({ name: 'Матчи', w: [30, 30, 8, 8, 30], rows: [['Стадия', 'Игрок 1', 'Леги', 'Леги', 'Игрок 2']].concat(gs.map(({ g, s }) => [gameLabel(t, g), nm(s.a), g.res.la, g.res.lb, nm(s.b)])) });
+  if (!sheets.length) sheets.push({ name: 'Участники', w: [8, 30, 20, 24], rows: [['№', 'Игрок', 'Город', 'Клуб']].concat(t.players.map(id => [no(id), nm(id), city(id), club(id)])) });
+  return new Blob([xlsxBook(sheets)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 // имя файла латиницей: не все браузеры принимают кириллицу в имени скачиваемого файла
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
@@ -5891,7 +5940,7 @@ function admCardModal() {
   if (d.clubs.length) h += '<div class="meta">Ведущий: ' + d.clubs.map(c => esc(c.name) + (c.status !== 'active' ? ' (' + CLUB_ST[c.status] + ')' : '')).join(', ') + '</div>';
   if (p.claim) h += codeNote(p);
   // профиль
-  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Звание или разряд (МС, КМС…)" aria-label="Звание">' : '') + (p.contacts ? infoForm(p, 'ac') + '<textarea class="inp" id="ac-note" maxlength="500" rows="2" placeholder="Заметки ведущего — видят только ведущие и администраторы" aria-label="Заметки">' + esc(p.note || '') + '</textarea>' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
+  if (canEdit) h += '<div class="ac-sec"><span class="label">Профиль</span><input class="inp" id="ac-name" maxlength="32" value="' + esc(p.name) + '" aria-label="Имя"><div class="nrow"><input class="inp" id="ac-city" maxlength="40" value="' + esc(p.city || '') + '" placeholder="Город" aria-label="Город"><input class="inp" id="ac-club" maxlength="40" value="' + esc(p.club || '') + '" placeholder="Клуб" aria-label="Клуб"></div>' + (Api.perm('titles') ? '<input class="inp" id="ac-title" maxlength="40" value="' + esc(p.title || '') + '" placeholder="Звание или разряд (МС, КМС…)" aria-label="Звание">' : '') + (Api.perm('players') ? '<label class="field"><span class="label">Рейтинг (для посева)</span><input class="inp num" id="ac-rating" type="number" inputmode="numeric" min="0" max="4000" value="' + (p.r != null ? p.r : 1500) + '" aria-label="Рейтинг"><span class="meta">Задайте вручную — дальше рейтинг меняется по матчам.</span></label>' : '') + (p.contacts ? infoForm(p, 'ac') + '<textarea class="inp" id="ac-note" maxlength="500" rows="2" placeholder="Заметки ведущего — видят только ведущие и администраторы" aria-label="Заметки">' + esc(p.note || '') + '</textarea>' : '') + '<div class="ac-btns"><button class="btn sm" data-act="ac-save" data-v="' + p.id + '">Сохранить</button><button class="ghost sm" data-act="photo-pick" data-v="avatar|' + p.id + '">' + (p.photo ? 'Сменить фото' : 'Добавить фото') + '</button></div></div>';
   // роль и доступ
   // пока список ролей грузится — хотя бы текущая роль, без пустого выбора
   const allRoles = (lz('roles', () => Api.get('/api/roles'), 600000).data || { roles: [{ key: p.role, rank: RANKS_UI[p.role] != null ? RANKS_UI[p.role] : 1 }] }).roles;
@@ -6062,7 +6111,8 @@ function tvo() {
 function tvoPanel() {
   const o = tvo();
   return '<div class="tvopt"><span class="label">Показывать</span>' + TVO_LIST.map(([k, l]) => '<button class="fchip' + (o[k] ? ' on' : '') + '" data-act="tvo" data-v="' + k + '" aria-pressed="' + !!o[k] + '">' + l + '</button>').join('') +
-    (SRV ? '<span class="label" style="margin-left:8px">Счёт позже на</span>' + TVO_DELAYS.map(d => '<button class="fchip' + ((o.delay || 0) === d ? ' on' : '') + '" data-act="tvo-delay" data-v="' + d + '" title="Видео VK отстаёт — задержите счёт, чтобы совпадал с видео">' + (d ? d + ' с' : 'без задержки') + '</button>').join('') : '') + '</div>';
+    (SRV ? '<span class="label" style="margin-left:8px">Счёт позже на</span>' + TVO_DELAYS.map(d => '<button class="fchip' + ((o.delay || 0) === d ? ' on' : '') + '" data-act="tvo-delay" data-v="' + d + '" title="Видео VK отстаёт — задержите счёт, чтобы совпадал с видео">' + (d ? d + ' с' : 'без задержки') + '</button>').join('') : '') +
+    '<span class="label" style="margin-left:8px">Квалификация: ТОП</span>' + [8, 10, 16, 24, 32, 64, 0].map(n => '<button class="fchip' + ((o.qtop == null ? 10 : o.qtop) === n ? ' on' : '') + '" data-act="tvo-qtop" data-v="' + n + '">' + (n || 'все') + '</button>').join('') + '</div>';
 }
 function liveTile(t, m) {
   tvFx(m);
@@ -6099,15 +6149,15 @@ function callsOf(t) {
 const tvName = (t, id, cls) => '<span class="tvn' + (cls ? ' ' + cls : '') + '">' + noBadge(t, id) + '<span>' + esc(P[id] ? P[id].name : '—') + '</span></span>';
 function callsHTML(t, max) {
   if (t.stage === 'qual') return qualCallsHTML(t, max);
-  const cs = callsOf(t).slice(0, max || 12);
+  const all = callsOf(t), cs = all.slice(0, max || 12);
   if (!cs.length) return '<p class="meta">Сейчас никого не вызываем.</p>';
-  return '<div class="tvcalls">' + cs.map(x => {
+  return '<div class="tvcalls cmp">' + cs.map(x => {
     const b = boardOf(t, x.g.r, x.g.i), nm = gName(t, x.g, x.n), rd = (t.ready && t.ready[x.g.r + ':' + x.g.i]) || {};
     // ✓ — игрок у мишени и нажал «Готов»
     const who = id => tvName(t, id, rd[id] ? 'rdy' : '');
     return '<div class="tvcall' + (b ? ' on' : '') + '"><div class="tvc-b">' + (b ? '<small>мишень</small><b>' + b + '</b>' : '<small>ждёт</small><b>—</b>') + '</div>' +
       '<div class="tvc-p">' + who(x.s.a) + who(x.s.b) + '</div><div class="tvc-m"><span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
-  }).join('') + '</div>';
+  }).join('') + '</div>' + (all.length > cs.length ? '<p class="meta">И ещё ' + (all.length - cs.length) + '</p>' : '');
 }
 // квалификация: на каждой мишени — кто бросает (по двое), ниже — очередь
 function qualCallsHTML(t, max) {
@@ -6115,13 +6165,13 @@ function qualCallsHTML(t, max) {
   if (!bd || !bd.n) return '<p class="meta">Мишени не указаны — игроки сдают попытки по команде организатора.</p>';
   const q = bd.q || {}, live = new Set(Object.keys(t.live || {}).filter(k => k.startsWith('q:')).map(k => k.split(':')[1]));
   const rows = [];
-  for (let b = 1; b <= bd.n && rows.length < (max || 12); b++) {
+  for (let b = 1; b <= bd.n && rows.length < (max || 40); b++) {
     const ids = Object.keys(q).filter(id => q[id] === b);
     rows.push('<div class="tvcall' + (ids.length ? ' on' : '') + '"><div class="tvc-b"><small>мишень</small><b>' + boardNo(t, b) + '</b></div><div class="tvc-p">' +
       (ids.length ? ids.map(id => tvName(t, id, live.has(id) ? 'rdy' : '')).join('') : '<span class="meta">свободна</span>') + '</div><div class="tvc-m"><span>квалификация</span></div></div>');
   }
   const queue = t.players.filter(id => !q[id] && myQualNextOf(t, id) != null).length;
-  return '<div class="tvcalls">' + rows.join('') + '</div>' + (queue ? '<p class="meta">В очереди к мишеням: ' + queue + '</p>' : '');
+  return '<div class="tvcalls cmp">' + rows.join('') + '</div>' + (queue ? '<p class="meta">В очереди к мишеням: ' + queue + '</p>' : '');
 }
 function recentHTML(t, max) {
   const done = (t.games || []).filter(g => g.res && gameState(t, g).st === 'done').map(g => ({ g, at: (MBY[g.res.mid] || {}).t || 0, s: gameState(t, g) }));
@@ -6153,10 +6203,10 @@ function tvView(id) {
   if (O.cams && streamsOf(t).length) h += '<div class="tvcams">' + streamsOf(t).slice(0, 2).map((s, k) => camHTML(s, 'tv' + k, { bare: true })).join('') + '</div>';
   h += '<div class="tvside">';
   if (t.stage === 'qual') {
-    const order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, 10);
-    if (O.calls && t.boards && t.boards.n) h += '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 12) + '</div>';
-    h += '<div class="tvbox"><h2>Квалификация · лучшие</h2>' + (order.length ? order.map((x, k) => '<div class="tvrow"><span class="r">' + (k + 1) + '</span><span>' + noBadge(t, x) + esc(P[x] ? P[x].name : '—') + '</span><span class="r">' + qBest(t, x) + '</span></div>').join('') : '<p class="meta">Результатов пока нет.</p>') + '</div>';
-  } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 10) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
+    const qn = O.qtop == null ? 10 : O.qtop, order = qualOrder(t).filter(x => qBest(t, x) != null).slice(0, qn || 999);
+    if (O.calls && t.boards && t.boards.n) h += '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 40) + '</div>';
+    h += '<div class="tvbox' + (order.length > 12 ? ' tvq-many' : '') + '"><h2>Квалификация · ' + (qn ? 'ТОП ' + qn : 'все') + '</h2>' + (order.length ? '<div class="tvq">' + order.map((x, k) => '<div class="tvrow"><span class="r">' + (k + 1) + '</span><span>' + noBadge(t, x) + esc(P[x] ? P[x].name : '—') + '</span><span class="r">' + qBest(t, x) + '</span></div>').join('') + '</div>' : '<p class="meta">Результатов пока нет.</p>') + '</div>';
+  } else h += (O.calls ? '<div class="tvbox"><h2>К мишеням</h2>' + callsHTML(t, 40) + '</div>' : '') + (O.recent ? '<div class="tvbox"><h2>Последние результаты</h2>' + recentHTML(t, 8) + '</div>' : '');
   if (O.stages) h += '<div class="tvbox"><h2>Ход турнира</h2>' + stagesView(t, resolver(t)) + '</div>';
   if (O.qr) h += '<div class="tvbox tvqr"><h2>Сетка и счёт на телефоне</h2>' + qrHTML(tourUrl(t.id)) + '<span class="meta">Наведите камеру телефона</span></div>';
   h += '</div>';
@@ -6261,7 +6311,7 @@ function deskView(id) {
     const l = (all.find(x => x[0] === k) || [k, k])[1];
     let body = '', wide = false;
     if (k === 'live') body = live.length ? '<div class="tvg" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))">' + live.map(m => liveTile(t, m)).join('') + '</div>' : '<p class="meta">Сейчас матчей нет.</p>';
-    else if (k === 'calls') body = callsHTML(t, 16) + (canDo(t, 'org') ? boardsCtl(t) : '');
+    else if (k === 'calls') body = callsHTML(t, 64) + (canDo(t, 'org') ? boardsCtl(t) : '');
     else if (k === 'stages') body = stagesView(t, resolver(t)) || '<p class="meta">Турнир ещё не начался.</p>';
     else if (k === 'qual') { body = qualView(t); wide = true; }
     else if (k === 'grid') { body = bracketView(t); wide = true; }
@@ -6812,7 +6862,8 @@ document.addEventListener('click', e => {
     case 'qplay': startQualGame(v); break;
     case 'qenter': {
       const [tid, id, k] = v.split('|'), t = TBY[tid], r = t && qRes(t, id)[+k];
-      closeModals(); S.qualModal = { tid, id, k: +k, val: r ? String(r.v) : '', err: '' }; render();
+      const r2 = t && +k === 0 && (t.qual.tries || 2) > 1 && qRes(t, id)[1], two = t && +k === 0 && (t.qual.tries || 2) > 1 && !(r2 && r2.mid) && !(r && r.mid) && !(t.live && (t.live['q:' + id + ':0'] || t.live['q:' + id + ':1']));
+      closeModals(); S.qualModal = { tid, id, k: +k, val: r ? String(r.v) : '', err: '' }; if (two) S.qualModal.val2 = r2 ? String(r2.v) : ''; render();
       const el = $('q-val'); if (el) el.focus();
       break;
     }
@@ -6922,6 +6973,7 @@ document.addEventListener('click', e => {
       });
       break;
     }
+    case 'res-xlsx': if (TBY[v]) { saveBlob(tourXlsx(TBY[v]), (latin(TBY[v].name) || TBY[v].id) + '.xlsx'); toast('Таблица сохранена — откроется в Excel.'); } break;
     case 'res-doc': if (TBY[v]) { saveBlob(resultsDocx(TBY[v]), 'Itogi-' + (latin(TBY[v].name) || TBY[v].id) + '.docx'); toast('Документ сохранён — откроется в Word.'); } break;
     case 'cover-set': case 'cover-rm': {
       const [tid, ph] = a === 'cover-set' ? v.split('|') : [v, null];
@@ -6960,7 +7012,7 @@ document.addEventListener('click', e => {
     case 'ac-save': {
       const val = k => { const el = $('ac-' + k); return el ? el.value.trim() : ''; };
       if (val('name').length < 2) { toast('Имя — от 2 символов.'); break; }
-      svDo(Api.patch('/api/admin/players/' + v, Object.assign({ name: val('name'), city: val('city'), club: val('club') }, $('ac-title') ? { title: val('title') } : {}, infoVals('ac'), $('ac-note') ? { note: val('note') } : {})), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); toast('Сохранено.'); });
+      svDo(Api.patch('/api/admin/players/' + v, Object.assign({ name: val('name'), city: val('city'), club: val('club') }, $('ac-title') ? { title: val('title') } : {}, $('ac-rating') && val('rating') !== '' ? { rating: Math.round(+val('rating')) } : {}, infoVals('ac'), $('ac-note') ? { note: val('note') } : {})), r => { svPlayer(r.player); svStale('admin:'); svStale('acard:'); svStale('player:'); svStale('rating'); toast('Сохранено.'); });
       break;
     }
     case 'ac-logout': svDo(Api.post('/api/admin/players/' + v + '/logout'), r => { svStale('acard:'); toast('Сеансы завершены: ' + r.sessions + '.'); }); break;
@@ -7207,6 +7259,7 @@ document.addEventListener('click', e => {
     case 'link-del': { const [tid, k] = v.split('|'), t = TBY[tid]; if (t) linksSave(t, (t.links || []).filter((_, j) => j !== +k), 'Ссылка убрана.'); break; }
     case 'install': if (installEv) { installEv.prompt(); installEv.userChoice.finally(() => { installEv = null; render(); }); } break;
     case 'tvo-delay': { const o = tvo(); o.delay = +v; lsSet('oche.tvopt', o); render(); break; }
+    case 'tvo-qtop': { const o = tvo(); o.qtop = +v; lsSet('oche.tvopt', o); render(); break; }
     case 'mcam': S.mcam = S.mcam === false; render(); break;
     case 'cam-add': if (S.camEdit) { S.camEdit.list.push({ title: '', url: '', boards: '' }); render(); } break;
     case 'cam-rm': if (S.camEdit) { S.camEdit.list.splice(+v, 1); render(); } break;
@@ -7332,6 +7385,7 @@ document.addEventListener('input', e => {
   if (t.id === 'crop-z') cropZoom(+t.value);
   if (t.dataset && t.dataset.camF && S.camEdit) { const [k, f] = t.dataset.camF.split('|'), c = S.camEdit.list[+k]; if (c) c[f] = t.value; }
   if (t.id === 'q-val' && S.qualModal) { S.qualModal.val = t.value; S.qualModal.err = ''; }
+  if (t.id === 'q-val2' && S.qualModal) { S.qualModal.val2 = t.value; S.qualModal.err = ''; }
   if (t.id === 'tb-val' && S.tbModal) { S.tbModal.val = t.value; S.tbModal.err = ''; }
   if (t.id === 'mail-consent' && S.login) { S.login.consent = t.checked; if (S.login.err) { S.login.err = ''; render(); } return; }
   if (t.dataset && t.dataset.lf && S.login) { S.login[t.dataset.lf] = t.value; return; }
@@ -7404,7 +7458,8 @@ document.addEventListener('keydown', e => {
     else if (t.value.trim() && !vis.length) addNtPlayer();
     return;
   }
-  if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); saveQualEntry(); return; }
+  if (e.key === 'Enter' && t && t.id === 'q-val') { e.preventDefault(); const n2 = $('q-val2'); if (n2) n2.focus(); else saveQualEntry(); return; }
+  if (e.key === 'Enter' && t && t.id === 'q-val2') { e.preventDefault(); saveQualEntry(); return; }
   if (e.key === 'Enter' && t && t.id === 'ref-name' && S.refIn) { e.preventDefault(); refGo(); return; }
   if (e.key === 'Enter' && t && t.id === 'lg-login' && S.login) { e.preventDefault(); const n = $('lg-pass'); if (n) n.focus(); return; }
   if (e.key === 'Enter' && t && /^(mail|lg)-/.test(t.id) && S.login) { e.preventDefault(); const b = document.querySelector('.ocard.login .btn:not(.alt)'); if (b && !b.disabled) b.click(); return; }
@@ -7471,6 +7526,18 @@ function saveQualEntry() {
   if (!q) return;
   const t = TBY[q.tid], max = t ? exMax(t.qual.ex) : 0, v = +String(q.val).trim();
   if (String(q.val).trim() === '' || !Number.isInteger(v) || v < 0 || v > max) { q.err = 'Введите целое число от 0 до ' + max + '.'; return render(); }
+  const s2 = q.val2 == null ? '' : String(q.val2).trim(), v2 = +s2;
+  if (s2 !== '' && (!Number.isInteger(v2) || v2 < 0 || v2 > max)) { q.err = 'Попытка 2: целое число от 0 до ' + max + '.'; return render(); }
+  if (s2 !== '') {
+    // обе попытки сразу: первая, затем вторая
+    if (SRV) return svDo((async () => {
+      svTourSet(await Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/0', { v }));
+      return Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/1', { v: v2 });
+    })(), r => { svTourSet(r); S.qualModal = null; toast('Сохранено: ' + v + ' и ' + v2 + '.'); })
+      .then(() => { if (S.qualModal) { S.qualModal.err = 'Не всё сохранилось — проверьте связь и повторите.'; render(); } });
+    if (!setQual(q.tid, q.id, 0, { v }) || !setQual(q.tid, q.id, 1, { v: v2 })) { q.err = 'Квалификация уже закрыта.'; return render(); }
+    S.qualModal = null; saveDb(); toast('Сохранено: ' + v + ' и ' + v2 + '.'); return render();
+  }
   const was = qRes(t, q.id)[q.k], replace = !!(SRV && ((was && was.mid) || (t.live && t.live['q:' + q.id + ':' + q.k])));
   if (SRV) return svDo(Api.put('/api/tournaments/' + q.tid + '/qual/' + q.id + '/' + q.k, replace ? { v, replace } : { v }), r => { svTourSet(r); S.qualModal = null; toast('Результат сохранён: ' + v + '.'); }).then(() => { if (S.qualModal) { S.qualModal.err = 'Не сохранилось — проверьте связь и повторите.'; render(); } });
   const old = qRes(t, q.id)[q.k];

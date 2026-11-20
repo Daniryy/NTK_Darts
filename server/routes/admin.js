@@ -154,6 +154,12 @@ module.exports = async function (app) {
         if (!full && (cur.phone != null || cur.login || cur.email)) throw E.forbidden('Игрок входит сам (телефон или почта) — новый код выдаёт администратор');
         set.claim = await newClaim(c);
       } else if (b.claim === false) set.claim = null;
+      // рейтинг для посева задаёт администратор; дальше он меняется по матчам как обычно
+      if (b.rating !== undefined && Math.round(cur.rating) !== b.rating) {
+        if (!full) throw E.forbidden('Рейтинг задаёт администратор');
+        set.rating = V.int(b.rating, 'rating', 0, 4000);
+        set.rating_base = cur.rating_base + (set.rating - cur.rating);
+      }
       if (b.ver !== undefined) {
         if (!full) throw E.forbidden('Подтверждает администратор');
         set.ver = V.bool(b.ver, 'ver');
@@ -177,7 +183,7 @@ module.exports = async function (app) {
       // блокировка или понижение администратора — его входы закрываются
       if (set.blocked || (set.role && RANK[cur.role] >= RANK.admin && RANK[set.role] < RANK.admin)) await c.query('DELETE FROM sessions WHERE player_id = $1', [cur.id]);
       const out = await one(c, `UPDATE players SET ${keys.map((k, n) => k + ' = $' + (n + 2)).join(', ')} WHERE id = $1 RETURNING *`, [cur.id, ...keys.map(k => set[k])]);
-      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex'].includes(k)).map(k => [k, set[k]]));
+      const log = Object.fromEntries(keys.filter(k => !['claim', 'pass_hash', 'login', 'base_role', 'note', 'birth_year', 'sex', 'rating_base'].includes(k)).map(k => [k, set[k]]));
       if (set.role) log.from = cur.role;
       if (b.claim === true) log.code = 'новый';
       await audit(c, me, set.role ? 'player.role' : set.blocked !== undefined ? 'player.block' : 'player.edit', out, log);

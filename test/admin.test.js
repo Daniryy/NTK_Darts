@@ -340,3 +340,13 @@ test('двухфакторный вход администраторов: при
   assert.equal(ok(await call(anon(), 'POST', '/api/auth/password', { login: 'twofa', password: 'Twofa-Secret-1' })).need2fa, 'setup');
   err(await call(TECH, 'DELETE', '/api/admin/players/' + AID + '/2fa'), 409);
 });
+
+test('рейтинг для посева задаёт администратор; пересчёт начинается с него', async () => {
+  const p = await tx(c => require('../server/players').createPlayer(c, { name: 'Рейтингов Пётр' }));
+  const AD = await login('p4'), NOBODY = await login((await tx(c => require('../server/players').createPlayer(c, { name: 'Простой Смотритель' }))).id);
+  err(await call(NOBODY, 'PATCH', '/api/admin/players/' + p.id, { rating: 1900 }), 403);
+  err(await call(AD, 'PATCH', '/api/admin/players/' + p.id, { rating: 99999 }), 400);
+  assert.equal(ok(await call(AD, 'PATCH', '/api/admin/players/' + p.id, { rating: 1900 })).player.r, 1900);
+  await tx(c => require('../server/stats').eloAll(c));
+  assert.equal(Math.round((await pool.query('SELECT rating FROM players WHERE id = $1', [p.id])).rows[0].rating), 1900);
+});
