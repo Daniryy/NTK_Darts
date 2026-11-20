@@ -4742,7 +4742,7 @@ function canEditPlayer(p) {
   return SRV ? !!Api.admin : /^x/.test(p.id);
 }
 // виды обрезки: аватар — квадрат, итоги — 4:3
-const CROP = { avatar: { a: 1, out: [480, 480], demo: [200, 200], q: 0.86 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 }, club: { a: 1, out: [400, 400], demo: [200, 200], q: 0.9 }, cover: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 } };
+const CROP = { avatar: { a: 1, out: [800, 800], demo: [200, 200], q: 0.88 }, tour: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 }, club: { a: 1, out: [400, 400], demo: [200, 200], q: 0.9 }, cover: { a: 4 / 3, out: [1600, 1200], demo: [960, 720], q: 0.84 } };
 let cropImg = null;
 function photoPick(kind, target) {
   const inp = document.createElement('input');
