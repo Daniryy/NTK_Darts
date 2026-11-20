@@ -65,7 +65,7 @@ test('турнир: ltwBy при создании и после старта, м
   // финал — до 3: 1:0 не годится
   err(await call(HOST, 'POST', '/api/tournaments/' + t.id + '/games/1/0/result', { la: 1, lb: 0 }), 400);
   // после старта ведущий меняет финал на «до 2»; другие настройки — нет
-  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id, { name: 'Другое' }), 409, 'bad_state');
+  err(await call(HOST, 'PATCH', '/api/tournaments/' + t.id, { mode: 301 }), 409, 'bad_state');
   err(await call(PL, 'PATCH', '/api/tournaments/' + t.id, { ltwBy: { f: 2 } }), 403);
   assert.deepEqual(ok(await call(HOST, 'PATCH', '/api/tournaments/' + t.id, { ltwBy: { f: 2 } })).tournament.ltwBy, { f: 2 });
   // финал в счётчике: матч создаётся с ltw стадии

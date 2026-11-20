@@ -74,7 +74,7 @@ test('табло получает подходы и результат сраз�
 
   const live = (await call('GET', `/api/tournaments/${t.id}/live`)).b;
   assert.equal(live.matches.length, 1);
-  assert.equal(live.matches[0].by, 'Тестовый Игрок');
+  assert.equal(live.matches[0].by, 'Игрок Тестовый');
 
   // подход 180: табло видит его быстрее 300 мс после ответа сервера
   const sent = await call('POST', `/api/matches/${id}/events`, { events: [{ seq: 1, type: 'visit', leg: 1, p: 0, s: 501, pts: 180, n: 3, b: 0, d: ['T20', 'T20', 'T20'] }] });

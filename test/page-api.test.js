@@ -124,7 +124,7 @@ test('очередь: замок у другого устройства оста
   A.ob.push(id, [v501(0, 1, 501, 45)]);
   await until(() => A.ob.get(id).stop);
   assert.equal(A.ob.get(id).stop.code, 'locked');
-  assert.equal(A.ob.get(id).stop.by, 'Тестовый Игрок');
+  assert.equal(A.ob.get(id).stop.by, 'Игрок Тестовый');
   assert.equal((await Bp.get('/api/matches/' + id)).match.lastSeq, 2);
 });
 

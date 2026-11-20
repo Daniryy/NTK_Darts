@@ -127,11 +127,11 @@
 
 ### `GET /api/me`
 ```json
-{ "player": { "id": "p17", "name": "Иван Петров", "handle": "ivan_p", "code": "OCH-4821", "city": "Москва", "club": "«Оче-бар»", "ver": false,
+{ "player": { "id": "p17", "name": "Иван Петров", "handle": "ivan_p", "code": "NDL-4821", "city": "Москва", "club": "«Оче-бар»", "ver": false,
     "role": "host", "phone": "+79123456789", "vk": true, "email": "ivan@mail.ru", "emailOk": true, "pass": true, "login": null },
   "admin": false, "role": "host", "perms": ["club_tour", "streams", "accounts", "host_nums"], "clubs": [{ "id": "c1", "name": "Клуб «Тройная двадцатка»" }] }
 ```
-`email` и `phone` видит только сам игрок (и администратор в карточке); `emailOk` — почта подтверждена кодом; `pass` — задан пароль. `code` — уникальный ID игрока: по нему ищут (`OCH-4821`, `#4821`, `4821`) и добавляют в турнир. `admin` — роль `admin` или `tech`. `clubs` — подтверждённые клубы, где игрок ведущий.
+`email` и `phone` видит только сам игрок (и администратор в карточке); `emailOk` — почта подтверждена кодом; `pass` — задан пароль. `code` — уникальный ID игрока: по нему ищут (`NDL-4821`, `#4821`, `4821`) и добавляют в турнир. `admin` — роль `admin` или `tech`. `clubs` — подтверждённые клубы, где игрок ведущий.
 Если вход не выполнен, приходит `{ "player": null, "admin": false, "role": null, "clubs": [] }`, а не ошибка.
 
 ### `PATCH /api/me`
@@ -351,14 +351,14 @@
 
 **Карточка игрока** (`PlayerShort`):
 ```json
-{ "id": "p3", "name": "Марина Соколова", "handle": "sokolova_m", "code": "OCH-1003", "city": "Казань", "club": "«Бычий глаз»", "ver": true, "r": 1612, "n": 41,
+{ "id": "p3", "name": "Марина Соколова", "handle": "sokolova_m", "code": "NDL-1003", "city": "Казань", "club": "«Бычий глаз»", "ver": true, "r": 1612, "n": 41,
   "photo": "/uploads/….jpg", "title": "КМС", "role": "plus", "walkon": "The White Stripes — Seven Nation Army" }
 ```
 `photo` — аватар или `null`, `title` — разряд или звание, `walkon` — выходная музыка (или `""`). Те же поля есть у `GET /api/me`, в `roster` турнира и в строках рейтинга (`photo`).
 `r` — рейтинг, `n` — число турнирных матчей в рейтинге.
 
 ### `GET /api/players?q=текст&limit=20`
-Поиск по имени, `@handle` и коду (`OCH-1003`, `#1003`). Ответ `{ "players": [PlayerShort] }`, не больше 50.
+Поиск по имени, `@handle` и коду (`NDL-1003`, `#1003`). Ответ `{ "players": [PlayerShort] }`, не больше 50.
 
 ### `POST /api/players` — нужен вход
 Тело `{ "name": "Гость Сергей", "city": "Москва" }`. Создаёт игрока без VK, чтобы добавить его в турнир. Если у этого же организатора уже есть игрок без VK с таким именем, возвращает его. Новых — не больше 100 в сутки (ведущему и выше — 1000), иначе `429 quota`. Ответ `{ "player": PlayerShort }`.

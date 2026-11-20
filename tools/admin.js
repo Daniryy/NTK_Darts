@@ -1,7 +1,7 @@
 // Логины и пароли администраторов — только с сервера (нужен доступ по SSH).
 //   npm run admin -- list                                   — кто может входить по паролю
 //   npm run admin -- new "Имя Фамилия" --login danil        — новый тех. администратор
-//   npm run admin -- set OCH-1234 --login danil [--role tech|admin] — дать логин существующему игроку
+//   npm run admin -- set NDL-1234 --login danil [--role tech|admin] — дать логин существующему игроку
 //   npm run admin -- password danil                         — сменить пароль
 //   npm run admin -- unlock danil                           — снять блокировку после неверных паролей
 //   npm run admin -- off danil                              — убрать вход по паролю
@@ -65,8 +65,8 @@ const who = p => p.name + ' (' + p.code + ', ' + p.role + (p.login ? ', логи
         t = await createPlayer(c, { name });
       } else {
         const key = String(argv[1] || '');
-        t = await one(c, 'SELECT * FROM players WHERE id = $1 OR upper(code) = upper($1) OR upper(code) = upper($2)', [key, 'OCH-' + key.replace(/^#/, '')]);
-        if (!t) fail('игрок ' + key + ' не найден (нужен ID из профиля, например OCH-1234)');
+        t = await one(c, 'SELECT * FROM players WHERE id = $1 OR upper(code) = upper($1) OR upper(code) = upper($2)', [key, 'NDL-' + key.replace(/^#/, '')]);
+        if (!t) fail('игрок ' + key + ' не найден (нужен ID из профиля, например NDL-1234)');
       }
       const out = await one(c, 'UPDATE players SET role = $2, login = $3, pass_hash = $4, pass_fails = 0, pass_lock_until = NULL, blocked = false WHERE id = $1 RETURNING *', [t.id, role, login, hash]);
       await audit(c, null, 'cli.login', out, { login, role });

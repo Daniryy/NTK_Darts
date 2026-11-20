@@ -655,6 +655,8 @@ a.mini { text-decoration: none; }
 .qtbl .tie { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--red); border: 1px solid currentColor; white-space: nowrap; }
 .qtbl .tie.ok { color: var(--green); }
 .qgrp td { padding-top: 14px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; text-align: left !important; }
+.pick.in { opacity: .55; cursor: default; }
+.tp-sug { display: grid; gap: 6px; margin-top: 8px; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .bzones { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; align-items: start; }
 @media (max-width: 700px) { .bzones { grid-template-columns: minmax(0, 1fr); } }
@@ -876,6 +878,7 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .w-sm .wt-r { gap: 8px; padding: 1px 6px; }
 .w-sm .wt-h { font-size: 10.5px; }
 .wt-h, .wt-f { flex: none; }
+.wt-r[style*="--pp"], .wt-pl[style*="--pp"] { background-image: linear-gradient(var(--green), var(--green)), linear-gradient(var(--surface3, var(--surface2)), var(--surface3, var(--surface2))); background-size: var(--pp) 3px, 100% 3px; background-position: left bottom, left bottom; background-repeat: no-repeat; }
 .wt-f { display: flex; justify-content: space-between; gap: 10px; font-size: max(11px, calc(var(--u) * 3.2)); color: var(--muted); }
 .wt .tvfx { font-size: calc(var(--u) * 20); }
 .tvfx { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: var(--display); font-weight: 700; font-size: clamp(48px, 6vw, 150px); letter-spacing: .04em; text-transform: uppercase; opacity: 0; }
@@ -992,7 +995,8 @@ body.watchw .wrap { gap: 10px; padding-top: 10px; }
 .gacts.wrap { flex-wrap: wrap; justify-content: flex-end; max-width: 330px; }
 .numb { min-width: 40px; height: 32px; padding: 0 6px; display: grid; place-items: center; border-radius: 8px; background: var(--surface2); border: 1px solid var(--line); font-family: var(--display); font-size: 18px; font-weight: 600; }
 .stag { display: inline-block; min-width: 26px; margin-right: 5px; padding: 0 4px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--line); font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: center; letter-spacing: .02em; }
-.pc-d { font-size: 10.5px; color: var(--muted); padding: 2px 10px 6px; }
+.gbar { height: 5px; border-radius: 99px; background: var(--surface2); overflow: hidden; margin: 2px 0 8px; } .gbar i { display: block; height: 100%; background: var(--green); }
+.pc-d { font-size: 10px; color: var(--muted); opacity: .55; padding: 2px 10px 6px; }
 .tchip { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--green-ink); background: var(--green); margin-right: 6px; }
 .tsteps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .tsteps li { display: grid; justify-items: center; align-content: start; gap: 6px; text-align: center; font-size: 12.5px; line-height: 1.25; color: var(--muted); }
@@ -1153,6 +1157,8 @@ figure .pcov.on { background: var(--green); color: #1a1205; font-weight: 700; cu
 .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 560px) { .players { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; } }
 .players.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* леги двух игроков — рядом, посередине экрана */
+.players.two .pl:nth-child(2) .nm { flex-direction: row-reverse; } .players.two .pl:nth-child(2) .nm .n { text-align: right; }
 .swap { justify-self: start; }
 .pl { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; position: relative; overflow: hidden; transition: border-color .2s ease, box-shadow .2s ease; }
 @media (min-width: 820px) { .pl { padding: 14px 16px; gap: 4px; border-radius: 14px; } }
@@ -1573,75 +1579,75 @@ const PALETTES = [
 ];
 
 const SEED_PLAYERS = [
-  ['p1', 'Артём Волков', 'volkov180', 'OCH-1001', 'Москва', '«Тройная двадцатка»', 88, 1],
-  ['p2', 'Игорь Белов', 'belov_spb', 'OCH-1002', 'Санкт-Петербург', '«Северный дубль»', 85, 1],
-  ['p3', 'Марина Соколова', 'sokolova_m', 'OCH-1003', 'Казань', '«Бычий глаз»', 80, 1],
-  ['p4', 'Денис Карпов', 'karpov_d', 'OCH-1004', 'Москва', '«Тройная двадцатка»', 76, 1],
-  ['p5', 'Олег Ткаченко', 'tkachenko_o', 'OCH-1005', 'Екатеринбург', '«Уральский сектор»', 74, 1],
-  ['p6', 'Ксения Лебедева', 'lebedeva_k', 'OCH-1006', 'Москва', '«Булл-бар»', 71, 0],
-  ['p7', 'Руслан Гаврилов', 'gavrilov_r', 'OCH-1007', 'Новосибирск', '«Сибирский дубль»', 69, 1],
-  ['p8', 'Павел Зуев', 'zuev_pavel', 'OCH-1008', 'Санкт-Петербург', '«Северный дубль»', 67, 0],
-  ['p9', 'Анна Мельникова', 'melnikova_a', 'OCH-1009', 'Москва', '«Булл-бар»', 64, 0],
-  ['p10', 'Тимур Ахметов', 'akhmetov_t', 'OCH-1010', 'Казань', '«Бычий глаз»', 62, 0],
-  ['p11', 'Сергей Орлов', 'orlov_nn', 'OCH-1011', 'Нижний Новгород', '', 60, 0],
-  ['p12', 'Дмитрий Фомин', 'fomin_d', 'OCH-1012', 'Москва', '«Булл-бар»', 57, 0],
-  ['p13', 'Елена Савина', 'savina_spb', 'OCH-1013', 'Санкт-Петербург', '', 55, 0],
-  ['p14', 'Никита Рябов', 'ryabov_ekb', 'OCH-1014', 'Екатеринбург', '«Уральский сектор»', 52, 0],
-  ['p15', 'Вадим Крылов', 'krylov_v', 'OCH-1015', 'Москва', '', 49, 0],
-  ['p16', 'Юлия Ершова', 'ershova_nsk', 'OCH-1016', 'Новосибирск', '«Сибирский дубль»', 46, 0]
+  ['p1', 'Волков Артём', 'volkov180', 'NDL-1001', 'Москва', '«Тройная двадцатка»', 88, 1],
+  ['p2', 'Белов Игорь', 'belov_spb', 'NDL-1002', 'Санкт-Петербург', '«Северный дубль»', 85, 1],
+  ['p3', 'Соколова Марина', 'sokolova_m', 'NDL-1003', 'Казань', '«Бычий глаз»', 80, 1],
+  ['p4', 'Карпов Денис', 'karpov_d', 'NDL-1004', 'Москва', '«Тройная двадцатка»', 76, 1],
+  ['p5', 'Ткаченко Олег', 'tkachenko_o', 'NDL-1005', 'Екатеринбург', '«Уральский сектор»', 74, 1],
+  ['p6', 'Лебедева Ксения', 'lebedeva_k', 'NDL-1006', 'Москва', '«Булл-бар»', 71, 0],
+  ['p7', 'Гаврилов Руслан', 'gavrilov_r', 'NDL-1007', 'Новосибирск', '«Сибирский дубль»', 69, 1],
+  ['p8', 'Зуев Павел', 'zuev_pavel', 'NDL-1008', 'Санкт-Петербург', '«Северный дубль»', 67, 0],
+  ['p9', 'Мельникова Анна', 'melnikova_a', 'NDL-1009', 'Москва', '«Булл-бар»', 64, 0],
+  ['p10', 'Ахметов Тимур', 'akhmetov_t', 'NDL-1010', 'Казань', '«Бычий глаз»', 62, 0],
+  ['p11', 'Орлов Сергей', 'orlov_nn', 'NDL-1011', 'Нижний Новгород', '', 60, 0],
+  ['p12', 'Фомин Дмитрий', 'fomin_d', 'NDL-1012', 'Москва', '«Булл-бар»', 57, 0],
+  ['p13', 'Савина Елена', 'savina_spb', 'NDL-1013', 'Санкт-Петербург', '', 55, 0],
+  ['p14', 'Рябов Никита', 'ryabov_ekb', 'NDL-1014', 'Екатеринбург', '«Уральский сектор»', 52, 0],
+  ['p15', 'Крылов Вадим', 'krylov_v', 'NDL-1015', 'Москва', '', 49, 0],
+  ['p16', 'Ершова Юлия', 'ershova_nsk', 'NDL-1016', 'Новосибирск', '«Сибирский дубль»', 46, 0]
 ];
 // игроки лиги NDL для демо-турниров с квалификацией
 const NDL_PLAYERS = [
-  ['p18', 'Дмитрий Горбунов', 'gorbunov_d', 'OCH-1018', 'Новоуральск', '«Новоуральская Дартс Лига»', 77, 1],
-  ['p19', 'Алексей Козеев', 'kozeev_a', 'OCH-1019', 'Новоуральск', '«Новоуральская Дартс Лига»', 82, 0],
-  ['p20', 'Ирина Сыханова', 'syhanova_i', 'OCH-1020', 'Новоуральск', '«Новоуральская Дартс Лига»', 63, 0]
+  ['p18', 'Горбунов Дмитрий', 'gorbunov_d', 'NDL-1018', 'Новоуральск', '«Новоуральская Дартс Лига»', 77, 1],
+  ['p19', 'Козеев Алексей', 'kozeev_a', 'NDL-1019', 'Новоуральск', '«Новоуральская Дартс Лига»', 82, 0],
+  ['p20', 'Сыханова Ирина', 'syhanova_i', 'NDL-1020', 'Новоуральск', '«Новоуральская Дартс Лига»', 63, 0]
 ];
 // ещё игроки, чтобы показать большую сетку на 64
 const MORE_PLAYERS = [
-  ['p21', 'Максим Захаров', 'zakharov_21', 'OCH-1021', 'Новосибирск', '«Сибирский дубль»', 66, 1],
-  ['p22', 'Иван Воробьёв', 'vorobiev_22', 'OCH-1022', 'Новосибирск', '«Сибирский дубль»', 71, 1],
-  ['p23', 'Кирилл Попов', 'popov_23', 'OCH-1023', 'Нижний Новгород', '', 67, 1],
-  ['p24', 'Екатерина Андреева', 'andreeva_24', 'OCH-1024', 'Краснодар', '', 69, 1],
-  ['p25', 'Андрей Богданов', 'bogdanov_25', 'OCH-1025', 'Москва', '«Тройная двадцатка»', 69, 1],
-  ['p26', 'Евгений Кузнецов', 'kuznetsov_26', 'OCH-1026', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
-  ['p27', 'Роман Степанов', 'stepanov_27', 'OCH-1027', 'Новоуральск', '«Новоуральская Дартс Лига»', 60, 0],
-  ['p28', 'Вера Лебедева', 'lebedeva2_28', 'OCH-1028', 'Казань', '«Бычий глаз»', 59, 0],
-  ['p29', 'Илья Смирнов', 'smirnov_29', 'OCH-1029', 'Москва', '«Тройная двадцатка»', 63, 1],
-  ['p30', 'Григорий Козлов', 'kozlov_30', 'OCH-1030', 'Новоуральск', '«Новоуральская Дартс Лига»', 64, 1],
-  ['p31', 'Владимир Голубев', 'golubev_31', 'OCH-1031', 'Самара', '«Волжская стрела»', 57, 0],
-  ['p32', 'Ольга Новикова', 'novikova_32', 'OCH-1032', 'Нижний Новгород', '', 60, 0],
-  ['p33', 'Константин Морозов', 'morozov_33', 'OCH-1033', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
-  ['p34', 'Степан Семёнов', 'semenov_34', 'OCH-1034', 'Москва', '«Тройная двадцатка»', 61, 0],
-  ['p35', 'Фёдор Беляев', 'belyaev_35', 'OCH-1035', 'Москва', '«Булл-бар»', 54, 0],
-  ['p36', 'Мария Морозова', 'morozova_36', 'OCH-1036', 'Самара', '«Волжская стрела»', 59, 0],
-  ['p37', 'Борис Михайлов', 'mikhailov_37', 'OCH-1037', 'Краснодар', '', 59, 0],
-  ['p38', 'Пётр Петров', 'petrov_38', 'OCH-1038', 'Краснодар', '', 57, 0],
-  ['p39', 'Арсений Зайцев', 'zaitsev_39', 'OCH-1039', 'Москва', '«Тройная двадцатка»', 53, 0],
-  ['p40', 'Полина Макарова', 'makarova_40', 'OCH-1040', 'Москва', '«Булл-бар»', 55, 0],
-  ['p41', 'Александр Петров', 'petrov_41', 'OCH-1041', 'Казань', '«Бычий глаз»', 51, 0],
-  ['p42', 'Максим Зайцев', 'zaitsev_42', 'OCH-1042', 'Самара', '«Волжская стрела»', 51, 0],
-  ['p43', 'Иван Фёдоров', 'fedorov_43', 'OCH-1043', 'Краснодар', '', 52, 0],
-  ['p44', 'Татьяна Егорова', 'egorova_44', 'OCH-1044', 'Санкт-Петербург', '«Северный дубль»', 50, 0],
-  ['p45', 'Михаил Захаров', 'zakharov_45', 'OCH-1045', 'Новосибирск', '«Сибирский дубль»', 49, 0],
-  ['p46', 'Андрей Воробьёв', 'vorobiev_46', 'OCH-1046', 'Санкт-Петербург', '«Северный дубль»', 52, 0],
-  ['p47', 'Евгений Попов', 'popov_47', 'OCH-1047', 'Нижний Новгород', '', 47, 0],
-  ['p48', 'Дарья Козлова', 'kozlova_48', 'OCH-1048', 'Самара', '«Волжская стрела»', 48, 0],
-  ['p49', 'Илья Кузнецов', 'kuznetsov_49', 'OCH-1049', 'Казань', '«Бычий глаз»', 48, 0],
-  ['p50', 'Григорий Степанов', 'stepanov_50', 'OCH-1050', 'Санкт-Петербург', '«Северный дубль»', 43, 0],
-  ['p51', 'Владимир Виноградов', 'vinogradov_51', 'OCH-1051', 'Новосибирск', '«Сибирский дубль»', 46, 0],
-  ['p52', 'Софья Волкова', 'volkova_52', 'OCH-1052', 'Екатеринбург', '«Уральский сектор»', 43, 0],
-  ['p53', 'Константин Козлов', 'kozlov_53', 'OCH-1053', 'Екатеринбург', '«Уральский сектор»', 41, 0],
-  ['p54', 'Степан Голубев', 'golubev_54', 'OCH-1054', 'Самара', '«Волжская стрела»', 41, 0],
-  ['p55', 'Фёдор Тарасов', 'tarasov_55', 'OCH-1055', 'Москва', '«Булл-бар»', 45, 0],
-  ['p56', 'Светлана Кузнецова', 'kuznetsova_56', 'OCH-1056', 'Нижний Новгород', '', 43, 0],
-  ['p57', 'Лев Семёнов', 'semenov_57', 'OCH-1057', 'Новоуральск', '«Новоуральская Дартс Лига»', 39, 0],
-  ['p58', 'Борис Беляев', 'belyaev_58', 'OCH-1058', 'Екатеринбург', '«Уральский сектор»', 39, 0],
-  ['p59', 'Пётр Новиков', 'novikov_59', 'OCH-1059', 'Нижний Новгород', '', 41, 0],
-  ['p60', 'Алина Попова', 'popova_60', 'OCH-1060', 'Санкт-Петербург', '«Северный дубль»', 36, 0],
-  ['p61', 'Александр Новиков', 'novikov_61', 'OCH-1061', 'Нижний Новгород', '', 34, 0],
-  ['p62', 'Максим Павлов', 'pavlov_62', 'OCH-1062', 'Санкт-Петербург', '«Северный дубль»', 39, 0],
-  ['p63', 'Иван Михайлов', 'mikhailov_63', 'OCH-1063', 'Самара', '«Волжская стрела»', 36, 0],
-  ['p64', 'Людмила Орлова', 'orlova_64', 'OCH-1064', 'Казань', '«Бычий глаз»', 36, 0]
+  ['p21', 'Захаров Максим', 'zakharov_21', 'NDL-1021', 'Новосибирск', '«Сибирский дубль»', 66, 1],
+  ['p22', 'Воробьёв Иван', 'vorobiev_22', 'NDL-1022', 'Новосибирск', '«Сибирский дубль»', 71, 1],
+  ['p23', 'Попов Кирилл', 'popov_23', 'NDL-1023', 'Нижний Новгород', '', 67, 1],
+  ['p24', 'Андреева Екатерина', 'andreeva_24', 'NDL-1024', 'Краснодар', '', 69, 1],
+  ['p25', 'Богданов Андрей', 'bogdanov_25', 'NDL-1025', 'Москва', '«Тройная двадцатка»', 69, 1],
+  ['p26', 'Кузнецов Евгений', 'kuznetsov_26', 'NDL-1026', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p27', 'Степанов Роман', 'stepanov_27', 'NDL-1027', 'Новоуральск', '«Новоуральская Дартс Лига»', 60, 0],
+  ['p28', 'Лебедева Вера', 'lebedeva2_28', 'NDL-1028', 'Казань', '«Бычий глаз»', 59, 0],
+  ['p29', 'Смирнов Илья', 'smirnov_29', 'NDL-1029', 'Москва', '«Тройная двадцатка»', 63, 1],
+  ['p30', 'Козлов Григорий', 'kozlov_30', 'NDL-1030', 'Новоуральск', '«Новоуральская Дартс Лига»', 64, 1],
+  ['p31', 'Голубев Владимир', 'golubev_31', 'NDL-1031', 'Самара', '«Волжская стрела»', 57, 0],
+  ['p32', 'Новикова Ольга', 'novikova_32', 'NDL-1032', 'Нижний Новгород', '', 60, 0],
+  ['p33', 'Морозов Константин', 'morozov_33', 'NDL-1033', 'Санкт-Петербург', '«Северный дубль»', 62, 0],
+  ['p34', 'Семёнов Степан', 'semenov_34', 'NDL-1034', 'Москва', '«Тройная двадцатка»', 61, 0],
+  ['p35', 'Беляев Фёдор', 'belyaev_35', 'NDL-1035', 'Москва', '«Булл-бар»', 54, 0],
+  ['p36', 'Морозова Мария', 'morozova_36', 'NDL-1036', 'Самара', '«Волжская стрела»', 59, 0],
+  ['p37', 'Михайлов Борис', 'mikhailov_37', 'NDL-1037', 'Краснодар', '', 59, 0],
+  ['p38', 'Петров Пётр', 'petrov_38', 'NDL-1038', 'Краснодар', '', 57, 0],
+  ['p39', 'Зайцев Арсений', 'zaitsev_39', 'NDL-1039', 'Москва', '«Тройная двадцатка»', 53, 0],
+  ['p40', 'Макарова Полина', 'makarova_40', 'NDL-1040', 'Москва', '«Булл-бар»', 55, 0],
+  ['p41', 'Петров Александр', 'petrov_41', 'NDL-1041', 'Казань', '«Бычий глаз»', 51, 0],
+  ['p42', 'Зайцев Максим', 'zaitsev_42', 'NDL-1042', 'Самара', '«Волжская стрела»', 51, 0],
+  ['p43', 'Фёдоров Иван', 'fedorov_43', 'NDL-1043', 'Краснодар', '', 52, 0],
+  ['p44', 'Егорова Татьяна', 'egorova_44', 'NDL-1044', 'Санкт-Петербург', '«Северный дубль»', 50, 0],
+  ['p45', 'Захаров Михаил', 'zakharov_45', 'NDL-1045', 'Новосибирск', '«Сибирский дубль»', 49, 0],
+  ['p46', 'Воробьёв Андрей', 'vorobiev_46', 'NDL-1046', 'Санкт-Петербург', '«Северный дубль»', 52, 0],
+  ['p47', 'Попов Евгений', 'popov_47', 'NDL-1047', 'Нижний Новгород', '', 47, 0],
+  ['p48', 'Козлова Дарья', 'kozlova_48', 'NDL-1048', 'Самара', '«Волжская стрела»', 48, 0],
+  ['p49', 'Кузнецов Илья', 'kuznetsov_49', 'NDL-1049', 'Казань', '«Бычий глаз»', 48, 0],
+  ['p50', 'Степанов Григорий', 'stepanov_50', 'NDL-1050', 'Санкт-Петербург', '«Северный дубль»', 43, 0],
+  ['p51', 'Виноградов Владимир', 'vinogradov_51', 'NDL-1051', 'Новосибирск', '«Сибирский дубль»', 46, 0],
+  ['p52', 'Волкова Софья', 'volkova_52', 'NDL-1052', 'Екатеринбург', '«Уральский сектор»', 43, 0],
+  ['p53', 'Козлов Константин', 'kozlov_53', 'NDL-1053', 'Екатеринбург', '«Уральский сектор»', 41, 0],
+  ['p54', 'Голубев Степан', 'golubev_54', 'NDL-1054', 'Самара', '«Волжская стрела»', 41, 0],
+  ['p55', 'Тарасов Фёдор', 'tarasov_55', 'NDL-1055', 'Москва', '«Булл-бар»', 45, 0],
+  ['p56', 'Кузнецова Светлана', 'kuznetsova_56', 'NDL-1056', 'Нижний Новгород', '', 43, 0],
+  ['p57', 'Семёнов Лев', 'semenov_57', 'NDL-1057', 'Новоуральск', '«Новоуральская Дартс Лига»', 39, 0],
+  ['p58', 'Беляев Борис', 'belyaev_58', 'NDL-1058', 'Екатеринбург', '«Уральский сектор»', 39, 0],
+  ['p59', 'Новиков Пётр', 'novikov_59', 'NDL-1059', 'Нижний Новгород', '', 41, 0],
+  ['p60', 'Попова Алина', 'popova_60', 'NDL-1060', 'Санкт-Петербург', '«Северный дубль»', 36, 0],
+  ['p61', 'Новиков Александр', 'novikov_61', 'NDL-1061', 'Нижний Новгород', '', 34, 0],
+  ['p62', 'Павлов Максим', 'pavlov_62', 'NDL-1062', 'Санкт-Петербург', '«Северный дубль»', 39, 0],
+  ['p63', 'Михайлов Иван', 'mikhailov_63', 'NDL-1063', 'Самара', '«Волжская стрела»', 36, 0],
+  ['p64', 'Орлова Людмила', 'orlova_64', 'NDL-1064', 'Казань', '«Бычий глаз»', 36, 0]
 ];
 const CHECKOUTS = [16, 20, 24, 32, 36, 40, 32, 40, 50, 56, 60, 64, 68, 72, 76, 80, 81, 84, 87, 90, 96, 100, 104, 107, 110, 116, 121, 124, 130, 141, 150, 161, 167, 170];
 
@@ -1667,6 +1673,19 @@ const ltwInfo = t => ltwTxt(t.ltw) + (t.ltwBy && Object.keys(t.ltwBy).length ? '
 // выбор «до скольких побед» по стадиям: act|стадия|число ('' — как общее)
 function stageLtwHTML(by, fmt, act, grp) {
   return ltwStages(fmt, grp).map(k => '<div class="stg-row"><span class="meta">' + STAGE_NAME[k] + '</span><div class="chips">' + [''].concat(LTW_LIST).map(v => '<button class="chip' + (v === '' ? ' txt' : '') + ((by && by[k] || '') === v ? ' on' : '') + '" data-act="' + act + '" data-v="' + k + '|' + v + '">' + (v === '' ? 'как все' : v) + '</button>').join('') + '</div></div>').join('');
+}
+// изменить турнир: название и место — всегда; мест — до старта; попыток квалификации — пока она не закрыта
+function tEditModal() {
+  const e = S.tEdit, t = TBY[e.tid];
+  if (!t) { S.tEdit = null; return ''; }
+  const qualOpen = t.qual && (t.status === 'reg' || t.stage === 'qual');
+  let h = '<div class="over" role="dialog" aria-modal="true" aria-label="Изменить турнир"><div class="ocard"><div class="ohead"><span class="label">Изменить турнир</span><button class="icon-btn" data-act="close-modal" aria-label="Закрыть">✕</button></div>';
+  h += '<div class="field"><label class="label" for="te-name">Название</label><input class="inp" id="te-name" maxlength="60" value="' + esc(e.name) + '"></div>';
+  h += '<div class="field"><label class="label" for="te-venue">Место проведения</label><input class="inp" id="te-venue" maxlength="60" value="' + esc(e.venue) + '"></div>';
+  if (t.status === 'reg') h += '<div class="field"><label class="label" for="te-cap">Мест</label><input class="inp" id="te-cap" inputmode="numeric" maxlength="3" value="' + esc(e.cap) + '" style="max-width:120px"></div>';
+  if (qualOpen) h += '<div class="field"><span class="label">Попыток квалификации</span><div class="chips">' + chips([1, 2], e.tries, 't-edit-tries', v => v === 1 ? 'Одна' : 'Две, идёт лучшая') + '</div></div>';
+  h += '<p class="meta">«До скольких побед» меняется ссылкой «изменить победы» под названием турнира' + (t.status === 'reg' ? '. Формат и игру — пока турнир не начат — проще задать заново: удалите турнир и создайте новый' : '') + '.</p>';
+  return h + '<button class="btn" data-act="t-edit-save">Сохранить</button></div></div>';
 }
 function ltwEditModal() {
   const e = S.ltwEdit, t = TBY[e.tid];
@@ -1708,7 +1727,7 @@ function makeSeed() {
   const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   const pick = a => a[Math.floor(R() * a.length)];
   const players = SEED_PLAYERS.map(([id, name, handle, code, city, club, base, ver]) => ({ id, name, handle, code, city, club, base, ver: !!ver }));
-  players.push({ id: 'me', name: 'Вы', handle: 'player_me', code: 'OCH-7749', city: 'Москва', club: '«Булл-бар»', base: 58, ver: false });
+  players.push({ id: 'me', name: 'Вы', handle: 'player_me', code: 'NDL-7749', city: 'Москва', club: '«Булл-бар»', base: 58, ver: false });
   const byId = Object.fromEntries(players.map(p => [p.id, p]));
   const matches = [], tours = [];
 
@@ -1866,7 +1885,7 @@ function loadDb() {
     if (ok) { try { migrateFrom(d); } catch (e) { db = makeSeed(); } }
   }
   const seedMap = Object.fromEntries(SEED_PLAYERS.map(row => [row[0], { handle: row[2], code: row[3] }]));
-  seedMap.me = { handle: 'player_me', code: 'OCH-7749' };
+  seedMap.me = { handle: 'player_me', code: 'NDL-7749' };
   let migrated = false;
   db.players.forEach(p => {
     const def = seedMap[p.id] || { handle: uniqueHandle(p.name || 'player'), code: uniqueCode() };
@@ -1878,7 +1897,7 @@ function loadDb() {
 }
 function uniqueCode() {
   let c;
-  do c = 'OCH-' + Math.floor(1000 + Math.random() * 9000); while (db.players.some(p => p.code === c));
+  do c = 'NDL-' + Math.floor(1000 + Math.random() * 9000); while (db.players.some(p => p.code === c));
   return c;
 }
 const TRANSLIT = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
@@ -1928,7 +1947,7 @@ function resolvePlayer(raw) {
     p.name.toLowerCase() === q ||
     (p.handle && p.handle.toLowerCase() === cleanHandle) ||
     (p.code && p.code.toLowerCase() === cleanCode) ||
-    (p.code && p.code.toLowerCase() === 'och-' + cleanCode) ||
+    (p.code && p.code.toLowerCase() === 'ndl-' + cleanCode) ||
     (p.name + ' (@' + p.handle + ')').toLowerCase() === q ||
     (p.name + ' · ' + p.code).toLowerCase() === q
   ) || null;
@@ -1966,6 +1985,7 @@ function roundLabel(t, r) {
 const placesTxt = (lo, hi) => lo === hi ? lo + '-е место' : lo + '–' + hi + ' места';
 function gameLabel(t, g, rv) {
   if (!g) return '';
+  if (g.grp != null) return 'группа ' + Bracket.groupName(g.grp) + ' · тур ' + (g.r + 1);
   if (t.format !== 'pl') return roundLabel(t, g.r);
   rv = rv || resolver(t);
   const { grp, lo } = plGroup(t, g.r, g.i), c = groupReal(t, rv, g.r, grp);
@@ -2057,8 +2077,8 @@ const S = {
   buf: '' // ввод суммы в счётчике, не часть G
 };
 // окна закрываются крестиком, «Отмена» или Esc — не кликом мимо: иначе выделение текста в поле за край окна закрывает форму
-const closeModals = () => { S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
-const anyModal = () => !!(S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
+const closeModals = () => { S.tEdit = null; S.refQr = null; S.refIn = null; S.issued = null; S.tbModal = null; S.cardsOne = null; S.post = null; S.proto = null; S.ltwEdit = null; S.qrAsk = null; S.cardsT = null; S.tfa = null; S.admOpen = null; S.login = null; S.qr = null; S.crop = null; S.lbox = null; S.modalMatch = null; S.quickModal = null; S.qualModal = null; S.settings = false; S.clearRes = false; S.confirmReset = false; };
+const anyModal = () => !!(S.tEdit || S.refQr || S.refIn || S.tbModal || S.post || S.proto || S.ltwEdit || S.qrAsk || S.cardsT || S.tfa || S.admOpen || S.login || S.qr || S.crop || S.lbox || S.modalMatch || S.quickModal || S.qualModal || S.settings);
 let G = null, undo = [];
 let tapLock = 0, eraseT = 0, wake = null; // wake: null | 'pending' | WakeLockSentinel
 
@@ -2129,7 +2149,7 @@ function validRoute(h) {
 }
 
 const nameOf = l => (l.id && P[l.id] ? P[l.id].name : l.n);
-const surname = l => { const n = nameOf(l); return l.id === ME ? n : n.split(' ').pop(); };
+const surname = l => { const n = nameOf(l); return l.id === ME ? n : n.split(' ')[0]; };
 function pname(l) {
   const n = nameOf(l);
   const p = l.id && P[l.id] ? P[l.id] : null;
@@ -2288,6 +2308,7 @@ function renderModals() {
   if (S.crop && cropImg) return cropModal();
   if (S.qrAsk) return qrAskModal();
   if (S.ltwEdit) return ltwEditModal();
+  if (S.tEdit) return tEditModal();
   if (S.proto) return protoModal();
   if (S.post) return '<div class="over" role="dialog" aria-modal="true" aria-label="Текст для поста"><div class="ocard"><div class="ohead"><span class="label">Пост с итогами</span>' + closeBtn + '</div><p class="meta">Проверьте и поправьте текст, затем скопируйте и опубликуйте в сообществе VK или в Telegram.</p><textarea class="inp" id="post-txt" rows="14" aria-label="Текст поста">' + esc(S.post.txt) + '</textarea><button class="btn" data-act="post-copy">Скопировать текст</button></div></div>';
   if (S.cardsT) return cardsModal();
@@ -2431,6 +2452,12 @@ const sTag = (t, g, side) => t.labels === 'ab' && isBracket(t) && g.r > 0 ? '<sp
 const otherLive = (t, g) => SRV && t.live ? t.live[g.r + ':' + g.i] || null : null;
 // счёт по легам идущего матча из потока
 function liveLegs(t, mid, side) { const m = SV.live[t.id] && SV.live[t.id][mid]; return m ? '<span style="color:var(--green)">' + m.legs[side] + '</span>' : ''; }
+// леги идущего матча игры: с этого телефона — из счётчика, с другого — из потока
+function gLive(t, g, side) {
+  if (liveCtxIs(t.id, g.r, g.i) && G && G.players && G.players[side]) return '<span style="color:var(--green)">' + (G.kind === 'ex' ? exSt().legs[side] : G.players[side].legs) + '</span>';
+  const mid = otherLive(t, g);
+  return mid ? liveLegs(t, mid, side) : '';
+}
 function gameActs(t, g, st, live) {
   if (st === 'done') return protoOk(g.res.mid) ? '<button class="mini" data-act="minfo" data-v="' + g.res.mid + '">Протокол</button>' : '';
   if (st !== 'ready' || !live) return '';
@@ -2541,7 +2568,7 @@ function gameBox(t, g, cx) {
   const act = st === 'done' && protoOk(g.res.mid) ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"'
     : lm ? ' role="button" tabindex="0" data-act="mview" data-v="' + lm + '"'
     : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live || !cx.staff ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
-  const row = (id, side) => '<div class="gb-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : lm ? liveLegs(t, lm, side) : '') + '</span></div>';
+  const row = (id, side) => '<div class="gb-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : live ? gLive(t, g, side) : '') + '</span></div>';
   return '<div class="gb' + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="gb-h"><span class="ell">' + gName(t, g, n) + (ready ? ' ' + boardTag(t, g.r, g.i) : '') + refTag(t, g.r, g.i) + '</span>' + (ready ? '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + '</div>' + row(a, 0) + row(b, 1) + '</div>';
 }
 function treeHTML(t, cx, cols) {
@@ -2573,7 +2600,7 @@ function gameCell(t, g, cx, o) {
   const act = st === 'done' && protoOk(g.res.mid) ? ' role="button" tabindex="0" data-act="minfo" data-v="' + g.res.mid + '"'
     : lm ? ' role="button" tabindex="0" data-act="mview" data-v="' + lm + '"'
     : ready && cx.score ? ' role="button" tabindex="0" data-act="' + (live || !cx.staff ? 'tplay' : 'qscore') + '" data-v="' + gref(t, g) + '"' : '';
-  const row = (id, side) => '<div class="pc-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : lm ? liveLegs(t, lm, side) : '') + '</span></div>';
+  const row = (id, side) => '<div class="pc-r' + (st === 'done' && g.res.w === id ? ' win' : '') + '">' + slotWho(t, cx, g, id, side, '', true) + avgCell(g, id, st, side) + '<span class="num">' + (st === 'done' ? (side ? g.res.lb : g.res.la) : live ? gLive(t, g, side) : '') + '</span></div>';
   return '<div class="' + cls + me + (ready ? ' ready' : '') + (live ? ' live' : '') + pathCls(a, b) + '"' + pids(a, b) + act + '><div class="pc-h"><span>' + gName(t, g, n) + '</span>' + (ready ? boardTag(t, g.r, g.i) + '<span class="go">' + (live ? 'идёт' : cx.score ? 'играть' : 'готов') + '</span>' : '') + tag + '</div>' + row(a, 0) + row(b, 1) + gDest(t, g) + '</div>';
 }
 function plGridHTML(t, cx, part) {
@@ -2648,8 +2675,8 @@ function partProgress(t, rv, k) {
 }
 // выбор игрока, чей путь подсветить в сетке (на телефоне наведения нет)
 function hpPicker(t) {
-  const ids = t.players.filter(x => P[x]).sort((a, b) => numOf(t, a) - numOf(t, b));
-  return '<div class="hp-row"><label class="label" for="hp-sel">Путь игрока</label><select class="inp" id="hp-sel" data-hp="1"><option value="">— никого —</option>' + ids.map(id => '<option value="' + id + '"' + (S.hp === id ? ' selected' : '') + '>' + numOf(t, id) + '. ' + esc(P[id].name) + '</option>').join('') + '</select></div>';
+  const ids = t.players.filter(x => P[x]).sort((a, b) => P[a].name.localeCompare(P[b].name, 'ru'));
+  return '<div class="hp-row"><label class="label" for="hp-sel">Путь игрока</label><select class="inp" id="hp-sel" data-hp="' + t.id + '"><option value="">— никого —</option>' + ids.map(id => '<option value="' + id + '"' + (S.hp === id ? ' selected' : '') + '>' + numOf(t, id) + '. ' + esc(P[id].name) + '</option>').join('') + '</select></div>';
 }
 function gameRow(t, g, cx) {
   const { a, b, st } = gameState(t, g, cx.rv);
@@ -2720,6 +2747,8 @@ function tourDelLink(t) {
     : '<button class="ghost dng sm set-foot" data-act="tour-del-ask" data-v="' + t.id + '">Удалить турнир</button>';
 }
 function tourView(id) {
+  // путь игрока — свой у каждого турнира: в другом турнире сетка не затемняется
+  if (S.hp && S.hpT !== id) S.hp = null;
   if (SRV) {
     const e = tourE(id);
     // турнира больше нет (удалён, очистка сервера): вкладка «Турниры» перестаёт вести в него
@@ -2757,6 +2786,7 @@ function tourView(id) {
   h += '<div class="meta">' + [t.city, venueOf(t), fmtDate(t.start), feeTxt(t.fee)].filter(Boolean).map(esc).concat(t.org.name ? [SRV && t.org.club ? '<button class="lnk" data-act="go" data-v="club.' + esc(t.org.club) + '">' + esc(t.org.name) + '</button>' : esc(t.org.name)] : []).join(' · ') + '</div>' + cupLinks(t) + '<div class="meta">' + fmtLine(t) + (canDo(t, 'org') && t.status !== 'done' ? ' <button class="lnk" data-act="ltw-edit" data-v="' + t.id + '">изменить победы</button>' : '') + '</div>';
   if (st !== 'reg') h += '<div class="row"><button class="mini" data-act="qr-show" data-v="' + t.id + '">QR для игроков</button><button class="mini" data-act="go" data-v="tv.' + t.id + '">Табло для ТВ</button><button class="mini" data-act="go" data-v="watch.' + t.id + '">Слежка за матчами</button>' + (canDo(t, 'org') ? '<button class="mini" data-act="go" data-v="desk.' + t.id + '">Экран организатора</button>' : '') + '</div>';
   h += '</div>';
+  if (canDo(t, 'org') && st !== 'done') h += '<div class="row"><button class="mini" data-act="t-edit" data-v="' + t.id + '">Изменить турнир</button></div>';
   if (st === 'live') h += yourMatch(t);
   h += '<div class="card tstat">';
   if (st === 'reg') {
@@ -2849,7 +2879,7 @@ function crossTable(ids, games, rows, adv, done) {
   games.forEach(g => { if (g.a && g.b) by[g.a + '|' + g.b] = g; });
   rows.forEach((x, k) => { R[x.id] = Object.assign({ rank: k + 1 }, x); });
   let h = '<div class="scroll"><table class="tbl xt"><thead><tr><th>№</th><th>Игрок</th>' + ids.map((_, j) => '<th class="xc">' + (j + 1) + '</th>').join('') +
-    '<th class="xs">В–П</th><th>Леги</th>' + (avg ? '<th>Ср.</th>' : '') + '<th>Место</th></tr></thead><tbody>';
+    '<th class="xs">В–П</th><th>Леги</th><th title="Разница легов">±</th>' + (avg ? '<th>Ср.</th>' : '') + '<th>Место</th></tr></thead><tbody>';
   ids.forEach((x, i) => {
     const s = R[x];
     h += '<tr class="' + (x === ME ? 'me' : '') + (s.rank <= adv ? ' adv' : '') + '"><td>' + (i + 1) + '</td><td>' + pid(x) + '</td>' + ids.map((y, j) => {
@@ -2858,7 +2888,7 @@ function crossTable(ids, games, rows, adv, done) {
       if (!g || !g.res) return '<td class="xc"></td>';
       const [a, b] = g.a === x ? [g.res.la, g.res.lb] : [g.res.lb, g.res.la];
       return '<td class="xc ' + (g.res.w === x ? 'xw' : 'xl') + '">' + a + ':' + b + '</td>';
-    }).join('') + '<td class="xs">' + s.w + '–' + s.l + '</td><td>' + s.lf + ':' + s.la + '</td>' + (avg ? '<td>' + avg3(s.pts, s.darts) + '</td>' : '') +
+    }).join('') + '<td class="xs">' + s.w + '–' + s.l + '</td><td>' + s.lf + ':' + s.la + '</td><td class="num">' + (s.lf - s.la > 0 ? '+' : '') + (s.lf - s.la) + '</td>' + (avg ? '<td>' + avg3(s.pts, s.darts) + '</td>' : '') +
       '<td class="xp">' + (done ? plcBadge(s.rank, s.rank, true) : '<span class="muted">' + s.rank + '</span>') + '</td></tr>';
   });
   return h + '</tbody></table></div>';
@@ -2873,7 +2903,7 @@ function groupsView(t) {
   }
   h += '<div class="grp-grid">' + G.ids.map((ids, k) => {
     const gg = games.filter(g => g.grp === k), tb = Bracket.table(ids, gg), left = gg.filter(g => !g.res).length;
-    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + (left ? '<span class="meta">осталось ' + left + '</span>' : '<span class="meta">сыграна</span>') + '</div>' + crossTable(ids, gg, tb, G.adv, !left) + '</div>';
+    return '<div class="card grp"><div class="tstat"><span class="label">Группа ' + Bracket.groupName(k) + '</span>' + '<span class="meta">' + (gg.length - left) + ' из ' + gg.length + ' · ' + (gg.length ? Math.round((gg.length - left) / gg.length * 100) : 0) + '%</span></div><div class="gbar"><i style="width:' + (gg.length ? (gg.length - left) / gg.length * 100 : 0) + '%"></i></div>' + crossTable(ids, gg, tb, G.adv, !left) + '</div>';
   }).join('') + '</div>';
   return h;
 }
@@ -2915,7 +2945,17 @@ function protoPrint(w, t, d) {
   w.document.close();
 }
 // организатор вписывает участника: по имени (новый — лайт-профиль, войдёт по QR) или по ID; пока идёт регистрация или квалификация
-const addPartBox = t => SRV && canDo(t, 'org') && (t.status === 'reg' || t.stage === 'qual') ? '<div class="card sec"><span class="label">' + (t.stage === 'qual' ? 'Вписать опоздавшего' : 'Вписать участника') + '</span><div class="nrow"><input class="inp" id="tp-add" maxlength="32" placeholder="Имя и фамилия или ID (OCH-1234)" aria-label="Вписать участника" autocomplete="off"><button class="mini go" data-act="tp-add" data-v="' + t.id + '">Вписать</button></div><span class="meta">Нового игрока сайт заведёт как лайт-профиль: войдёт по QR-карточке — кнопка «QR» рядом с ним.</span></div>' : '';
+function addPartBox(t) {
+  if (!(SRV && canDo(t, 'org') && (t.status === 'reg' || t.stage === 'qual'))) return '';
+  const q = (S.tpq || '').trim(), e = q ? lz('psearch:' + q, () => Api.get('/api/players?limit=40&q=' + encodeURIComponent(q)), 60000) : null;
+  const found = e && e.data ? e.data.players.map(svPlayer).sort((a, b) => a.name.localeCompare(b.name, 'ru')) : [];
+  let h = '<div class="card sec"><span class="label">' + (t.stage === 'qual' ? 'Вписать опоздавшего' : 'Вписать участника') + '</span><div class="nrow"><input class="inp" id="tp-add" data-tpq="1" maxlength="32" value="' + esc(S.tpq || '') + '" placeholder="Начните вводить фамилию или ID (NDL-1234)" aria-label="Вписать участника" autocomplete="off"><button class="mini go" data-act="tp-add" data-v="' + t.id + '">Вписать нового</button></div>';
+  if (q) h += '<div class="tp-sug">' + (e && !e.data ? '<span class="meta">Ищем…</span>' : found.length ? found.map(p => t.players.includes(p.id)
+    ? '<div class="pick in" aria-disabled="true">' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">уже в турнире</span></span></div>'
+    : '<button class="pick" data-act="tp-pick" data-v="' + t.id + '|' + p.id + '">' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc([p.city, p.club].filter(Boolean).join(' · ')) + '</span></span></button>').join('')
+    : '<span class="meta">В базе такого нет — «Вписать нового» заведёт игрока.</span>') + '</div>';
+  return h + '<span class="meta">' + (t.stage === 'qual' ? 'Опоздавшего можно вписать, пока квалификация не закрыта. ' : '') + 'Нового игрока сайт заведёт как лайт-профиль: войдёт по QR-карточке — кнопка «QR» рядом с ним.</span></div>';
+}
 // QR входа для лайт-профиля участника — организатору
 const qrOneBtn = (t, id) => SRV && canDo(t, 'org') && P[id] && P[id].lite ? '<button class="mini" data-act="card-one" data-v="' + t.id + '|' + id + '" title="QR для входа игрока">QR</button>' : '';
 async function addParticipant(tid) {
@@ -2923,13 +2963,14 @@ async function addParticipant(tid) {
   if (raw.length < 2) { if (el) el.focus(); return; }
   try {
     let p;
-    if (/^och-\d+$/i.test(raw)) {
+    if (/^ndl-\d+$/i.test(raw)) {
       p = ((await Api.get('/api/players?q=' + encodeURIComponent(raw) + '&limit=5')).players || []).find(x => x.code.toLowerCase() === raw.toLowerCase());
       if (!p) { toast('Игрок с ID ' + raw.toUpperCase() + ' не найден.'); return; }
     } else p = (await Api.post('/api/players', { name: raw })).player;
     svPlayer(p);
     const r = await Api.post('/api/tournaments/' + tid + '/entries', { playerId: p.id });
     svTourSet(r);
+    S.tpq = '';
     toast(p.lite ? p.name + ' вписан — лайт-профиль, QR для входа рядом с ним.' : p.name + ' вписан в турнир.');
   } catch (e) { toast(e.net ? 'Нет связи с сервером.' : e.data && e.data.reason === 'already' ? 'Этот игрок уже в турнире.' : e.message); }
   render();
@@ -2985,7 +3026,7 @@ function launchRegTour(tid, paidOnly) {
 /* Стадии турнира: квалификация и круги сетки, у каждой процент завершения */
 function stagesOf(t, rv) {
   const out = [];
-  if (t.qual) { const n = t.players.filter(id => qBest(t, id) != null).length; out.push({ l: 'Квалификация', done: n, total: t.players.length }); }
+  if (t.qual) { const tr = t.qual.tries || 1, n = t.players.reduce((a, id) => a + Math.min(tr, qRes(t, id).filter(Boolean).length), 0); out.push({ l: 'Квалификация', done: n, total: t.players.length * tr }); }
   if (t.groups && t.groups.done && t.groups.games) { const n = t.groups.games.length; out.push({ l: 'Группы', done: n, total: n }); }
   if (t.games.length) Bracket.roundProgress(t, rv).forEach(x => out.push({ l: t.stage === 'groups' ? 'Группы · тур ' + (x.r + 1) : t.format === 'ko' || t.format === 'de' ? cap1(roundLabel(t, x.r)) : t.format === 'rr' || t.format === 'sw' ? 'Тур ' + (x.r + 1) : 'Круг ' + (x.r + 1), done: x.done, total: x.total }));
   return out;
@@ -3376,7 +3417,7 @@ function ntPool() {
 const ntExact = q => !!q && ntPool().some(p => p.name.toLowerCase() === q.toLowerCase());
 function newTourView() {
   if (SRV && !ME) return '<div class="narrow"><h1 class="h1">Новый турнир</h1><div class="note-box">Создавать турниры можно после входа.</div><button class="btn" data-act="login">Войти</button></div>';
-  const nt = S.nt || (S.nt = { name: 'Мой турнир', city: meP().city || '', venue: meP().club || '', fmt: 'pl', exk: '501', lim: false, qk: 'score', tries: 2, ltw: 2, seed: 'r', sel: [], q: '', err: '' });
+  const nt = S.nt || (S.nt = { name: 'Мой турнир', city: meP().city || '', venue: meP().club || '', fmt: 'pl', exk: '501', lim: false, qk: 'score', tries: 2, ltw: 2, seed: 'r', sel: [], q: '', err: '', reg: SRV, cap: '64' });
   if (nt.venue == null) nt.venue = '';
   if (!nt.exk) nt.exk = String(nt.mode || 501);
   nt.sel = nt.sel.filter(id => P[id]);
@@ -3442,9 +3483,9 @@ function newTourView() {
   h += '</details>';
   if (SRV) {
     const capMax = ntMax(nt);
-    h += '<div class="field"><span class="label">Участники</span><div class="chips">' + [['sel', 'Выбрать сейчас'], ['reg', 'Открытая регистрация']].map(([v, l]) => '<button class="chip txt' + ((nt.reg ? 'reg' : 'sel') === v ? ' on' : '') + '" data-act="nt-regmode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+    h += '<div class="field"><span class="label">Участники</span><div class="chips">' + [['reg', 'Набрать потом (регистрация)'], ['sel', 'Выбрать сейчас и начать']].map(([v, l]) => '<button class="chip txt' + ((nt.reg ? 'reg' : 'sel') === v ? ' on' : '') + '" data-act="nt-regmode" data-v="' + v + '">' + l + '</button>').join('') + '</div>';
     if (nt.reg) {
-      h += '<span class="meta">Турнир появится во вкладке «Регистрация», игроки запишутся сами. Когда соберутся — «Начать» на странице турнира' + (nt.feeOn ? '; можно начать только с оплатившими' : '') + '.</span>';
+      h += '<span class="meta">Турнир создаётся пустым, со статусом «идёт регистрация»: игроки записываются сами, вы вписываете их на странице турнира. Соберутся — «Начать» там же' + (nt.feeOn ? '; можно начать только с оплатившими' : '') + '.</span>';
       h += '<div class="nrow nt-bd"><label class="nt-bn"><span class="meta">Мест</span><input class="inp" id="nt-cap" data-nt="cap" inputmode="numeric" maxlength="3" value="' + esc(nt.cap || '') + '" placeholder="16"></label>' +
         '<label class="nt-bl"><span class="meta">Начало</span><input class="inp" id="nt-start" data-nt="startAt" type="datetime-local" value="' + esc(nt.startAt || '') + '"></label></div>' +
         '<label style="display:grid;gap:4px"><span class="meta">Запись до (необязательно)</span><input class="inp" id="nt-regu" data-nt="regUntil" type="datetime-local" value="' + esc(nt.regUntil || '') + '" style="max-width:260px"></label>' +
@@ -3452,18 +3493,23 @@ function newTourView() {
     }
     h += '</div>';
   }
-  const sel = !nt.qualOn && nt.seed === 'r' ? nt.sel.slice().sort((a, b) => rt(b) - rt(a)) : nt.sel;
+  const abc = (a, b) => P[a].name.localeCompare(P[b].name, 'ru');
+  const sel = !nt.qualOn && nt.seed === 'm' ? nt.sel : nt.sel.slice().sort(abc);
   h += '<div class="field"><div class="tstat"><span class="label">' + (SRV && nt.reg ? 'Вписать сразу (необязательно)' : 'Участники') + ' · ' + nt.sel.length + '</span>' + (nt.sel.length ? '<button class="ghost sm" data-act="nt-clear">Снять всех</button>' : '') + '</div>';
   if (sel.length && !nt.qualOn && nt.seed === 'm') h += seedListHTML(sel, 'nt', true);
-  else if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><b>' + (k + 1) + '</b><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
+  else if (sel.length) h += '<div class="selchips">' + sel.map((id, k) => '<button class="selchip" data-act="nt-p" data-v="' + id + '" aria-label="Убрать: ' + esc(P[id].name) + '"><span>' + esc(P[id].name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
   const raw = nt.q.trim(), q = raw.toLowerCase().replace(/^@/, '');
   if (SRV && Api.perm('host_nums')) h += '<div class="nrow"><input class="inp" id="nt-nums" inputmode="numeric" placeholder="Мои номера: 1 4 7-12" aria-label="Добавить по моим номерам" autocomplete="off"><button class="mini" data-act="nt-nums">Добавить</button></div><span class="meta">Номера — из вашего списка в <button class="lnk" data-act="go" data-v="admin">панели управления</button>.</span>';
-  h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Найти или добавить игрока: имя или ID" aria-label="Найти или добавить игрока" autocomplete="off">';
+  h += '<input class="inp" id="nt-q" data-ntq="1" value="' + esc(nt.q) + '" placeholder="Начните вводить фамилию игрока" aria-label="Найти или добавить игрока" autocomplete="off">';
   h += '<button class="ghost addp" id="nt-add" data-act="nt-addp"' + (raw && !ntExact(raw) ? '' : ' hidden') + '>+ Добавить «' + esc(raw) + '»</button>';
   const order = p => p.id === ME ? 0 : /^x/.test(p.id) ? 1 : 2;
-  if (SRV && !ntPool().length) h += svState(lz('psearch:' + (nt.qq || '').trim(), () => Api.get('/api/players?limit=40')), 'игроков') || '<p class="meta">Никого не нашли — добавьте игрока по имени.</p>';
-  h += '<div class="picks">' + ntPool().filter(p => !nt.sel.includes(p.id)).sort((a, b) => order(a) - order(b) || rt(b.id) - rt(a.id)).map(p => {
+  // на сервере список появляется по первым буквам; уже выбранный игрок помечен — второй раз не добавится
+  const pool = SRV && !raw ? [] : ntPool();
+  if (SRV && raw && !pool.length) h += svState(lz('psearch:' + (nt.qq || '').trim(), () => Api.get('/api/players?limit=40')), 'игроков') || '<p class="meta">Никого не нашли — добавьте игрока кнопкой выше.</p>';
+  else if (SRV && !raw) h += '<p class="meta">Введите первые буквы фамилии — покажем подходящих игроков.</p>';
+  h += '<div class="picks">' + pool.filter(p => SRV || !nt.sel.includes(p.id)).sort((a, b) => SRV ? a.name.localeCompare(b.name, 'ru') : order(a) - order(b) || rt(b.id) - rt(a.id)).map(p => {
     const key = (p.name + ' @' + p.handle + ' ' + p.code).toLowerCase();
+    if (nt.sel.includes(p.id)) return '<div class="pick in" aria-disabled="true">' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">уже в турнире</span></span></div>';
     return '<button class="pick" data-act="nt-p" data-v="' + p.id + '" data-key="' + esc(key) + '"' + (q && !SRV && !key.includes(q) ? ' hidden' : '') + '>' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc([p.city, p.club].filter(Boolean).join(' · ')) + '</span></span></button>';
   }).join('') + '</div></div>';
   const sm = ntSummary(nt);
@@ -3637,7 +3683,7 @@ function profileForm(p) {
     club = '<select class="inp" id="me-club" aria-label="Клуб"><option value="">Без клуба</option>' + list.map(c => '<option value="' + esc(c.name) + '"' + (c.name === p.club ? ' selected' : '') + '>' + esc(c.name) + (c.city ? ' · ' + esc(c.city) : '') + '</option>').join('') +
       (p.club && !list.some(c => c.name === p.club) ? '<option value="' + esc(p.club) + '" selected>' + esc(p.club) + '</option>' : '') + '</select>';
   }
-  let h = '<div class="pedit"><label class="label" for="me-name">Имя и фамилия</label><input class="inp" id="me-name" maxlength="32" value="' + esc(p.name) + '" placeholder="Имя и фамилия" autocomplete="name">';
+  let h = '<div class="pedit"><label class="label" for="me-name">Фамилия и имя</label><input class="inp" id="me-name" maxlength="32" value="' + esc(p.name) + '" placeholder="Имя и фамилия" autocomplete="name">';
   h += '<div class="nrow"><div class="field"><label class="label" for="me-city">Город</label><input class="inp" id="me-city" maxlength="40" list="city-list" value="' + esc(p.city || '') + '" placeholder="Например, Новоуральск" autocomplete="address-level2"></div>';
   h += '<div class="field"><label class="label" for="me-club">Клуб</label>' + club + '</div></div><datalist id="city-list">' + cities.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
   if (SRV) h += '<span class="meta">Клуб — из зарегистрированных в NDL. Нет вашего — его ведущий регистрирует клуб в профиле. Звание вписывает администратор клуба.</span>';
@@ -5073,7 +5119,7 @@ function mailForm(L, c, dis) {
   if (L.link === 'email') return h + '<p class="meta">Пришлём код на почту. Подтверждённая почта — вход по паролю и восстановление пароля, если забудете.</p>' + mailInp + '<button class="btn" data-act="mail-send"' + dis + '>Получить код</button>';
   if (L.mode === 'reg' && !siteCfg().signup) L.mode = 'login';
   if (L.mode === 'reg') {
-    h += inp('mail-name', 'name', 'text', 'Имя и фамилия', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
+    h += inp('mail-name', 'name', 'text', 'Фамилия и имя', ' maxlength="32" autocomplete="name"') + inp('mail-city', 'city', 'text', 'Город', ' maxlength="40" autocomplete="address-level2"') + mailInp + inp('mail-pass', 'pass', 'password', 'Пароль, от 8 символов', ' autocomplete="new-password"');
     h += '<label class="consent meta"><input type="checkbox" id="mail-consent"' + (L.consent ? ' checked' : '') + '><span>Согласен на обработку персональных данных по <button class="lnk" data-act="privacy-open">политике</button></span></label>';
     h += '<button class="btn" data-act="mail-reg"' + dis + '>Зарегистрироваться</button><span class="meta">' + (c.email ? 'Пришлём на почту код подтверждения.' : 'Почта понадобится для входа вместе с паролем.') + ' Уже есть аккаунт? ' + linkBtn('login', 'Войти') + '</span>';
     return h;
@@ -5359,7 +5405,7 @@ function clubTools(d) {
   // помощники
   h += '<span class="label">Помощники · ' + d.helpers.length + ' из 5</span><span class="meta">Ведут счёт, ставят мишени, вносят квалификацию и отмечают взносы в турнирах клуба. Управлять турниром не могут.</span>';
   h += d.helpers.map(p => { svPlayer(p); return '<div class="lrow"><span>' + pid(p.id) + ' <span class="meta">' + esc(p.code) + '</span></span><button class="mini dng" data-act="helper-rm" data-v="' + esc(c.id) + '|' + esc(p.id) + '">Убрать</button></div>'; }).join('');
-  if (d.helpers.length < 5) h += '<div class="nrow"><input class="inp" id="helper-id" placeholder="ID игрока, например OCH-1005" aria-label="ID помощника"><button class="mini go" data-act="helper-add" data-v="' + esc(c.id) + '">Добавить</button></div>';
+  if (d.helpers.length < 5) h += '<div class="nrow"><input class="inp" id="helper-id" placeholder="ID игрока, например NDL-1005" aria-label="ID помощника"><button class="mini go" data-act="helper-add" data-v="' + esc(c.id) + '">Добавить</button></div>';
   // статистика
   const mx = Math.max(1, ...s.months.map(m => m.players));
   h += '<span class="label">Статистика клуба</span><div class="tiles"><div class="tile"><span class="label">Новых за месяц</span><span class="v">' + s.newMonth + '</span></div><div class="tile"><span class="label">Касса за 30 дней</span><span class="v">' + rub(s.cash30) + '</span><span class="s">по отметкам «оплатил»</span></div></div>';
@@ -5764,7 +5810,7 @@ function admAccounts() {
   const full = Api.perm('players'), q = (S.admQ || '').trim(), f = full ? S.admF || '' : '';
   const e = lz('admin:' + f + ':' + q, () => Api.get('/api/admin/players?limit=100' + (q ? '&q=' + encodeURIComponent(q) : '') + (f === 'blocked' ? '&blocked=1' : f === 'mine' ? '&mine=1' : f ? '&role=' + f : '')));
   let h = '<details class="panel"' + (S.admNewOpen ? ' open' : '') + '><summary class="h2" data-act="adm-new-tg">+ Новый аккаунт</summary><p class="meta">Для тех, кто не может войти сам: пожилые игроки, гости бара. Получите QR-карточку: игрок наводит на неё камеру и сразу играет со своего телефона, участвует в турнирах. Это лайт-профиль — в общий рейтинг не входит, пока игрок не привяжет свой телефон, почту или VK; матчи при этом сохранятся.</p>';
-  h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Имя и фамилия" aria-label="Имя и фамилия"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
+  h += '<input class="inp" id="adm-name" maxlength="32" placeholder="Фамилия и имя" aria-label="Фамилия и имя"><div class="nrow"><input class="inp" id="adm-city" maxlength="40" placeholder="Город" aria-label="Город"><input class="inp" id="adm-club" maxlength="40" placeholder="Клуб" aria-label="Клуб"></div>';
   h += '<div class="nrow"><input class="inp" id="adm-phone" type="tel" placeholder="Телефон — необязательно" aria-label="Телефон">' + (Api.perm('host_nums') ? '<input class="inp" id="adm-n" inputmode="numeric" maxlength="4" placeholder="Мой №" aria-label="Мой номер игрока" style="max-width:110px">' : '') + '</div>';
   h += (Api.perm('titles') ? '<input class="inp" id="adm-title" maxlength="40" placeholder="Звание или разряд (МС, КМС…)" aria-label="Звание">' : '') + '<button class="btn sm" data-act="adm-new">Создать аккаунт</button>';
   if (S.admNew) h += codeNote(S.admNew) + admLoginSec(S.admNew);
@@ -5928,7 +5974,7 @@ function admNums() {
   let free = 1;
   while (nums.some(x => x.n === free)) free++;
   let h = '<p class="meta">Свои номера постоянных игроков — видите только вы. В новом турнире наберите «1 4 7-12», и участники добавятся сразу, без поиска по именам.</p>';
-  h += '<div class="panel"><span class="h2">Назначить номер</span><div class="nrow"><input class="inp" id="num-n" inputmode="numeric" maxlength="4" aria-label="Номер" style="max-width:90px" value="' + esc(S.numN || free) + '"><input class="inp" id="num-q" data-numq="1" placeholder="Игрок: имя или ID (OCH-1234)" aria-label="Игрок" value="' + esc(S.numQ || '') + '" autocomplete="off"></div>';
+  h += '<div class="panel"><span class="h2">Назначить номер</span><div class="nrow"><input class="inp" id="num-n" inputmode="numeric" maxlength="4" aria-label="Номер" style="max-width:90px" value="' + esc(S.numN || free) + '"><input class="inp" id="num-q" data-numq="1" placeholder="Игрок: имя или ID (NDL-1234)" aria-label="Игрок" value="' + esc(S.numQ || '') + '" autocomplete="off"></div>';
   if ((S.numQQ || '').trim()) {
     const r = lz('psearch:' + S.numQQ.trim(), () => Api.get('/api/players?limit=40&q=' + encodeURIComponent(S.numQQ.trim())), 60000);
     h += svState(r, 'игроков') || (r.data.players.length ? '<div class="picks">' + r.data.players.slice(0, 12).map(p => { svPlayer(p); return '<button class="pick" data-act="num-set" data-v="' + p.id + '">' + avatar(p.id) + '<span style="display:grid;text-align:left;min-width:0"><span>' + esc(p.name) + '</span><span class="meta" style="font-size:11px">' + esc([p.code, p.city].filter(Boolean).join(' · ')) + '</span></span></button>'; }).join('') + '</div>' : '<p class="meta">Никого не нашли. Нет аккаунта — заведите его во вкладке «Аккаунты».</p>');
@@ -5952,7 +5998,7 @@ function admClubs() {
     if (c.note) x += '<span class="meta">Ответ: ' + esc(c.note) + '</span>';
     if (c.hosts.length) x += '<div class="selchips">' + c.hosts.map(p => '<button class="selchip" data-act="club-host-rm" data-v="' + c.id + '|' + p.id + '" aria-label="Убрать ведущего: ' + esc(p.name) + '"><span>' + esc(p.name) + '</span><i aria-hidden="true">×</i></button>').join('') + '</div>';
     if (c.status === 'pending') x += '<input class="inp" id="club-note-' + c.id + '" maxlength="300" placeholder="Комментарий (виден заявителю)" aria-label="Комментарий"><div class="gacts"><button class="mini go" data-act="club-st" data-v="' + c.id + '|active">Подтвердить</button><button class="mini" data-act="club-st" data-v="' + c.id + '|rejected">Отклонить</button></div>';
-    else if (c.status === 'active') x += '<div class="nrow"><input class="inp" id="club-host-' + c.id + '" placeholder="ID игрока, например OCH-1005" aria-label="ID нового ведущего"><button class="mini" data-act="club-host-add" data-v="' + c.id + '">+ Ведущий</button></div><div class="gacts"><button class="ghost sm dng" data-act="club-st" data-v="' + c.id + '|closed">Закрыть клуб</button></div>';
+    else if (c.status === 'active') x += '<div class="nrow"><input class="inp" id="club-host-' + c.id + '" placeholder="ID игрока, например NDL-1005" aria-label="ID нового ведущего"><button class="mini" data-act="club-host-add" data-v="' + c.id + '">+ Ведущий</button></div><div class="gacts"><button class="ghost sm dng" data-act="club-st" data-v="' + c.id + '|closed">Закрыть клуб</button></div>';
     else x += '<div class="gacts"><button class="mini" data-act="club-st" data-v="' + c.id + '|active">Открыть снова</button></div>';
     return x + '</div>';
   }).join('');
@@ -6036,7 +6082,7 @@ function liveTile(t, m) {
   const L = s.last;
   // выход на матч: до первого броска — выходная музыка игроков
   const walk = !L && (s.leg || 1) === 1 ? m.players.filter(p => P[p.id] && P[p.id].walkon) : [];
-  if (walk.length) h += '<div class="tvwalk">' + walk.map(p => '♪ ' + esc(p.name.split(' ').pop()) + ': ' + esc(P[p.id].walkon)).join(' · ') + '</div>';
+  if (walk.length) h += '<div class="tvwalk">' + walk.map(p => '♪ ' + esc(p.name.split(' ')[0]) + ': ' + esc(P[p.id].walkon)).join(' · ') + '</div>';
   h += '<div class="sub"><span>' + esc(Games.name(ex)) + (O.progress ? (m.players.length > 1 ? ' · ' + ltwTxt(m.ltw) + ' · лег ' + s.leg : '') + (N && s.vis ? ' · подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : '') : '') + '</span><span>' + (s.tie ? 'ничья — булл' : O.last && L ? esc((m.players[L.p] || {}).name || '').split(' ').pop() + ': ' + (L.b ? 'перебор' : L.pts) : '') + '</span></div>';
   // перерисовка не перезапускает анимацию: она продолжается с прошедшего момента
   if (fx) h += '<div class="tvfx on ' + fx.k + '" style="animation-delay:-' + (Date.now() - fx.at) + 'ms" aria-hidden="true">' + esc(fx.t) + '</div>';
@@ -6060,7 +6106,7 @@ function callsHTML(t, max) {
     // ✓ — игрок у мишени и нажал «Готов»
     const who = id => tvName(t, id, rd[id] ? 'rdy' : '');
     return '<div class="tvcall' + (b ? ' on' : '') + '"><div class="tvc-b">' + (b ? '<small>мишень</small><b>' + b + '</b>' : '<small>ждёт</small><b>—</b>') + '</div>' +
-      '<div class="tvc-p">' + who(x.s.a) + who(x.s.b) + '</div><div class="tvc-m">' + (nm ? '<b>' + esc(nm) + '</b>' : '') + '<span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
+      '<div class="tvc-p">' + who(x.s.a) + who(x.s.b) + '</div><div class="tvc-m"><span>' + esc(gameLabel(t, x.g)) + '</span></div></div>';
   }).join('') + '</div>';
 }
 // квалификация: на каждой мишени — кто бросает (по двое), ниже — очередь
@@ -6120,7 +6166,7 @@ function tvView(id) {
 /* Слежка: сколько угодно идущих матчей на одном экране. Сетка подбирается под размер экрана:
    мало пар — крупные фото и счёт, больше — фото меньше, дальше только маленькие аватары; имя и счёт видны всегда.
    Матчи — все идущие или выбранные; выбор хранится на устройстве. */
-const sn = p => ((p && p.name) || '').split(' ').pop();
+const sn = p => ((p && p.name) || '').split(' ')[0];
 function watchSel(tid) { const o = lsGet('oche.watch.' + tid); return o && Array.isArray(o.ids) ? o : { all: true, ids: [] }; }
 // лучшая раскладка n плиток на экране w×h: столбцов столько, чтобы плитка вышла крупнее.
 // ar — нужная плитке ширина на высоту: с фото над именами ~1.35, строками ~2.4; уже minW плитка не бывает
@@ -6147,16 +6193,19 @@ function watchTile(t, m, size, u) {
     return ph ? '<img class="' + cls + '" src="' + esc(ph) + '" alt="" loading="lazy">' : '<span class="' + cls + ' ini">' + esc(ini) + '</span>';
   };
   const avg = i => O.avg && s.avg && s.avg[i] != null ? 'ср. ' + s.avg[i].toFixed(1) : '';
+  // прогресс игрока, как на табло: x01 — набрано из стартовых, упражнение — подходы из N
+  const ppv = i => ex.k === 'x01' && s.scores && ex.mode ? (ex.mode - s.scores[i]) / ex.mode : N && s.vis ? Math.min(N, s.vis[i] || 0) / N : null;
+  const pp = i => { const v = ppv(i); return v == null ? '' : ' style="--pp:' + Math.max(0, Math.round(v * 100)) + '%"'; };
   const legs = i => m.players.length > 1 || m.ltw > 1 ? m.legs[i] : '';
   const L = s.last, lastTxt = s.tie ? 'ничья — булл' : O.last && L ? esc(sn(m.players[L.p])) + ': ' + (L.b ? 'перебор' : L.pts) : '';
   const prog = [Games.name(ex), O.progress && m.players.length > 1 ? 'до ' + m.ltw + ' · лег ' + s.leg : '', O.progress && N && s.vis ? 'подход ' + Math.min(N, Math.max(...s.vis)) + '/' + N : ''].filter(Boolean).join(' · ');
   let h = '<div class="wt w-' + size + '" style="--u:' + u.toFixed(2) + 'px"' + (SRV ? ' role="button" tabindex="0" data-act="mview" data-v="' + m.id + '"' : '') + '><div class="wt-h"><span class="ell">' + esc(lbl) + '</span>' + (b ? '<span class="bd">Мишень ' + b + '</span>' : '') + '</div>';
   if (big && two && O.photos) {
     // крупно: фото над именами, как на табло лиги; лег и счёт посередине
-    h += '<div class="wt-big">' + m.players.map((p, i) => '<div class="wt-pl' + (s.cur === i ? ' act' : '') + '">' + pic(p, 'wt-ph') + '<div class="wt-nm ell">' + (O.nums ? noBadge(t, p.id) : '') + esc(p.name) + '</div><div class="wt-sc">' + (s.scores ? s.scores[i] : '') + '</div><div class="wt-av">' + avg(i) + '</div></div>').join('<div class="wt-mid"><span class="wt-lg">' + legs(0) + ' : ' + legs(1) + '</span><span class="meta">леги</span></div>') + '</div>';
+    h += '<div class="wt-big">' + m.players.map((p, i) => '<div class="wt-pl' + (s.cur === i ? ' act' : '') + '"' + pp(i) + '>' + pic(p, 'wt-ph') + '<div class="wt-nm ell">' + (O.nums ? noBadge(t, p.id) : '') + esc(p.name) + '</div><div class="wt-sc">' + (s.scores ? s.scores[i] : '') + '</div><div class="wt-av">' + avg(i) + '</div></div>').join('<div class="wt-mid"><span class="wt-lg">' + legs(0) + ' : ' + legs(1) + '</span><span class="meta">леги</span></div>') + '</div>';
   } else {
     // строки игроков: маленькое фото (или без него), имя, леги, счёт
-    h += '<div class="wt-rows">' + m.players.map((p, i) => '<div class="wt-r' + (s.cur === i ? ' act' : '') + '">' + (O.photos && size !== 'sm' ? pic(p, 'wt-av-i') : '') + '<span class="wt-nm ell">' + (O.nums ? noBadge(t, p.id) : '') + esc(size === 'sm' ? sn(p) : p.name) + (avg(i) && size !== 'sm' ? ' <span class="meta">' + avg(i) + '</span>' : '') + '</span><span class="wt-lg">' + legs(i) + '</span><span class="wt-sc">' + (s.scores ? s.scores[i] : '') + '</span></div>').join('') + '</div>';
+    h += '<div class="wt-rows">' + m.players.map((p, i) => '<div class="wt-r' + (s.cur === i ? ' act' : '') + '"' + pp(i) + '>' + (O.photos && size !== 'sm' ? pic(p, 'wt-av-i') : '') + '<span class="wt-nm ell">' + (O.nums ? noBadge(t, p.id) : '') + esc(size === 'sm' ? sn(p) : p.name) + (avg(i) && size !== 'sm' ? ' <span class="meta">' + avg(i) + '</span>' : '') + '</span><span class="wt-lg">' + legs(i) + '</span><span class="wt-sc">' + (s.scores ? s.scores[i] : '') + '</span></div>').join('') + '</div>';
   }
   if (size !== 'sm') h += '<div class="wt-f"><span class="ell">' + esc(prog) + '</span><span class="ell">' + lastTxt + '</span></div>';
   if (fx) h += '<div class="tvfx on ' + fx.k + '" style="animation-delay:-' + (Date.now() - fx.at) + 'ms" aria-hidden="true">' + esc(fx.t) + '</div>';
@@ -6193,7 +6242,7 @@ function deskPanels(t) {
   }
   if (t.games && t.games.length) out.push(['recent', 'Последние результаты']);
   streamsOf(t).forEach((s, k) => out.push(['cam' + k, s.title]));
-  liveOf(t).forEach(m => out.push(['m:' + m.id, m.players.map(p => p.name.split(' ').pop()).join(' — ')]));
+  liveOf(t).forEach(m => out.push(['m:' + m.id, m.players.map(p => p.name.split(' ')[0]).join(' — ')]));
   return out;
 }
 function deskView(id) {
@@ -6365,11 +6414,11 @@ function exGameView() {
   }
   h += '</div></div>';
   if (ex.k === 'cricket') {
-    h += '<div class="g-stats-area"><div class="stats"><table class="ckt"><thead><tr><th></th>' + g.players.map(q => '<th>' + esc(q.name.split(' ').pop()) + '</th>').join('') + '</tr></thead><tbody>';
+    h += '<div class="g-stats-area"><div class="stats"><table class="ckt"><thead><tr><th></th>' + g.players.map(q => '<th>' + esc(q.name.split(' ')[0]) + '</th>').join('') + '</tr></thead><tbody>';
     Games.CRICKET.forEach(k => { h += '<tr><td class="n">' + (k === 25 ? 'Булл' : k) + '</td>' + st.marks.map(mk => '<td class="m' + ((mk[k] || 0) >= 3 ? ' c' : '') + '">' + ckMark(mk[k] || 0) + '</td>').join('') + '</tr>'; });
     h += '<tr><td class="n">Очки</td>' + st.tot.map(x => '<td class="m">' + x + '</td>').join('') + '</tr></tbody></table></div></div>';
   } else if (st.legsLog.length) {
-    h += '<div class="g-stats-area"><div class="stats"><table><thead><tr><th>Лег</th>' + g.players.map(q => '<th>' + esc(q.name.split(' ').pop()) + '</th>').join('') + '</tr></thead><tbody>' +
+    h += '<div class="g-stats-area"><div class="stats"><table><thead><tr><th>Лег</th>' + g.players.map(q => '<th>' + esc(q.name.split(' ')[0]) + '</th>').join('') + '</tr></thead><tbody>' +
       st.legsLog.map(L => '<tr><td>' + L.leg + '</td>' + L.tot.map((x, i) => '<td' + (i === L.w ? ' style="color:var(--green);font-weight:600"' : '') + '>' + x + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></div>';
   }
   h += '</div>';
@@ -6380,7 +6429,7 @@ function exGameView() {
     const solo = n === 1;
     h += '<div class="over" role="dialog" aria-modal="true" aria-label="' + (leg ? 'Лег выигран' : 'Матч окончен') + '"><div class="ocard center"><div class="ohead"><span class="label">' + (solo ? 'Результат' : leg ? 'Лег ' + L.leg + ' выигран' : 'Победитель матча') + '</span>' + (G.duo && !undo.length ? '' : '<button class="ghost sm" data-act="undo">Отменить последний подход</button>') + '</div>';
     if (solo) h += '<h2>' + L.tot[0] + ' ' + u.tot + '</h2><p class="meta">' + esc(w.name) + ' · ' + esc(Games.label(ex)) + ' · ' + u.avg + ' ' + (Games.avg(st.pts[0], st.darts[0]) || 0).toFixed(1) + '</p>';
-    else h += '<h2>' + esc(w.name) + '</h2><div class="score">' + g.players.map((q, i) => '<span>' + esc(q.name) + ' <b>' + st.legs[i] + '</b></span>').join('') + '</div><p class="meta">Лег ' + L.leg + ': ' + g.players.map((q, i) => esc(q.name.split(' ').pop()) + ' ' + L.tot[i]).join(' — ') + (st.last && st.last.tb ? ' · решил бросок в булл' : '') + '</p>';
+    else h += '<h2>' + esc(w.name) + '</h2><div class="score">' + g.players.map((q, i) => '<span>' + esc(q.name) + ' <b>' + st.legs[i] + '</b></span>').join('') + '</div><p class="meta">Лег ' + L.leg + ': ' + g.players.map((q, i) => esc(q.name.split(' ')[0]) + ' ' + L.tot[i]).join(' — ') + (st.last && st.last.tb ? ' · решил бросок в булл' : '') + '</p>';
     if (leg) h += '<button class="btn" data-act="next">Лег ' + (L.leg + 1) + ' · начинает ' + esc(g.players[(g.mstart + L.leg) % n].name) + '</button>';
     else {
       if (g.res && g.res.msg) h += '<p class="msg">' + esc(g.res.msg) + '</p>';
@@ -6719,6 +6768,24 @@ document.addEventListener('click', e => {
     case 'tfa-new-ask': S.tfaNew = !S.tfaNew; render(); break;
     case 'ac-2fa-off': svDo(Api.del('/api/admin/players/' + v + '/2fa'), () => { svStale('acard:'); svStale('admin:'); toast('Двухфакторный вход сброшен — при входе приложение привяжут заново.'); }); break;
     case 'boards': { const [tid, d] = v.split('|'); setBoards(tid, +d); break; }
+    case 'tp-pick': { const [tid, pid] = v.split('|'); svDo(Api.post('/api/tournaments/' + tid + '/entries', { playerId: pid }), r => { svTourSet(r); S.tpq = ''; toast((P[pid] ? P[pid].name : 'Игрок') + ' вписан в турнир.'); }); break; }
+    case 't-edit': { const t = TBY[v]; if (t) { closeModals(); S.tEdit = { tid: v, name: t.name, venue: t.venue || '', cap: String(t.cap), tries: t.qual ? t.qual.tries : 0 }; render(); } break; }
+    case 't-edit-tries': if (S.tEdit) { S.tEdit.tries = +v; render(); } break;
+    case 't-edit-save': {
+      const e = S.tEdit, t = e && TBY[e.tid];
+      if (!t) break;
+      const g = id => { const el = $(id); return el ? el.value.trim() : ''; }, name = g('te-name'), body = {};
+      if (!name) { toast('Введите название.'); break; }
+      if (name !== t.name) body.name = name;
+      if (g('te-venue') !== (t.venue || '')) body.venue = g('te-venue');
+      if (t.status === 'reg' && $('te-cap') && +g('te-cap') !== t.cap) body.cap = +g('te-cap');
+      if (t.qual && e.tries && e.tries !== t.qual.tries) body.qualTries = e.tries;
+      if (!Object.keys(body).length) { closeModals(); render(); break; }
+      // попытки — отдельным запросом: их можно менять и после старта, пока идёт квалификация
+      const tries = body.qualTries; delete body.qualTries;
+      svDo((async () => { let r = null; if (tries) r = await Api.patch('/api/tournaments/' + e.tid, { qualTries: tries }); if (Object.keys(body).length) r = await Api.patch('/api/tournaments/' + e.tid, body); return r; })(), r => { svTourSet(r); closeModals(); toast('Турнир изменён.'); });
+      break;
+    }
     case 'bmode': { const [tid, m] = v.split('|'); setBoardsMode(tid, m === '1'); break; }
     case 'bsel': { const [tid, k] = v.split('|'); S.bsel = S.bsel && S.bsel.k === k ? null : { tid, k }; render(); break; }
     case 'bdrop': { const [tid, to] = v.split('|'); if (S.bsel && S.bsel.tid === tid) boardDrop(tid, S.bsel.k, to); break; }
@@ -6872,9 +6939,9 @@ document.addEventListener('click', e => {
       const q = (($('helper-id') || {}).value || '').trim();
       if (!q) { toast('Введите ID игрока.'); break; }
       const job = Api.get('/api/players?limit=5&q=' + encodeURIComponent(q)).then(r => {
-        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(x => x.code.toLowerCase() === k || 'och-' + k === x.code.toLowerCase() || x.id === k);
+        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(x => x.code.toLowerCase() === k || 'ndl-' + k === x.code.toLowerCase() || x.id === k);
         const pp = hit.length === 1 ? hit[0] : r.players.length === 1 ? r.players[0] : null;
-        if (!pp) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (OCH-…)');
+        if (!pp) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (NDL-…)');
         return Api.post('/api/clubs/' + encodeURIComponent(v) + '/helpers', { playerId: pp.id });
       });
       svDo(job, () => { svStale('club:'); svStale('tour:'); toast('Помощник добавлен.'); });
@@ -6963,11 +7030,11 @@ document.addEventListener('click', e => {
     }
     case 'club-host-add': {
       const el = $('club-host-' + v), q = el ? el.value.trim() : '';
-      if (!q) { toast('Введите ID игрока, например OCH-1005.'); break; }
+      if (!q) { toast('Введите ID игрока, например NDL-1005.'); break; }
       svDo(Api.get('/api/players?limit=5&q=' + encodeURIComponent(q)).then(r => {
-        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(p => p.code.toLowerCase() === k || 'och-' + k === p.code.toLowerCase() || p.handle === k.replace(/^@/, '') || p.id === k);
+        const k = q.toLowerCase().replace(/^#/, ''), hit = r.players.filter(p => p.code.toLowerCase() === k || 'ndl-' + k === p.code.toLowerCase() || p.handle === k.replace(/^@/, '') || p.id === k);
         const p = hit.length === 1 ? hit[0] : r.players.length === 1 ? r.players[0] : null;
-        if (!p) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (OCH-…)');
+        if (!p) throw new Api.ApiError(404, 'not_found', 'Игрок не найден — укажите точный ID (NDL-…)');
         return Api.post('/api/admin/clubs/' + v + '/hosts', { playerId: p.id });
       }), () => { svStale('aclubs:'); toast('Ведущий добавлен.'); });
       break;
@@ -7243,6 +7310,7 @@ document.addEventListener('input', e => {
       if (foot) { const m = foot.querySelector('.meta'), b = foot.querySelector('[data-act="nt-create"]'); if (m) { m.textContent = sm.txt; m.style.color = sm.ok ? '' : 'var(--red)'; } if (b) b.disabled = !sm.ok; }
     }
   }
+  if (t.dataset && t.dataset.tpq) { S.tpq = t.value; clearTimeout(S.tpT); S.tpT = setTimeout(() => render(), 300); return; }
   if (t.dataset && t.dataset.ntq && S.nt && SRV) {
     // на сервере — поиск после паузы в наборе
     S.nt.q = t.value;
@@ -7288,7 +7356,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset && t.dataset.rregion) { S.rregion = t.value; S.rpage = 0; render(); return; }
   // путь игрока: подсветить и прокрутить сетку к его последнему матчу
-  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; render(); if (S.hp) showPath(S.hp); return; }
+  if (t.dataset && t.dataset.hp !== undefined && t.tagName === 'SELECT') { S.hp = t.value || null; S.hpT = t.dataset.hp; render(); if (S.hp) showPath(S.hp); return; }
   if (t.dataset && t.dataset.refOf) {
     const [tid, r, i] = t.dataset.refOf.split('|');
     svDo(Api.patch('/api/tournaments/' + tid + '/refs', { r: +r, i: +i, ref: t.value || null }), x => svTourSet(x));

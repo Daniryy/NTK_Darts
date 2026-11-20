@@ -227,7 +227,22 @@ module.exports = async function (app) {
       needOwner(t, me);
       const b = req.body || {};
       // подписи матчей, взнос и «до скольких побед» можно менять и после старта — для матчей, которые ещё не начаты
-      const LATE = ['labels', 'fee', 'ltw', 'ltwBy'];
+      const LATE = ['labels', 'fee', 'ltw', 'ltwBy', 'name', 'venue', 'city', 'qualTries'];
+      // попыток квалификации: до старта и пока квалификация идёт; меньше — только если вторых попыток ещё нет
+      if (b.qualTries !== undefined) {
+        const n = V.int(b.qualTries, 'qualTries', 1, 2);
+        if (!t._row.qual) throw E.conflict('bad_state', 'У турнира нет квалификации');
+        if (t.status !== 'reg' && t.stage !== 'qual') throw E.conflict('bad_state', 'Квалификация уже закрыта');
+        if (n < t._row.qual.tries && Object.values(t.qual.res).some(r => r[1])) throw E.conflict('bad_state', 'Вторые попытки уже сданы — сначала удалите их');
+        await c.query(`UPDATE tournaments SET qual = jsonb_set(qual, '{tries}', $2::jsonb), version = version + 1 WHERE id = $1`, [t.id, String(n)]);
+        delete b.qualTries;
+        if (!Object.keys(b).length) {
+          await T.refreshTour(c, await getTour(c, t.id, false));
+          await S.autoStage(c, t.id);
+          forget('t', t.id);
+          return tourResp(c, t.id, me);
+        }
+      }
       if (t.status !== 'reg' && !(Object.keys(b).length && Object.keys(b).every(k => LATE.includes(k)))) throw E.conflict('bad_state', 'Менять настройки можно только до старта');
       const f = tourFields(b, false, me);
       if (b.clubId !== undefined) Object.assign(f, await clubFields(c, b.clubId, me));

@@ -76,13 +76,13 @@ test('логин и пароль игроку: администратор выд
 });
 
 test('ведущий выдаёт логин своему аккаунту, но не чужому; логин — по фамилии латиницей', async () => {
-  const p = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Иван Щукин', city: 'Москва' }), 201).player;
+  const p = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Щукин Иван', city: 'Москва' }), 201).player;
   const r = ok(await call(HOST, 'PUT', '/api/admin/players/' + p.id + '/login', {}));
   assert.equal(r.login, 'schukin');
   assert.equal(r.player.lite, false, 'с логином — полный аккаунт');
   err(await call(HOST, 'PUT', '/api/admin/players/p9/login', {}), 403);
   // тёзка получает следующий номер
-  const q = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Пётр Щукин' }), 201).player;
+  const q = ok(await call(HOST, 'POST', '/api/admin/players', { name: 'Щукин Пётр' }), 201).player;
   assert.equal(ok(await call(HOST, 'PUT', '/api/admin/players/' + q.id + '/login', {})).login, 'schukin2');
   // игрок привязал свою почту — аккаунт уже его: ведущий новый пароль не выдаст, администратор — да
   await pool.query(`UPDATE players SET email = 'schukin@mail.ru' WHERE id = $1`, [q.id]);

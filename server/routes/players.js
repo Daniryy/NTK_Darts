@@ -11,7 +11,7 @@ const { TOUR_SQL, loadTours, tourCard } = require('../tour');
 const lim = (v, def, max) => Math.min(max, Math.max(1, +v || def));
 const R = require('../regions');
 const before = v => v == null ? Number.MAX_SAFE_INTEGER : Math.max(0, +v || 0);
-// поиск как на странице: имя, @handle, код OCH-1003 или #1003
+// поиск как на странице: имя, @handle, код NDL-1003 или #1003
 function searchSql(q, arg, alias) {
   const s = String(q).trim().toLowerCase();
   if (!s) return null;

@@ -31,7 +31,7 @@ function newPassword() {
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
 async function freeLogin(c, p) {
   const words = String(p.last_name || p.name || '').trim().toLowerCase().split(/\s+/);
-  let b = [...(p.last_name ? words[0] : words[words.length - 1])].map(ch => TR[ch] != null ? TR[ch] : ch).join('').replace(/[^a-z0-9]/g, '').slice(0, 24);
+  let b = [...words[0]].map(ch => TR[ch] != null ? TR[ch] : ch).join('').replace(/[^a-z0-9]/g, '').slice(0, 24);
   if (b.length < 3) b = 'player';
   for (let n = 1; ; n++) { const l = n === 1 ? b : b + n; if (!await one(c, 'SELECT 1 FROM players WHERE login = $1', [l])) return l; }
 }

@@ -267,14 +267,14 @@ test('регистрация и запуск', async () => {
   assert.equal(live.name, 'Рег 2');
   assert.equal(live.games.length, 3); // 3 игрока: каждый с каждым
   assert.ok(live.games.every(g => g.a && g.b));
-  err(await call(A, 'PATCH', `/api/tournaments/${t.id}`, { name: 'Поздно' }), 409, 'bad_state');
+  err(await call(A, 'PATCH', `/api/tournaments/${t.id}`, { mode: 301 }), 409, 'bad_state');
 });
 
 test('дружеский матч с гостем', async () => {
   const before = ok(await call(null, 'GET', '/api/players/' + ME)).stats;
   const id = mid();
   const m = ok(await call(A, 'PUT', '/api/matches/' + id, { mode: 501, ltw: 1, dbl: true, players: [{ id: ME }, { name: 'Гость' }] }), 201).match;
-  assert.deepEqual(m.players.map(p => p.name), ['Тестовый Игрок', 'Гость']);
+  assert.deepEqual(m.players.map(p => p.name), ['Игрок Тестовый', 'Гость']);
   ok(await call(A, 'POST', `/api/matches/${id}/events`, { events: matchEvents(m, 1) }));
   const after = ok(await call(null, 'GET', '/api/players/' + ME)).stats;
   assert.equal(after.all.n, before.all.n + 1);

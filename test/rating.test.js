@@ -32,7 +32,7 @@ test.before(async () => {
   await tx(seed);
   // 150 игроков в рейтинге из разных городов, часть — с «г.» и «ё»
   await pool.query(`INSERT INTO players (id, name, handle, code, city, rating, rated, created_at)
-    SELECT 'r' || g, 'Рейтинг ' || g, 'rate_' || g, 'OCH-' || (9000 + g), (ARRAY['Екатеринбург', 'г. Нижний Тагил', 'Тюмень', 'Орёл', 'Хутор Ромашка'])[1 + g % 5], 1300 + g, 1, 0
+    SELECT 'r' || g, 'Рейтинг ' || g, 'rate_' || g, 'NDL-' || (9000 + g), (ARRAY['Екатеринбург', 'г. Нижний Тагил', 'Тюмень', 'Орёл', 'Хутор Ромашка'])[1 + g % 5], 1300 + g, 1, 0
     FROM generate_series(1, 150) g`);
   app = build({ logger: false });
   await app.ready();
